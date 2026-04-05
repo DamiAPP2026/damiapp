@@ -2,74 +2,129 @@ import { useState } from 'react'
 
 const PIN = '261120'
 
-export default function App() {
+function Login({ onLogin }) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
-  const [authenticated, setAuthenticated] = useState(false)
 
   function handleLogin() {
     if (pin === PIN) {
-      setAuthenticated(true)
-      setError('')
+      onLogin()
     } else {
       setError('PIN errato. Riprova.')
       setPin('')
     }
   }
 
-  if (authenticated) {
-    return (
-      <div style={{padding:'20px', fontFamily:'sans-serif'}}>
-        <h1>✅ Benvenuto in DamiAPP!</h1>
-        <p>Login effettuato con successo.</p>
-      </div>
-    )
-  }
-
   return (
     <div style={{
-      minHeight:'100vh', display:'flex', alignItems:'center',
-      justifyContent:'center', background:'#F0F2F8', fontFamily:'sans-serif'
+      minHeight:'100vh', display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      background:'#F0F2F8', fontFamily:"-apple-system,'Segoe UI',sans-serif"
     }}>
       <div style={{
-        background:'#fff', borderRadius:'24px', padding:'32px 28px',
-        width:'300px', boxShadow:'0 8px 28px rgba(74,108,247,0.15)'
+        background:'#fff', borderRadius:'28px', overflow:'hidden',
+        width:'320px', boxShadow:'0 8px 32px rgba(74,108,247,0.18)'
       }}>
-        <h2 style={{textAlign:'center', color:'#1A1F3A', marginBottom:'8px'}}>
-          DamiAPP
-        </h2>
-        <p style={{textAlign:'center', color:'#8A94B2', marginBottom:'24px', fontSize:'14px'}}>
-          Inserisci il PIN per accedere
-        </p>
-        <input
-          type="password"
-          value={pin}
-          onChange={e => setPin(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          placeholder="••••••"
-          style={{
-            width:'100%', padding:'12px', borderRadius:'12px',
-            border:'2px solid #EDF0F8', fontSize:'20px', textAlign:'center',
-            letterSpacing:'8px', marginBottom:'12px', outline:'none',
-            boxSizing:'border-box'
-          }}
-        />
-        {error && (
-          <p style={{color:'#F7295A', fontSize:'13px', textAlign:'center', marginBottom:'12px'}}>
-            {error}
-          </p>
-        )}
-        <button
-          onClick={handleLogin}
-          style={{
-            width:'100%', padding:'14px', borderRadius:'50px', border:'none',
-            background:'linear-gradient(135deg, #4A6CF7, #7B5EA7)',
-            color:'#fff', fontSize:'15px', fontWeight:'700', cursor:'pointer'
-          }}
-        >
-          Accedi
-        </button>
+
+        {/* Header gradiente */}
+        <div style={{
+          background:'linear-gradient(135deg,#4A6CF7,#7B5EA7)',
+          padding:'32px 24px 28px', textAlign:'center'
+        }}>
+          <div style={{
+            width:'64px', height:'64px', borderRadius:'20px',
+            background:'rgba(255,255,255,0.2)', margin:'0 auto 14px',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'32px', border:'2px solid rgba(255,255,255,0.3)'
+          }}>🧠</div>
+          <div style={{fontSize:'22px', fontWeight:'900', color:'#fff'}}>
+            DamiAPP
+          </div>
+          <div style={{fontSize:'12px', color:'rgba(255,255,255,0.75)', marginTop:'4px'}}>
+            Gestione crisi epilettiche
+          </div>
+        </div>
+
+        {/* Form */}
+        <div style={{padding:'24px'}}>
+          <div style={{
+            fontSize:'11px', fontWeight:'700', color:'#8A94B2',
+            textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'8px'
+          }}>
+            PIN di accesso
+          </div>
+          <input
+            type="password"
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            placeholder="••••••"
+            maxLength={6}
+            style={{
+              width:'100%', padding:'14px', borderRadius:'14px',
+              border:'2px solid #EDF0F8', fontSize:'24px',
+              textAlign:'center', letterSpacing:'10px',
+              marginBottom:'8px', outline:'none',
+              boxSizing:'border-box', color:'#1A1F3A',
+              transition:'border-color 0.2s'
+            }}
+            onFocus={e => e.target.style.borderColor='#4A6CF7'}
+            onBlur={e => e.target.style.borderColor='#EDF0F8'}
+          />
+
+          {error && (
+            <div style={{
+              color:'#F7295A', fontSize:'13px', textAlign:'center',
+              marginBottom:'12px', fontWeight:'600'
+            }}>
+              ❌ {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleLogin}
+            style={{
+              width:'100%', padding:'15px', borderRadius:'50px',
+              border:'none', cursor:'pointer', fontWeight:'800',
+              fontSize:'15px', color:'#fff', marginTop:'4px',
+              background:'linear-gradient(135deg,#4A6CF7,#7B5EA7)',
+              boxShadow:'0 6px 18px rgba(74,108,247,0.38)'
+            }}
+          >
+            Accedi
+          </button>
+
+          <div style={{
+            textAlign:'center', marginTop:'16px',
+            fontSize:'12px', color:'#8A94B2'
+          }}>
+            🔒 Dati cifrati e protetti
+          </div>
+        </div>
       </div>
     </div>
   )
+}
+
+function Home() {
+  return (
+    <div style={{
+      minHeight:'100vh', background:'#F0F2F8',
+      fontFamily:"-apple-system,'Segoe UI',sans-serif",
+      padding:'20px'
+    }}>
+      <h1 style={{color:'#1A1F3A'}}>🏠 Home — DamiAPP</h1>
+      <p style={{color:'#8A94B2'}}>In costruzione...</p>
+    </div>
+  )
+}
+
+export default function App() {
+  const [authenticated, setAuthenticated] = useState(false)
+
+  if (!authenticated) {
+    return <Login onLogin={() => setAuthenticated(true)} />
+  }
+
+  return <Home />
 }
