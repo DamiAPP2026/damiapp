@@ -3,6 +3,7 @@ import Home from './Home'
 
 const PIN = '261120'
 
+
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
   "La cura più grande nasce dall'amore più profondo.",
