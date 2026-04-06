@@ -5,11 +5,49 @@ import {
   AlertTriangle, Clock, Bell, Phone
 } from 'lucide-react'
 
-export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
+const DEMO_DATA = {
+  ultimaCrisi: '12g', ultimaCrisiSub: 'al 25/03',
+  prossimaTerapia: '18:00', prossimaTerapiaSub: 'Keppra 500mg',
+  scadenze: '3', scadenzeSub: 'entro 15g',
+  terapie: [
+    {n:'Keppra 500mg', c:'#F7295A', o:'08:00'},
+    {n:'Depakine 250ml', c:'#00BFA6', o:'13:00'},
+    {n:'Keppra 500mg', c:'#7B5EA7', o:'20:00'},
+  ],
+  scadenzeMed: [
+    {n:'Keppra', g:'6g', c:'#F7295A'},
+    {n:'Depakine', g:'14g', c:'#FFD93D'},
+    {n:'Rivotril', g:'22g', c:'#7B5EA7'},
+  ],
+  barsSettimana: [60,30,80,20,100,50,70],
+  barsStats: [40,65,85,50,100,70,90],
+}
+
+const REAL_DATA = {
+  ultimaCrisi: '26g', ultimaCrisiSub: 'al 20/03',
+  prossimaTerapia: '20:00', prossimaTerapiaSub: 'Keppra',
+  scadenze: '2', scadenzeSub: 'entro 30g',
+  terapie: [
+    {n:'Keppra 500mg', c:'#F7295A', o:'08:00'},
+    {n:'Depakine', c:'#00BFA6', o:'13:00'},
+    {n:'Keppra 750', c:'#7B5EA7', o:'20:00'},
+  ],
+  scadenzeMed: [
+    {n:'Keppra', g:'6g', c:'#F7295A'},
+    {n:'Depakine', g:'18g', c:'#FFD93D'},
+    {n:'Keppra 750', g:'25g', c:'#7B5EA7'},
+  ],
+  barsSettimana: [40,20,60,10,80,30,50],
+  barsStats: [30,55,75,40,90,60,80],
+}
+
+export default function HomeScreen({ nomeUtente, frase, isDemo, onNavigate }) {
   const [timerSec, setTimerSec] = useState(0)
   const [running, setRunning] = useState(false)
   const [time, setTime] = useState(new Date())
   const timerRef = useRef(null)
+
+  const data = isDemo ? DEMO_DATA : REAL_DATA
 
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000)
@@ -53,30 +91,41 @@ export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
 
         {/* ── HERO CARD ── */}
         <div style={{padding:'12px 12px 0'}}>
-          <div style={{background:'#feffff',borderRadius:'22px',padding:'16px 18px',boxShadow:sh}}>
+          <div style={{background:'#feffff', borderRadius:'22px', padding:'14px 18px 16px', boxShadow:sh}}>
 
-{/* Data + Ora in cima a destra */}
-<div style={{
-  display:'flex', justifyContent:'flex-end', alignItems:'center',
-  gap:'8px', marginBottom:'6px', marginTop:'-4px'
-}}>
-  <span style={{fontSize:'10px', color:'#bec1cc', fontWeight:'600'}}>{dataStr}</span>
-  <span style={{
-    fontSize:'13px', fontWeight:'900', color:'#bec1cc',
-    fontVariantNumeric:'tabular-nums', letterSpacing:'0.5px'
-  }}>{timeStr}</span>
-</div>
+            {/* Riga 1: Data + Ora in cima a destra */}
+            <div style={{
+              display:'flex', justifyContent:'flex-end', alignItems:'center',
+              gap:'8px', marginBottom:'10px', marginTop:'-2px'
+            }}>
+              <span style={{fontSize:'10px', color:'#bec1cc', fontWeight:'600'}}>{dataStr}</span>
+              <span style={{
+                fontSize:'13px', fontWeight:'900', color:'#bec1cc',
+                fontVariantNumeric:'tabular-nums', letterSpacing:'0.5px'
+              }}>{timeStr}</span>
+            </div>
 
-{/* Logo centrato, più grande, senza scritta */}
-<div style={{
-  display:'flex', justifyContent:'center',
-  marginBottom:'14px'
-}}>
-  <img src="/DamiLogo.png" alt="logo" style={{
-    width:'51px', height:'51px', borderRadius:'50%', objectFit:'cover',
-    boxShadow:'0 4px 14px rgba(8,24,76,0.15)'
-  }}/>
-</div>
+            {/* Logo centrato grande */}
+            <div style={{display:'flex', justifyContent:'center', marginBottom:'12px'}}>
+              <img src="/DamiLogo.png" alt="logo" style={{
+                width:'62px', height:'62px', borderRadius:'50%', objectFit:'cover',
+                boxShadow:'0 6px 20px rgba(8,24,76,0.18)'
+              }}/>
+            </div>
+
+            {/* Badge demo */}
+            {isDemo && (
+              <div style={{
+                textAlign:'center', marginBottom:'8px'
+              }}>
+                <span style={{
+                  background:'linear-gradient(135deg,#FFD93D,#FF8C42)',
+                  color:'#5a3000', fontSize:'10px', fontWeight:'800',
+                  padding:'3px 12px', borderRadius:'20px',
+                  letterSpacing:'0.5px'
+                }}>🎭 MODALITÀ DEMO</span>
+              </div>
+            )}
 
             {/* Saluto */}
             <div style={{
@@ -96,58 +145,54 @@ export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
 
               {/* Avvia timer crisi */}
-              <button onClick={startTimer} style={{
-                position:'relative', height:'46px', borderRadius:'50px',
-                border:'none', overflow:'hidden', cursor:'pointer',
-                boxShadow:'0 6px 20px rgba(25,63,158,0.35)'
-              }}>
-                <div style={{
-                  position:'absolute', inset:0,
-                  background:'linear-gradient(135deg,#193f9e,#2e84e9)'
-                }}/>
-                {/* Motivo colorato basso-sinistra */}
+              <button
+                onClick={() => { startTimer(); onNavigate && onNavigate('crisi') }}
+                style={{
+                  position:'relative', height:'50px', borderRadius:'50px',
+                  border:'none', overflow:'hidden', cursor:'pointer',
+                  boxShadow:'0 6px 20px rgba(25,63,158,0.35)'
+                }}>
+                <div style={{position:'absolute', inset:0, background:'linear-gradient(135deg,#193f9e,#2e84e9)'}}/>
+                {/* Motivo basso-sinistra */}
                 <div style={{
                   position:'absolute', left:0, bottom:0,
-                  width:'38px', height:'38px',
+                  width:'40px', height:'40px',
                   background:'linear-gradient(135deg,#FF5B8D,#FF9F3F)',
-                  borderRadius:'0 50% 0 50px',
-                  opacity:0.75
+                  borderRadius:'0 50% 0 50px', opacity:0.75
                 }}/>
-                {/* Motivo colorato alto-destra */}
+                {/* Motivo alto-destra */}
                 <div style={{
                   position:'absolute', right:0, top:0,
-                  width:'28px', height:'28px',
+                  width:'30px', height:'30px',
                   background:'linear-gradient(135deg,#FFD93D,#FF8C42)',
-                  borderRadius:'50px 0 50% 0',
-                  opacity:0.65
+                  borderRadius:'50px 0 50% 0', opacity:0.65
                 }}/>
                 <div style={{
                   position:'absolute', inset:0, display:'flex',
                   alignItems:'center', justifyContent:'center',
                   gap:'6px', color:'#fff',
-                  fontSize:'clamp(10px,2.5vw,12px)', fontWeight:'800',
+                  fontSize:'clamp(12px,3vw,14px)', fontWeight:'800',
                   letterSpacing:'0.2px'
                 }}>
-                  <AlertTriangle size={13} color="#fff"/>
+                  <AlertTriangle size={15} color="#fff"/>
                   Avvia timer crisi
                 </div>
               </button>
 
-              {/* Soccorso 112 */}
+              {/* Soccorso */}
               <button
                 onClick={() => window.location.href = 'tel:112'}
                 style={{
-                  height:'46px', borderRadius:'50px',
+                  height:'50px', borderRadius:'50px',
                   border:'2.5px solid #e53935', background:'#feffff',
                   cursor:'pointer', display:'flex', alignItems:'center',
                   justifyContent:'center', gap:'6px',
                   boxShadow:'0 4px 14px rgba(229,57,53,0.18)'
-                }}
-              >
-                <Phone size={13} color="#e53935"/>
+                }}>
+                <Phone size={15} color="#e53935"/>
                 <span style={{
-                  fontSize:'clamp(11px,2.5vw,13px)', fontWeight:'900',
-                  color:'#8B6914', letterSpacing:'0.3px',
+                  fontSize:'clamp(12px,3vw,14px)', fontWeight:'900',
+                  color:'#8B6914', letterSpacing:'0.5px',
                   textShadow:'0 1px 2px rgba(0,0,0,0.10)'
                 }}>SOCCORSO</span>
               </button>
@@ -155,21 +200,24 @@ export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
           </div>
         </div>
 
-        {/* ── MINI CARDS (più piccole) ── */}
+        {/* ── MINI CARDS ── */}
         <div style={{
           display:'grid', gridTemplateColumns:'repeat(3,1fr)',
           gap:'6px', padding:'8px 12px'
         }}>
           {[
-            {Icon:AlertTriangle,ibg:'linear-gradient(135deg,#F7295A,#FF9F3F)',
-              ish:'rgba(247,41,90,0.25)',label:'Ultima crisi',val:'26g',
-              sub:'al 20/03',bar:'linear-gradient(90deg,#F7295A,#FF8C42)'},
-            {Icon:Clock,ibg:'linear-gradient(135deg,#00BFA6,#2e84e9)',
-              ish:'rgba(0,191,166,0.25)',label:'Prossima terapia',val:'20:00',
-              sub:'Keppra',bar:'linear-gradient(90deg,#00BFA6,#2e84e9)'},
-            {Icon:Bell,ibg:'linear-gradient(135deg,#FFD93D,#FF8C42)',
-              ish:'rgba(255,140,66,0.25)',label:'Scadenze',val:'2',
-              sub:'entro 30g',bar:'linear-gradient(90deg,#FFD93D,#FF8C42)'},
+            {Icon:AlertTriangle, ibg:'linear-gradient(135deg,#F7295A,#FF9F3F)',
+              ish:'rgba(247,41,90,0.25)', label:'Ultima crisi',
+              val:data.ultimaCrisi, sub:data.ultimaCrisiSub,
+              bar:'linear-gradient(90deg,#F7295A,#FF8C42)'},
+            {Icon:Clock, ibg:'linear-gradient(135deg,#00BFA6,#2e84e9)',
+              ish:'rgba(0,191,166,0.25)', label:'Prossima terapia',
+              val:data.prossimaTerapia, sub:data.prossimaTerapiaSub,
+              bar:'linear-gradient(90deg,#00BFA6,#2e84e9)'},
+            {Icon:Bell, ibg:'linear-gradient(135deg,#FFD93D,#FF8C42)',
+              ish:'rgba(255,140,66,0.25)', label:'Scadenze',
+              val:data.scadenze, sub:data.scadenzeSub,
+              bar:'linear-gradient(90deg,#FFD93D,#FF8C42)'},
           ].map(({Icon,ibg,ish,label,val,sub,bar},i) => (
             <div key={i} style={{
               background:'#feffff', borderRadius:'14px', overflow:'hidden',
@@ -214,15 +262,15 @@ export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
             </div>
           </div>
           {[
-            {Icon:AlertTriangle,bg:'linear-gradient(135deg,#F7295A,#FF8C42)',
-              sh:'rgba(247,41,90,0.2)',title:'Registra crisi ora',sub:'Timer in tempo reale',
-              page:'crisi'},
-            {Icon:Pill,bg:'linear-gradient(135deg,#00BFA6,#2e84e9)',
-              sh:'rgba(0,191,166,0.2)',title:'Terapie programmate',sub:'Prossima alle 20:00',
-              page:'terapie'},
-            {Icon:Droplets,bg:'linear-gradient(135deg,#7B5EA7,#2e84e9)',
-              sh:'rgba(123,94,167,0.2)',title:'Toilet Training',sub:'Log giornaliero',
-              page:'toilet'},
+            {Icon:AlertTriangle, bg:'linear-gradient(135deg,#F7295A,#FF8C42)',
+              sh:'rgba(247,41,90,0.2)', title:'Registra crisi ora',
+              sub:'Timer in tempo reale', page:'crisi'},
+            {Icon:Pill, bg:'linear-gradient(135deg,#00BFA6,#2e84e9)',
+              sh:'rgba(0,191,166,0.2)', title:'Terapie programmate',
+              sub:'Prossima alle '+data.prossimaTerapia, page:'terapie'},
+            {Icon:Droplets, bg:'linear-gradient(135deg,#7B5EA7,#2e84e9)',
+              sh:'rgba(123,94,167,0.2)', title:'Toilet Training',
+              sub:'Log giornaliero', page:'toilet'},
           ].map(({Icon,bg,sh,title,sub,page},i) => (
             <div key={i} onClick={() => onNavigate && onNavigate(page)} style={{
               background:'#feffff', borderRadius:'14px',
@@ -252,124 +300,125 @@ export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
             "Dashboard"
           </div>
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
-            {[
-              {
-                title:'Statistiche',
-                content: (
-                  <div>
-                    <div style={{display:'flex', alignItems:'flex-end', gap:'3px', height:'34px'}}>
-                      {[40,65,85,50,100,70,90].map((h,i) => (
-                        <div key={i} style={{
-                          flex:1, height:`${h}%`, borderRadius:'3px 3px 0 0', opacity:0.8,
-                          background:['#193f9e','#7B5EA7','#F7295A','#00BFA6','#193f9e','#FFD93D','#7B5EA7'][i]
-                        }}/>
-                      ))}
-                    </div>
-                    <div style={{display:'flex', marginTop:'3px'}}>
-                      {['L','M','M','G','V','S','D'].map((d,i) => (
-                        <span key={i} style={{flex:1,textAlign:'center',fontSize:'7px',color:'#bec1cc'}}>{d}</span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              },
-              {
-                title:'Prossime terapie',
-                content: (
-                  <div>
-                    {[{n:'Keppra 500mg',c:'#F7295A',o:'08:00'},{n:'Depakine',c:'#00BFA6',o:'13:00'},{n:'Keppra 750',c:'#7B5EA7',o:'20:00'}].map((t,i) => (
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:'6px',padding:'3px 0',borderBottom:i<2?'1px solid #f0f1f4':'none'}}>
-                        <div style={{width:'6px',height:'6px',borderRadius:'50%',background:t.c,flexShrink:0}}/>
-                        <span style={{fontSize:'10px',color:'#394058',fontWeight:'600',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.n}</span>
-                        <span style={{fontSize:'9px',color:'#bec1cc'}}>{t.o}</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              },
-              {
-                title:'Crisi settimana',
-                content: (
-                  <div>
-                    <div style={{display:'flex', alignItems:'flex-end', gap:'3px', height:'34px'}}>
-                      {[60,30,80,20,100,50,70].map((h,i) => (
-                        <div key={i} style={{
-                          flex:1, height:`${h}%`, borderRadius:'3px 3px 0 0', opacity:0.75,
-                          background:['#193f9e','#7B5EA7','#F7295A','#193f9e','#F7295A','#7B5EA7','#193f9e'][i]
-                        }}/>
-                      ))}
-                    </div>
-                    <div style={{display:'flex', marginTop:'3px'}}>
-                      {['L','M','M','G','V','S','D'].map((d,i) => (
-                        <span key={i} style={{flex:1,textAlign:'center',fontSize:'7px',color:'#bec1cc'}}>{d}</span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              },
-              {
-                title:'Scadenze medicinali',
-                content: (
-                  <div>
-                    {[{n:'Keppra',g:'6g',c:'#F7295A'},{n:'Depakine',g:'18g',c:'#FFD93D'},{n:'Keppra 750',g:'25g',c:'#7B5EA7'}].map((m,i) => (
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:'6px',padding:'3px 0',borderBottom:i<2?'1px solid #f0f1f4':'none'}}>
-                        <div style={{width:'6px',height:'6px',borderRadius:'50%',background:m.c,flexShrink:0}}/>
-                        <span style={{fontSize:'10px',color:'#394058',fontWeight:'600',flex:1}}>{m.n}</span>
-                        <span style={{fontSize:'9px',fontWeight:'700',padding:'1px 6px',borderRadius:'20px',
-                          background:m.g==='6g'?'#FEF0F4':'#f3f4f7',
-                          color:m.g==='6g'?'#F7295A':'#7c8088'}}>{m.g}</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              },
-            ].map(({title,content},i) => (
-              <div key={i} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
-                  <span style={{fontSize:'11px',fontWeight:'800',color:'#02153f'}}>{title}</span>
-                  <ChevronRight size={12} color="#2e84e9"/>
-                </div>
-                {content}
+
+            <div style={{background:'#feffff', borderRadius:'16px', padding:'12px', boxShadow:shSm}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
+                <span style={{fontSize:'11px', fontWeight:'800', color:'#02153f'}}>Statistiche</span>
+                <ChevronRight size={12} color="#2e84e9"/>
               </div>
-            ))}
+              <div style={{display:'flex', alignItems:'flex-end', gap:'3px', height:'34px'}}>
+                {data.barsStats.map((h,i) => (
+                  <div key={i} style={{
+                    flex:1, height:`${h}%`, borderRadius:'3px 3px 0 0', opacity:0.8,
+                    background:['#193f9e','#7B5EA7','#F7295A','#00BFA6','#193f9e','#FFD93D','#7B5EA7'][i]
+                  }}/>
+                ))}
+              </div>
+              <div style={{display:'flex', marginTop:'3px'}}>
+                {['L','M','M','G','V','S','D'].map((d,i) => (
+                  <span key={i} style={{flex:1,textAlign:'center',fontSize:'7px',color:'#bec1cc'}}>{d}</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{background:'#feffff', borderRadius:'16px', padding:'12px', boxShadow:shSm}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
+                <span style={{fontSize:'11px', fontWeight:'800', color:'#02153f'}}>Prossime terapie</span>
+                <ChevronRight size={12} color="#2e84e9"/>
+              </div>
+              {data.terapie.map((t,i) => (
+                <div key={i} style={{
+                  display:'flex', alignItems:'center', gap:'6px', padding:'3px 0',
+                  borderBottom: i<2 ? '1px solid #f0f1f4' : 'none'
+                }}>
+                  <div style={{width:'6px', height:'6px', borderRadius:'50%', background:t.c, flexShrink:0}}/>
+                  <span style={{fontSize:'10px', color:'#394058', fontWeight:'600', flex:1,
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{t.n}</span>
+                  <span style={{fontSize:'9px', color:'#bec1cc'}}>{t.o}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{background:'#feffff', borderRadius:'16px', padding:'12px', boxShadow:shSm}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
+                <span style={{fontSize:'11px', fontWeight:'800', color:'#02153f'}}>Crisi settimana</span>
+                <ChevronRight size={12} color="#2e84e9"/>
+              </div>
+              <div style={{display:'flex', alignItems:'flex-end', gap:'3px', height:'34px'}}>
+                {data.barsSettimana.map((h,i) => (
+                  <div key={i} style={{
+                    flex:1, height:`${h}%`, borderRadius:'3px 3px 0 0', opacity:0.75,
+                    background:['#193f9e','#7B5EA7','#F7295A','#193f9e','#F7295A','#7B5EA7','#193f9e'][i]
+                  }}/>
+                ))}
+              </div>
+              <div style={{display:'flex', marginTop:'3px'}}>
+                {['L','M','M','G','V','S','D'].map((d,i) => (
+                  <span key={i} style={{flex:1,textAlign:'center',fontSize:'7px',color:'#bec1cc'}}>{d}</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{background:'#feffff', borderRadius:'16px', padding:'12px', boxShadow:shSm}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
+                <span style={{fontSize:'11px', fontWeight:'800', color:'#02153f'}}>Scadenze medicinali</span>
+                <ChevronRight size={12} color="#2e84e9"/>
+              </div>
+              {data.scadenzeMed.map((m,i) => (
+                <div key={i} style={{
+                  display:'flex', alignItems:'center', gap:'6px', padding:'3px 0',
+                  borderBottom: i<2 ? '1px solid #f0f1f4' : 'none'
+                }}>
+                  <div style={{width:'6px', height:'6px', borderRadius:'50%', background:m.c, flexShrink:0}}/>
+                  <span style={{fontSize:'10px', color:'#394058', fontWeight:'600', flex:1}}>{m.n}</span>
+                  <span style={{
+                    fontSize:'9px', fontWeight:'700', padding:'1px 6px', borderRadius:'20px',
+                    background: i===0 ? '#FEF0F4' : '#f3f4f7',
+                    color: i===0 ? '#F7295A' : '#7c8088'
+                  }}>{m.g}</span>
+                </div>
+              ))}
+            </div>
+
           </div>
         </div>
 
         {/* ── TIMER ── */}
         <div style={{padding:'0 12px'}}>
-          <div style={{background:'#feffff',borderRadius:'20px',padding:'16px',boxShadow:sh}}>
-            <div style={{fontSize:'14px',fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>
+          <div style={{background:'#feffff', borderRadius:'20px', padding:'16px', boxShadow:sh}}>
+            <div style={{fontSize:'14px', fontWeight:'800', color:'#02153f', marginBottom:'8px'}}>
               ⏱ Registrazione crisi
             </div>
             <div style={{
-              fontSize:'clamp(36px,10vw,46px)', fontWeight:'900',
-              textAlign:'center', color:'#02153f', letterSpacing:'-2px',
+              fontSize:'clamp(36px,10vw,46px)', fontWeight:'900', textAlign:'center',
+              color:'#02153f', letterSpacing:'-2px',
               fontVariantNumeric:'tabular-nums', marginBottom:'4px'
             }}>
               {fmt(timerSec)}
             </div>
             <div style={{
               textAlign:'center', fontSize:'11px', marginBottom:'14px',
-              color:running?'#F7295A':'#bec1cc', fontWeight:running?'700':'400'
+              color: running ? '#F7295A' : '#bec1cc',
+              fontWeight: running ? '700' : '400'
             }}>
               {running ? '🔴 Crisi in corso...' : 'Premi ▶ per avviare'}
             </div>
             <div style={{display:'flex', justifyContent:'center', gap:'14px'}}>
               <button onClick={startTimer} style={{
-                width:'46px',height:'46px',borderRadius:'50%',border:'none',cursor:'pointer',
+                width:'46px', height:'46px', borderRadius:'50%', border:'none', cursor:'pointer',
                 background:'linear-gradient(135deg,#193f9e,#2e84e9)',
-                display:'flex',alignItems:'center',justifyContent:'center',
+                display:'flex', alignItems:'center', justifyContent:'center',
                 boxShadow:'0 6px 18px rgba(25,63,158,0.38)'
               }}><Play size={19} color="#fff" fill="#fff"/></button>
               <button onClick={stopTimer} style={{
-                width:'46px',height:'46px',borderRadius:'50%',border:'none',cursor:'pointer',
+                width:'46px', height:'46px', borderRadius:'50%', border:'none', cursor:'pointer',
                 background:'linear-gradient(135deg,#F7295A,#FF8C42)',
-                display:'flex',alignItems:'center',justifyContent:'center',
+                display:'flex', alignItems:'center', justifyContent:'center',
                 boxShadow:'0 6px 18px rgba(247,41,90,0.32)'
               }}><Square size={19} color="#fff" fill="#fff"/></button>
               <button onClick={resetTimer} style={{
-                width:'46px',height:'46px',borderRadius:'50%',border:'none',cursor:'pointer',
-                background:'#f3f4f7',display:'flex',alignItems:'center',justifyContent:'center',
+                width:'46px', height:'46px', borderRadius:'50%', border:'none', cursor:'pointer',
+                background:'#f3f4f7', display:'flex', alignItems:'center', justifyContent:'center',
                 boxShadow:'0 2px 8px rgba(0,0,0,0.08)'
               }}><RotateCcw size={19} color="#7c8088"/></button>
             </div>
@@ -378,33 +427,33 @@ export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
 
         {/* ── NAVBAR ── */}
         <div style={{
-          position:'fixed',bottom:0,left:0,right:0,
-          background:'#feffff',borderTop:'1px solid #f0f1f4',
-          display:'flex',padding:'7px 0 14px',
+          position:'fixed', bottom:0, left:0, right:0,
+          background:'#feffff', borderTop:'1px solid #f0f1f4',
+          display:'flex', padding:'7px 0 14px',
           boxShadow:'0 -4px 16px rgba(2,21,63,0.08)'
         }}>
           {[
-            {Icon:Home,label:'Home',page:'home',act:true},
-            {Icon:BookOpen,label:'Diario',page:'diario'},
-            {Icon:Pill,label:'Terapie',page:'terapie'},
-            {Icon:Droplets,label:'Toilet',page:'toilet'},
-            {Icon:BarChart2,label:'Report',page:'report'},
-            {Icon:Settings,label:'Altro',page:'altro'},
+            {Icon:Home, label:'Home', page:'home', act:true},
+            {Icon:BookOpen, label:'Diario', page:'diario'},
+            {Icon:Pill, label:'Terapie', page:'terapie'},
+            {Icon:Droplets, label:'Toilet', page:'toilet'},
+            {Icon:BarChart2, label:'Report', page:'report'},
+            {Icon:Settings, label:'Altro', page:'altro'},
           ].map(({Icon,label,page,act},i) => (
             <div key={i} onClick={() => onNavigate && onNavigate(page)} style={{
-              flex:1,display:'flex',flexDirection:'column',
-              alignItems:'center',gap:'3px',cursor:'pointer'
+              flex:1, display:'flex', flexDirection:'column',
+              alignItems:'center', gap:'3px', cursor:'pointer'
             }}>
               <div style={{
-                width:'34px',height:'24px',display:'flex',
-                alignItems:'center',justifyContent:'center',
-                borderRadius:'8px',background:act?'#EEF3FD':'transparent'
+                width:'34px', height:'24px', display:'flex',
+                alignItems:'center', justifyContent:'center',
+                borderRadius:'8px', background: act ? '#EEF3FD' : 'transparent'
               }}>
-                <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
+                <Icon size={17} color={act ? '#193f9e' : '#bec1cc'}/>
               </div>
               <span style={{
-                fontSize:'9px',fontWeight:act?'800':'500',
-                color:act?'#193f9e':'#bec1cc'
+                fontSize:'9px', fontWeight: act ? '800' : '500',
+                color: act ? '#193f9e' : '#bec1cc'
               }}>{label}</span>
             </div>
           ))}

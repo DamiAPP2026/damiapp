@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import Home from './Home'
 
-const PIN = '261120'
-const VERSION = '05.00.04'
+const PIN_REALE = '261120'
+const PIN_DEMO = '010101'
+const VERSION = '05.00.05'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -30,11 +31,11 @@ const FRASI = [
   "I momenti difficili costruiscono persone straordinarie.",
   "La pazienza è la forma più nobile di forza.",
   "Non sei solo — c'è sempre chi ti sostiene.",
-  "Ogni giorno con Damiano è un giorno pieno di significato.",
+  "Ogni giorno è un giorno pieno di significato.",
   "La normalità si costruisce un giorno alla volta.",
-  "Il tuo amore è la sua ancora più sicura.",
   "Anche le piccole vittorie meritano di essere celebrate.",
   "Sei più forte di quanto credi — sempre.",
+  "La cura quotidiana è il gesto d'amore più grande.",
 ]
 
 export function getFrase() {
@@ -42,7 +43,90 @@ export function getFrase() {
   return FRASI[idx]
 }
 
-function OnboardingModal({ onDone }) {
+function Disclaimer({ nome, onAccept }) {
+  return (
+    <div style={{
+      position:'fixed', inset:0, background:'rgba(2,21,63,0.6)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      zIndex:2000, padding:'20px',
+      fontFamily:"-apple-system,'Segoe UI',sans-serif"
+    }}>
+      <div style={{
+        background:'#feffff', borderRadius:'24px', padding:'28px 24px',
+        width:'100%', maxWidth:'360px',
+        boxShadow:'0 20px 60px rgba(2,21,63,0.3)'
+      }}>
+        <div style={{textAlign:'center', marginBottom:'20px'}}>
+          <div style={{
+            width:'52px', height:'52px', borderRadius:'50%',
+            background:'linear-gradient(135deg,#F7295A,#FF8C42)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            margin:'0 auto 14px', fontSize:'24px'
+          }}>⚠️</div>
+          <div style={{fontSize:'18px', fontWeight:'900', color:'#08184c', marginBottom:'6px'}}>
+            Informativa sull'utilizzo
+          </div>
+          <div style={{fontSize:'12px', color:'#7c8088'}}>
+            Leggi attentamente prima di continuare
+          </div>
+        </div>
+
+        <div style={{
+          background:'#f3f4f7', borderRadius:'14px', padding:'16px',
+          marginBottom:'20px', fontSize:'12px', color:'#394058',
+          lineHeight:'1.7', maxHeight:'200px', overflowY:'auto'
+        }}>
+          <p style={{marginBottom:'10px'}}>
+            <strong style={{color:'#08184c'}}>Ciao {nome}!</strong> Prima di accedere a DamiAPP,
+            ti chiediamo di leggere e accettare quanto segue:
+          </p>
+          <p style={{marginBottom:'10px'}}>
+            <strong style={{color:'#02153f'}}>1. Responsabilità dei dati</strong><br/>
+            DamiAPP è uno strumento di supporto personale. I dati inseriti
+            sono sotto la tua esclusiva responsabilità. Gli sviluppatori non
+            sono responsabili per errori, perdite o utilizzi impropri delle
+            informazioni inserite.
+          </p>
+          <p style={{marginBottom:'10px'}}>
+            <strong style={{color:'#02153f'}}>2. Protezione dei dati</strong><br/>
+            I dati sono salvati su Firebase (Google).
+            <strong style={{color:'#F7295A'}}> DamiAPP non garantisce
+            la protezione assoluta dei dati</strong> e non è conforme
+            a normative specifiche per dati sanitari. Non inserire dati
+            strettamente confidenziali.
+          </p>
+          <p style={{marginBottom:'10px'}}>
+            <strong style={{color:'#02153f'}}>3. Uso medico</strong><br/>
+            DamiAPP <strong>non sostituisce il medico</strong> né costituisce
+            consulenza medica. In caso di emergenza chiama sempre il 112.
+          </p>
+          <p style={{marginBottom:'10px'}}>
+            <strong style={{color:'#02153f'}}>4. Modalità Demo</strong><br/>
+            In modalità Demo tutti i dati sono fittizi e a scopo dimostrativo.
+            Non inserire dati reali in modalità demo.
+          </p>
+          <p style={{margin:0, color:'#bec1cc', fontSize:'11px'}}>
+            Versione {VERSION} — Continuando accetti queste condizioni.
+          </p>
+        </div>
+
+        <button onClick={onAccept} style={{
+          width:'100%', padding:'15px', borderRadius:'50px', border:'none',
+          cursor:'pointer', fontWeight:'800', fontSize:'15px', color:'#fff',
+          background:'linear-gradient(135deg,#08184c,#193f9e)',
+          boxShadow:'0 6px 20px rgba(8,24,76,0.35)', marginBottom:'10px'
+        }}>
+          ✅ Ho letto e accetto
+        </button>
+        <div style={{textAlign:'center', fontSize:'11px', color:'#bec1cc'}}>
+          Non accettando non potrai utilizzare l'app
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OnboardingModal({ onDone, isDemo }) {
   const [nome, setNome] = useState('')
   return (
     <div style={{
@@ -62,15 +146,24 @@ function OnboardingModal({ onDone }) {
             objectFit:'cover', marginBottom:'14px',
             boxShadow:'0 4px 16px rgba(8,24,76,0.25)'
           }}/>
-          <div style={{
-            fontSize:'22px', fontWeight:'900', color:'#08184c',
-            marginBottom:'6px', letterSpacing:'-0.5px'
-          }}>
-            Benvenuto in DamiAPP
+          <div style={{fontSize:'20px', fontWeight:'900', color:'#08184c', marginBottom:'6px'}}>
+            {isDemo ? '👋 Benvenuto nella Demo!' : 'Benvenuto in DamiAPP'}
           </div>
           <div style={{fontSize:'13px', color:'#7c8088', lineHeight:'1.5'}}>
-            Come ti chiami? Ti saluteremo ogni giorno.
+            {isDemo
+              ? 'Come ti chiami? Personalizziamo la demo per te.'
+              : 'Come ti chiami? Ti saluteremo ogni giorno.'}
           </div>
+          {isDemo && (
+            <div style={{
+              marginTop:'10px', padding:'8px 12px',
+              background:'rgba(255,140,66,0.12)',
+              borderRadius:'10px', border:'1px solid rgba(255,140,66,0.3)',
+              fontSize:'11px', color:'#8B6914', fontWeight:'600'
+            }}>
+              🎭 Modalità Demo — dati fittizi
+            </div>
+          )}
         </div>
         <input
           value={nome}
@@ -84,23 +177,19 @@ function OnboardingModal({ onDone }) {
             marginBottom:'16px', outline:'none', boxSizing:'border-box',
             fontFamily:'inherit', background:'#f3f4f7'
           }}
-          onFocus={e => e.target.style.borderColor = '#2e84e9'}
-          onBlur={e => e.target.style.borderColor = '#e8eaf0'}
+          onFocus={e => e.target.style.borderColor='#2e84e9'}
+          onBlur={e => e.target.style.borderColor='#e8eaf0'}
         />
         <button
           onClick={() => nome.trim() && onDone(nome.trim())}
           disabled={!nome.trim()}
           style={{
             width:'100%', padding:'15px', borderRadius:'50px', border:'none',
-            background: nome.trim()
-              ? 'linear-gradient(135deg,#08184c,#193f9e)'
-              : '#e8eaf0',
+            background: nome.trim() ? 'linear-gradient(135deg,#08184c,#193f9e)' : '#e8eaf0',
             color: nome.trim() ? '#fff' : '#bec1cc',
             fontSize:'15px', fontWeight:'800',
             cursor: nome.trim() ? 'pointer' : 'default',
-            boxShadow: nome.trim()
-              ? '0 6px 20px rgba(8,24,76,0.35)'
-              : 'none'
+            boxShadow: nome.trim() ? '0 6px 20px rgba(8,24,76,0.35)' : 'none'
           }}
         >
           Inizia →
@@ -117,7 +206,8 @@ function Login({ onLogin }) {
   const [token, setToken] = useState('')
 
   function handleLogin() {
-    if (pin === PIN) onLogin()
+    if (pin === PIN_REALE) onLogin(false)
+    else if (pin === PIN_DEMO) onLogin(true)
     else { setError('PIN errato. Riprova.'); setPin('') }
   }
 
@@ -130,38 +220,44 @@ function Login({ onLogin }) {
       <div style={{
         background:'#feffff', borderRadius:'28px', overflow:'hidden',
         width:'100%', maxWidth:'340px',
-        boxShadow:'0 12px 40px rgba(2,21,63,0.14), 0 4px 12px rgba(0,0,0,0.06)'
+        boxShadow:'0 20px 60px rgba(2,21,63,0.20), 0 8px 20px rgba(2,21,63,0.10), 0 2px 6px rgba(0,0,0,0.06)'
       }}>
 
-        {/* Header scuro */}
+        {/* Header */}
         <div style={{
           background:'linear-gradient(135deg,#08184c,#193f9e)',
-          padding:'36px 24px 30px', textAlign:'center'
+          padding:'36px 24px 30px', textAlign:'center', position:'relative'
         }}>
-          <img src="/DamiLogo.png" alt="logo" style={{
-            width:'80px', height:'80px', borderRadius:'50%',
-            objectFit:'cover', marginBottom:'14px',
-            border:'3px solid rgba(255,255,255,0.25)',
-            boxShadow:'0 6px 20px rgba(0,0,0,0.25)'
-          }}/>
+          {/* Versioning alto destra */}
           <div style={{
-            fontSize:'28px', fontWeight:'900', color:'#fff', letterSpacing:'-0.5px'
-          }}>
+            position:'absolute', top:'10px', right:'14px',
+            fontSize:'10px', color:'rgba(255,255,255,0.35)',
+            fontWeight:'600', letterSpacing:'0.5px'
+          }}>v{VERSION}</div>
+
+          <img src="/DamiLogo.png" alt="logo" style={{
+            width:'100px', height:'100px', borderRadius:'50%',
+            objectFit:'cover', marginBottom:'16px',
+            border:'3px solid rgba(255,255,255,0.25)',
+            boxShadow:'0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'
+          }}/>
+          <div style={{fontSize:'28px', fontWeight:'900', color:'#fff', letterSpacing:'-0.5px'}}>
             DamiAPP
           </div>
-          <div style={{fontSize:'12px', color:'rgba(255,255,255,0.6)', marginTop:'4px'}}>
-            Gestione crisi epilettiche v{VERSION}
+          <div style={{fontSize:'12px', color:'rgba(255,255,255,0.5)', marginTop:'4px'}}>
+            Il tuo assistente quotidiano
           </div>
         </div>
 
-        {/* Tab Paziente / Medico */}
+        {/* Tab */}
         <div style={{
           display:'grid', gridTemplateColumns:'1fr 1fr',
-          background:'#f3f4f7', margin:'16px 16px 0', borderRadius:'12px',
-          padding:'3px', gap:'3px'
+          background:'#f3f4f7', margin:'16px 16px 0',
+          borderRadius:'12px', padding:'3px', gap:'3px'
         }}>
           {['paziente','medico'].map(t => (
-            <button key={t} onClick={() => {setTab(t); setError(''); setPin(''); setToken('')}}
+            <button key={t}
+              onClick={() => { setTab(t); setError(''); setPin(''); setToken('') }}
               style={{
                 padding:'9px', borderRadius:'9px', border:'none', cursor:'pointer',
                 fontWeight:'700', fontSize:'12px', fontFamily:'inherit',
@@ -177,15 +273,12 @@ function Login({ onLogin }) {
 
         {/* Form */}
         <div style={{padding:'20px 24px 28px'}}>
-
           {tab === 'paziente' ? (
             <>
               <div style={{
                 fontSize:'11px', fontWeight:'700', color:'#7c8088',
                 textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
-              }}>
-                PIN di accesso
-              </div>
+              }}>PIN di accesso</div>
               <input
                 type="password"
                 value={pin}
@@ -200,8 +293,8 @@ function Login({ onLogin }) {
                   boxSizing:'border-box', color:'#02153f', background:'#f3f4f7',
                   fontFamily:'inherit'
                 }}
-                onFocus={e => e.target.style.borderColor = '#2e84e9'}
-                onBlur={e => e.target.style.borderColor = '#e8eaf0'}
+                onFocus={e => e.target.style.borderColor='#2e84e9'}
+                onBlur={e => e.target.style.borderColor='#e8eaf0'}
               />
               {error && (
                 <div style={{
@@ -214,18 +307,20 @@ function Login({ onLogin }) {
                 cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
                 background:'linear-gradient(135deg,#08184c,#193f9e)',
                 boxShadow:'0 8px 24px rgba(8,24,76,0.35)'
+              }}>Accedi</button>
+              <div style={{
+                textAlign:'center', marginTop:'12px',
+                fontSize:'11px', color:'#bec1cc'
               }}>
-                Accedi
-              </button>
+                💡 PIN demo disponibile per la presentazione
+              </div>
             </>
           ) : (
             <>
               <div style={{
                 fontSize:'11px', fontWeight:'700', color:'#7c8088',
                 textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
-              }}>
-                Token di accesso medico
-              </div>
+              }}>Token di accesso medico</div>
               <input
                 type="text"
                 value={token}
@@ -238,8 +333,8 @@ function Login({ onLogin }) {
                   boxSizing:'border-box', color:'#02153f', background:'#f3f4f7',
                   fontFamily:"'Courier New', monospace"
                 }}
-                onFocus={e => e.target.style.borderColor = '#2e84e9'}
-                onBlur={e => e.target.style.borderColor = '#e8eaf0'}
+                onFocus={e => e.target.style.borderColor='#2e84e9'}
+                onBlur={e => e.target.style.borderColor='#e8eaf0'}
               />
               {error && (
                 <div style={{
@@ -252,20 +347,17 @@ function Login({ onLogin }) {
                 cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
                 background:'linear-gradient(135deg,#00BFA6,#2e84e9)',
                 boxShadow:'0 8px 24px rgba(0,191,166,0.3)'
-              }}>
-                Accedi come Medico
-              </button>
+              }}>Accedi come Medico</button>
               <div style={{
-                textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'
+                textAlign:'center', marginTop:'12px',
+                fontSize:'11px', color:'#bec1cc'
               }}>
                 Il token ti è stato fornito dalla famiglia del paziente
               </div>
             </>
           )}
-
           <div style={{
-            textAlign:'center', marginTop:'16px',
-            fontSize:'12px', color:'#bec1cc',
+            textAlign:'center', marginTop:'16px', fontSize:'12px', color:'#bec1cc',
             display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'
           }}>
             🔒 Dati cifrati e protetti
@@ -278,27 +370,42 @@ function Login({ onLogin }) {
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false)
+  const [isDemo, setIsDemo] = useState(false)
   const [nomeUtente, setNomeUtente] = useState(
     () => localStorage.getItem('damiapp_nome') || ''
   )
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showDisclaimer, setShowDisclaimer] = useState(false)
+  const [pendingNome, setPendingNome] = useState('')
 
-  useEffect(() => {
-    if (authenticated && !nomeUtente) setShowOnboarding(true)
-  }, [authenticated])
-
-  function handleNome(nome) {
-    localStorage.setItem('damiapp_nome', nome)
-    setNomeUtente(nome)
-    setShowOnboarding(false)
+  function handleLogin(demo) {
+    setIsDemo(demo)
+    setAuthenticated(true)
+    if (demo || !nomeUtente) setShowOnboarding(true)
   }
 
-  if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />
+  function handleNome(nome) {
+    setPendingNome(nome)
+    setShowOnboarding(false)
+    setShowDisclaimer(true)
+  }
+
+  function handleAcceptDisclaimer() {
+    if (!isDemo) localStorage.setItem('damiapp_nome', pendingNome)
+    setShowDisclaimer(false)
+  }
+
+  const nomeEffettivo = isDemo
+    ? (pendingNome || 'Ospite')
+    : (pendingNome || nomeUtente || 'Damiano')
+
+  if (!authenticated) return <Login onLogin={handleLogin} />
 
   return (
     <>
-      {showOnboarding && <OnboardingModal onDone={handleNome} />}
-      <Home nomeUtente={nomeUtente} frase={getFrase()} />
+      {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo} />}
+      {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer} />}
+      <Home nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} />
     </>
   )
 }
