@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Home from './Home'
 
 const PIN = '261120'
-const VERSION = '05.00.03'
+const VERSION = '05.00.04'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -60,10 +60,10 @@ function OnboardingModal({ onDone }) {
           <img src="/DamiLogo.png" alt="logo" style={{
             width:'72px', height:'72px', borderRadius:'50%',
             objectFit:'cover', marginBottom:'14px',
-            boxShadow:'0 4px 16px rgba(25,63,158,0.25)'
+            boxShadow:'0 4px 16px rgba(8,24,76,0.25)'
           }}/>
           <div style={{
-            fontSize:'22px', fontWeight:'900', color:'#02153f',
+            fontSize:'22px', fontWeight:'900', color:'#08184c',
             marginBottom:'6px', letterSpacing:'-0.5px'
           }}>
             Benvenuto in DamiAPP
@@ -93,13 +93,13 @@ function OnboardingModal({ onDone }) {
           style={{
             width:'100%', padding:'15px', borderRadius:'50px', border:'none',
             background: nome.trim()
-              ? 'linear-gradient(135deg,#193f9e,#2e84e9)'
+              ? 'linear-gradient(135deg,#08184c,#193f9e)'
               : '#e8eaf0',
             color: nome.trim() ? '#fff' : '#bec1cc',
             fontSize:'15px', fontWeight:'800',
             cursor: nome.trim() ? 'pointer' : 'default',
             boxShadow: nome.trim()
-              ? '0 6px 20px rgba(25,63,158,0.35)'
+              ? '0 6px 20px rgba(8,24,76,0.35)'
               : 'none'
           }}
         >
@@ -113,6 +113,8 @@ function OnboardingModal({ onDone }) {
 function Login({ onLogin }) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [tab, setTab] = useState('paziente')
+  const [token, setToken] = useState('')
 
   function handleLogin() {
     if (pin === PIN) onLogin()
@@ -131,83 +133,140 @@ function Login({ onLogin }) {
         boxShadow:'0 12px 40px rgba(2,21,63,0.14), 0 4px 12px rgba(0,0,0,0.06)'
       }}>
 
-        {/* Header */}
+        {/* Header scuro */}
         <div style={{
-          background:'linear-gradient(135deg,#193f9e,#2e84e9)',
+          background:'linear-gradient(135deg,#08184c,#193f9e)',
           padding:'36px 24px 30px', textAlign:'center'
         }}>
           <img src="/DamiLogo.png" alt="logo" style={{
             width:'80px', height:'80px', borderRadius:'50%',
             objectFit:'cover', marginBottom:'14px',
-            border:'3px solid rgba(255,255,255,0.35)',
-            boxShadow:'0 6px 20px rgba(0,0,0,0.2)'
+            border:'3px solid rgba(255,255,255,0.25)',
+            boxShadow:'0 6px 20px rgba(0,0,0,0.25)'
           }}/>
           <div style={{
-            fontSize:'28px', fontWeight:'900', color:'#fff',
-            letterSpacing:'-0.5px'
+            fontSize:'28px', fontWeight:'900', color:'#fff', letterSpacing:'-0.5px'
           }}>
             DamiAPP
           </div>
-          <div style={{
-            fontSize:'12px', color:'rgba(255,255,255,0.7)',
-            marginTop:'4px'
-          }}>
+          <div style={{fontSize:'12px', color:'rgba(255,255,255,0.6)', marginTop:'4px'}}>
             Gestione crisi epilettiche v{VERSION}
           </div>
         </div>
 
+        {/* Tab Paziente / Medico */}
+        <div style={{
+          display:'grid', gridTemplateColumns:'1fr 1fr',
+          background:'#f3f4f7', margin:'16px 16px 0', borderRadius:'12px',
+          padding:'3px', gap:'3px'
+        }}>
+          {['paziente','medico'].map(t => (
+            <button key={t} onClick={() => {setTab(t); setError(''); setPin(''); setToken('')}}
+              style={{
+                padding:'9px', borderRadius:'9px', border:'none', cursor:'pointer',
+                fontWeight:'700', fontSize:'12px', fontFamily:'inherit',
+                background: tab===t ? '#feffff' : 'transparent',
+                color: tab===t ? '#08184c' : '#7c8088',
+                boxShadow: tab===t ? '0 2px 8px rgba(2,21,63,0.10)' : 'none',
+                transition:'all 0.2s'
+              }}>
+              {t === 'paziente' ? '👤 Paziente' : '👨‍⚕️ Medico'}
+            </button>
+          ))}
+        </div>
+
         {/* Form */}
-        <div style={{padding:'28px 24px'}}>
-          <div style={{
-            fontSize:'11px', fontWeight:'700', color:'#7c8088',
-            textTransform:'uppercase', letterSpacing:'0.8px',
-            marginBottom:'10px'
-          }}>
-            PIN di accesso
-          </div>
-          <input
-            type="password"
-            value={pin}
-            onChange={e => setPin(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder="• • • • • •"
-            maxLength={6}
-            style={{
-              width:'100%', padding:'16px', borderRadius:'14px',
-              border:'2px solid #e8eaf0', fontSize:'26px',
-              textAlign:'center', letterSpacing:'12px',
-              marginBottom:'10px', outline:'none',
-              boxSizing:'border-box', color:'#02153f',
-              background:'#f3f4f7', fontFamily:'inherit'
-            }}
-            onFocus={e => e.target.style.borderColor = '#2e84e9'}
-            onBlur={e => e.target.style.borderColor = '#e8eaf0'}
-          />
-          {error && (
-            <div style={{
-              color:'#e53935', fontSize:'13px', textAlign:'center',
-              marginBottom:'12px', fontWeight:'600'
-            }}>
-              ❌ {error}
-            </div>
+        <div style={{padding:'20px 24px 28px'}}>
+
+          {tab === 'paziente' ? (
+            <>
+              <div style={{
+                fontSize:'11px', fontWeight:'700', color:'#7c8088',
+                textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
+              }}>
+                PIN di accesso
+              </div>
+              <input
+                type="password"
+                value={pin}
+                onChange={e => setPin(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                placeholder="• • • • • •"
+                maxLength={6}
+                style={{
+                  width:'100%', padding:'16px', borderRadius:'14px',
+                  border:'2px solid #e8eaf0', fontSize:'26px', textAlign:'center',
+                  letterSpacing:'12px', marginBottom:'10px', outline:'none',
+                  boxSizing:'border-box', color:'#02153f', background:'#f3f4f7',
+                  fontFamily:'inherit'
+                }}
+                onFocus={e => e.target.style.borderColor = '#2e84e9'}
+                onBlur={e => e.target.style.borderColor = '#e8eaf0'}
+              />
+              {error && (
+                <div style={{
+                  color:'#e53935', fontSize:'13px', textAlign:'center',
+                  marginBottom:'12px', fontWeight:'600'
+                }}>❌ {error}</div>
+              )}
+              <button onClick={handleLogin} style={{
+                width:'100%', padding:'16px', borderRadius:'50px', border:'none',
+                cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
+                background:'linear-gradient(135deg,#08184c,#193f9e)',
+                boxShadow:'0 8px 24px rgba(8,24,76,0.35)'
+              }}>
+                Accedi
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{
+                fontSize:'11px', fontWeight:'700', color:'#7c8088',
+                textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
+              }}>
+                Token di accesso medico
+              </div>
+              <input
+                type="text"
+                value={token}
+                onChange={e => setToken(e.target.value.toUpperCase())}
+                placeholder="Es: DMI·7K2X·9P4R"
+                style={{
+                  width:'100%', padding:'14px', borderRadius:'14px',
+                  border:'2px solid #e8eaf0', fontSize:'16px', textAlign:'center',
+                  letterSpacing:'2px', marginBottom:'10px', outline:'none',
+                  boxSizing:'border-box', color:'#02153f', background:'#f3f4f7',
+                  fontFamily:"'Courier New', monospace"
+                }}
+                onFocus={e => e.target.style.borderColor = '#2e84e9'}
+                onBlur={e => e.target.style.borderColor = '#e8eaf0'}
+              />
+              {error && (
+                <div style={{
+                  color:'#e53935', fontSize:'13px', textAlign:'center',
+                  marginBottom:'12px', fontWeight:'600'
+                }}>❌ {error}</div>
+              )}
+              <button onClick={() => setError('Token non valido o scaduto.')} style={{
+                width:'100%', padding:'16px', borderRadius:'50px', border:'none',
+                cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
+                background:'linear-gradient(135deg,#00BFA6,#2e84e9)',
+                boxShadow:'0 8px 24px rgba(0,191,166,0.3)'
+              }}>
+                Accedi come Medico
+              </button>
+              <div style={{
+                textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'
+              }}>
+                Il token ti è stato fornito dalla famiglia del paziente
+              </div>
+            </>
           )}
-          <button
-            onClick={handleLogin}
-            style={{
-              width:'100%', padding:'16px', borderRadius:'50px',
-              border:'none', cursor:'pointer', fontWeight:'800',
-              fontSize:'16px', color:'#fff', letterSpacing:'0.3px',
-              background:'linear-gradient(135deg,#193f9e,#2e84e9)',
-              boxShadow:'0 8px 24px rgba(25,63,158,0.38)'
-            }}
-          >
-            Accedi
-          </button>
+
           <div style={{
-            textAlign:'center', marginTop:'18px',
+            textAlign:'center', marginTop:'16px',
             fontSize:'12px', color:'#bec1cc',
-            display:'flex', alignItems:'center',
-            justifyContent:'center', gap:'5px'
+            display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'
           }}>
             🔒 Dati cifrati e protetti
           </div>
@@ -225,9 +284,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
-    if (authenticated && !nomeUtente) {
-      setShowOnboarding(true)
-    }
+    if (authenticated && !nomeUtente) setShowOnboarding(true)
   }, [authenticated])
 
   function handleNome(nome) {
@@ -236,9 +293,7 @@ export default function App() {
     setShowOnboarding(false)
   }
 
-  if (!authenticated) {
-    return <Login onLogin={() => setAuthenticated(true)} />
-  }
+  if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />
 
   return (
     <>

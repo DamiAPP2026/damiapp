@@ -55,30 +55,28 @@ export default function HomeScreen({ nomeUtente, frase, onNavigate }) {
         <div style={{padding:'12px 12px 0'}}>
           <div style={{background:'#feffff',borderRadius:'22px',padding:'16px 18px',boxShadow:sh}}>
 
-            {/* Riga 1: Data + Ora giustificati a destra */}
-            <div style={{
-              display:'flex', justifyContent:'flex-end', alignItems:'center',
-              gap:'8px', marginBottom:'10px'
-            }}>
-              <span style={{fontSize:'10px', color:'#bec1cc', fontWeight:'600'}}>{dataStr}</span>
-              <span style={{
-                fontSize:'13px', fontWeight:'900', color:'#bec1cc',
-                fontVariantNumeric:'tabular-nums', letterSpacing:'0.5px'
-              }}>{timeStr}</span>
-            </div>
+{/* Data + Ora in cima a destra */}
+<div style={{
+  display:'flex', justifyContent:'flex-end', alignItems:'center',
+  gap:'8px', marginBottom:'6px', marginTop:'-4px'
+}}>
+  <span style={{fontSize:'10px', color:'#bec1cc', fontWeight:'600'}}>{dataStr}</span>
+  <span style={{
+    fontSize:'13px', fontWeight:'900', color:'#bec1cc',
+    fontVariantNumeric:'tabular-nums', letterSpacing:'0.5px'
+  }}>{timeStr}</span>
+</div>
 
-            {/* Riga 2: Logo + DamiAPP centrati */}
-            <div style={{
-              display:'flex', alignItems:'center', justifyContent:'center',
-              gap:'9px', marginBottom:'14px'
-            }}>
-              <img src="/DamiLogo.png" alt="logo" style={{
-                width:'39px', height:'39px', borderRadius:'50%', objectFit:'cover'
-              }}/>
-              <span style={{
-                fontSize:'17px', fontWeight:'800', color:'#08184c', letterSpacing:'-0.2px'
-              }}>DamiAPP</span>
-            </div>
+{/* Logo centrato, più grande, senza scritta */}
+<div style={{
+  display:'flex', justifyContent:'center',
+  marginBottom:'14px'
+}}>
+  <img src="/DamiLogo.png" alt="logo" style={{
+    width:'51px', height:'51px', borderRadius:'50%', objectFit:'cover',
+    boxShadow:'0 4px 14px rgba(8,24,76,0.15)'
+  }}/>
+</div>
 
             {/* Saluto */}
             <div style={{
