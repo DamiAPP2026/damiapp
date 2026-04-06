@@ -425,39 +425,38 @@ export default function HomeScreen({ nomeUtente, frase, isDemo, onNavigate }) {
           </div>
         </div>
 
-        {/* ── NAVBAR ── */}
-        <div style={{
-          position:'fixed', bottom:0, left:0, right:0,
-          background:'#feffff', borderTop:'1px solid #f0f1f4',
-          display:'flex', padding:'7px 0 14px',
-          boxShadow:'0 -4px 16px rgba(2,21,63,0.08)'
-        }}>
-          {[
-            {Icon:Home, label:'Home', page:'home', act:true},
-            {Icon:BookOpen, label:'Diario', page:'diario'},
-            {Icon:Pill, label:'Terapie', page:'terapie'},
-            {Icon:Droplets, label:'Toilet', page:'toilet'},
-            {Icon:BarChart2, label:'Report', page:'report'},
-            {Icon:Settings, label:'Altro', page:'altro'},
-          ].map(({Icon,label,page,act},i) => (
-            <div key={i} onClick={() => onNavigate && onNavigate(page)} style={{
-              flex:1, display:'flex', flexDirection:'column',
-              alignItems:'center', gap:'3px', cursor:'pointer'
-            }}>
-              <div style={{
-                width:'34px', height:'24px', display:'flex',
-                alignItems:'center', justifyContent:'center',
-                borderRadius:'8px', background: act ? '#EEF3FD' : 'transparent'
-              }}>
-                <Icon size={17} color={act ? '#193f9e' : '#bec1cc'}/>
-              </div>
-              <span style={{
-                fontSize:'9px', fontWeight: act ? '800' : '500',
-                color: act ? '#193f9e' : '#bec1cc'
-              }}>{label}</span>
-            </div>
-          ))}
-        </div>
+{/* ── NAVBAR ── */}
+<div style={{
+  position:'fixed', bottom:0, left:0, right:0,
+  background:'#feffff', borderTop:'1px solid #f0f1f4',
+  display:'flex', padding:'7px 0 14px',
+  boxShadow:'0 -4px 16px rgba(2,21,63,0.08)'
+}}>
+  {[
+    {ico:'🏠', label:'Home', page:'home', act:true},
+    {ico:'📋', label:'Diario', page:'diario'},
+    {ico:'💊', label:'Terapie', page:'terapie'},
+    {ico:'🚽', label:'Toilet', page:'toilet'},
+    {ico:'🔗', label:'Condividi', page:'condividi'},
+    {ico:'⚙️', label:'Altro', page:'altro'},
+  ].map(({ico, label, page, act}) => (
+    <div key={page} onClick={() => onNavigate && onNavigate(page)} style={{
+      flex:1, display:'flex', flexDirection:'column',
+      alignItems:'center', gap:'3px', cursor:'pointer'
+    }}>
+      <div style={{
+        width:'34px', height:'24px', display:'flex',
+        alignItems:'center', justifyContent:'center',
+        borderRadius:'8px', fontSize:'15px',
+        background: act ? '#EEF3FD' : 'transparent'
+      }}>{ico}</div>
+      <span style={{
+        fontSize:'9px', fontWeight: act ? '800' : '500',
+        color: act ? '#193f9e' : '#bec1cc'
+      }}>{label}</span>
+    </div>
+  ))}
+</div>
 
       </div>
     </>

@@ -6,9 +6,9 @@ const firebaseConfig = {
   authDomain: "appcrisi.firebaseapp.com",
   databaseURL: "https://appcrisi-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "appcrisi",
-  storageBucket: "appcrisi.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef"
+  storageBucket: "appcrisi.firebasestorage.app",
+  messagingSenderId: "474165776971",
+  appId: "1:474165776971:web:f7a1eb7867ad0b970eb3ce"
 }
 
 const app = initializeApp(firebaseConfig)

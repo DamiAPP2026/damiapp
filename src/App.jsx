@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import Home from './Home'
 import CrisiPage from './CrisiPage'
 import DiarioCrisi from './DiarioCrisi'
-import SOSPage from './SOSPage'
 import TerapiePage from './TerapiePage'
+import SOSPage from './SOSPage'
+import ToiletPage from './ToiletPage'
+import CondividiPage from './CondividiPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
-const VERSION = '05.00.07'
+const VERSION = '05.00.08'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -74,7 +76,6 @@ function Disclaimer({ nome, onAccept }) {
             Leggi attentamente prima di continuare
           </div>
         </div>
-
         <div style={{
           background:'#f3f4f7', borderRadius:'14px', padding:'16px',
           marginBottom:'20px', fontSize:'12px', color:'#394058',
@@ -87,41 +88,32 @@ function Disclaimer({ nome, onAccept }) {
           <p style={{marginBottom:'10px'}}>
             <strong style={{color:'#02153f'}}>1. Responsabilità dei dati</strong><br/>
             DamiAPP è uno strumento di supporto personale. I dati inseriti
-            sono sotto la tua esclusiva responsabilità. Gli sviluppatori non
-            sono responsabili per errori, perdite o utilizzi impropri delle
-            informazioni inserite.
+            sono sotto la tua esclusiva responsabilità.
           </p>
           <p style={{marginBottom:'10px'}}>
             <strong style={{color:'#02153f'}}>2. Protezione dei dati</strong><br/>
             I dati sono salvati su Firebase (Google).
             <strong style={{color:'#F7295A'}}> DamiAPP non garantisce
-            la protezione assoluta dei dati</strong> e non è conforme
-            a normative specifiche per dati sanitari. Non inserire dati
-            strettamente confidenziali.
+            la protezione assoluta dei dati.</strong>
           </p>
           <p style={{marginBottom:'10px'}}>
             <strong style={{color:'#02153f'}}>3. Uso medico</strong><br/>
-            DamiAPP <strong>non sostituisce il medico</strong> né costituisce
-            consulenza medica. In caso di emergenza chiama sempre il 112.
+            DamiAPP <strong>non sostituisce il medico</strong>. In caso di emergenza chiama il 112.
           </p>
           <p style={{marginBottom:'10px'}}>
             <strong style={{color:'#02153f'}}>4. Modalità Demo</strong><br/>
-            In modalità Demo tutti i dati sono fittizi e a scopo dimostrativo.
-            Non inserire dati reali in modalità demo.
+            In modalità Demo tutti i dati sono fittizi e dimostrativi.
           </p>
           <p style={{margin:0, color:'#bec1cc', fontSize:'11px'}}>
-            Versione {VERSION} — Continuando accetti queste condizioni.
+            v{VERSION} — Continuando accetti queste condizioni.
           </p>
         </div>
-
         <button onClick={onAccept} style={{
           width:'100%', padding:'15px', borderRadius:'50px', border:'none',
           cursor:'pointer', fontWeight:'800', fontSize:'15px', color:'#fff',
           background:'linear-gradient(135deg,#08184c,#193f9e)',
           boxShadow:'0 6px 20px rgba(8,24,76,0.35)', marginBottom:'10px'
-        }}>
-          ✅ Ho letto e accetto
-        </button>
+        }}>✅ Ho letto e accetto</button>
         <div style={{textAlign:'center', fontSize:'11px', color:'#bec1cc'}}>
           Non accettando non potrai utilizzare l'app
         </div>
@@ -154,19 +146,15 @@ function OnboardingModal({ onDone, isDemo }) {
             {isDemo ? '👋 Benvenuto nella Demo!' : 'Benvenuto in DamiAPP'}
           </div>
           <div style={{fontSize:'13px', color:'#7c8088', lineHeight:'1.5'}}>
-            {isDemo
-              ? 'Come ti chiami? Personalizziamo la demo per te.'
-              : 'Come ti chiami? Ti saluteremo ogni giorno.'}
+            {isDemo ? 'Come ti chiami? Personalizziamo la demo.' : 'Come ti chiami? Ti saluteremo ogni giorno.'}
           </div>
           {isDemo && (
             <div style={{
               marginTop:'10px', padding:'8px 12px',
-              background:'rgba(255,140,66,0.12)',
-              borderRadius:'10px', border:'1px solid rgba(255,140,66,0.3)',
+              background:'rgba(255,140,66,0.12)', borderRadius:'10px',
+              border:'1px solid rgba(255,140,66,0.3)',
               fontSize:'11px', color:'#8B6914', fontWeight:'600'
-            }}>
-              🎭 Modalità Demo — dati fittizi
-            </div>
+            }}>🎭 Modalità Demo — dati fittizi</div>
           )}
         </div>
         <input
@@ -195,9 +183,7 @@ function OnboardingModal({ onDone, isDemo }) {
             cursor: nome.trim() ? 'pointer' : 'default',
             boxShadow: nome.trim() ? '0 6px 20px rgba(8,24,76,0.35)' : 'none'
           }}
-        >
-          Inizia →
-        </button>
+        >Inizia →</button>
       </div>
     </div>
   )
@@ -208,11 +194,29 @@ function Login({ onLogin }) {
   const [error, setError] = useState('')
   const [tab, setTab] = useState('paziente')
   const [token, setToken] = useState('')
+  const [ricordaPin, setRicordaPin] = useState(false)
+
+  // Carica PIN salvato
+  useEffect(() => {
+    const savedPin = localStorage.getItem('damiapp_saved_pin')
+    if (savedPin) {
+      setPin(savedPin)
+      setRicordaPin(true)
+    }
+  }, [])
 
   function handleLogin() {
-    if (pin === PIN_REALE) onLogin(false)
-    else if (pin === PIN_DEMO) onLogin(true)
-    else { setError('PIN errato. Riprova.'); setPin('') }
+    if (pin === PIN_REALE || pin === PIN_DEMO) {
+      if (ricordaPin) {
+        localStorage.setItem('damiapp_saved_pin', pin)
+      } else {
+        localStorage.removeItem('damiapp_saved_pin')
+      }
+      onLogin(pin === PIN_DEMO)
+    } else {
+      setError('PIN errato. Riprova.')
+      setPin('')
+    }
   }
 
   return (
@@ -224,8 +228,9 @@ function Login({ onLogin }) {
       <div style={{
         background:'#feffff', borderRadius:'28px', overflow:'hidden',
         width:'100%', maxWidth:'340px',
-        boxShadow:'0 20px 60px rgba(2,21,63,0.20), 0 8px 20px rgba(2,21,63,0.10), 0 2px 6px rgba(0,0,0,0.06)'
+        boxShadow:'0 20px 60px rgba(2,21,63,0.20), 0 8px 20px rgba(2,21,63,0.10)'
       }}>
+        {/* Header */}
         <div style={{
           background:'linear-gradient(135deg,#08184c,#193f9e)',
           padding:'36px 24px 30px', textAlign:'center', position:'relative'
@@ -233,13 +238,13 @@ function Login({ onLogin }) {
           <div style={{
             position:'absolute', top:'10px', right:'14px',
             fontSize:'10px', color:'rgba(255,255,255,0.35)',
-            fontWeight:'600', letterSpacing:'0.5px'
+            fontWeight:'600'
           }}>v{VERSION}</div>
           <img src="/DamiLogo.png" alt="logo" style={{
             width:'100px', height:'100px', borderRadius:'50%',
             objectFit:'cover', marginBottom:'16px',
             border:'3px solid rgba(255,255,255,0.25)',
-            boxShadow:'0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'
+            boxShadow:'0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)'
           }}/>
           <div style={{fontSize:'28px', fontWeight:'900', color:'#fff', letterSpacing:'-0.5px'}}>
             DamiAPP
@@ -249,6 +254,7 @@ function Login({ onLogin }) {
           </div>
         </div>
 
+        {/* Tab */}
         <div style={{
           display:'grid', gridTemplateColumns:'1fr 1fr',
           background:'#f3f4f7', margin:'16px 16px 0',
@@ -294,6 +300,28 @@ function Login({ onLogin }) {
                 onFocus={e => e.target.style.borderColor='#2e84e9'}
                 onBlur={e => e.target.style.borderColor='#e8eaf0'}
               />
+
+              {/* Ricorda PIN */}
+              <div
+                onClick={() => setRicordaPin(!ricordaPin)}
+                style={{
+                  display:'flex', alignItems:'center', gap:'8px',
+                  cursor:'pointer', marginBottom:'14px', userSelect:'none'
+                }}>
+                <div style={{
+                  width:'20px', height:'20px', borderRadius:'6px',
+                  border:`2px solid ${ricordaPin ? '#193f9e' : '#dde0ed'}`,
+                  background: ricordaPin ? '#193f9e' : '#fff',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  flexShrink:0, transition:'all 0.2s'
+                }}>
+                  {ricordaPin && <span style={{color:'#fff', fontSize:'13px', fontWeight:'900'}}>✓</span>}
+                </div>
+                <span style={{fontSize:'12px', color:'#7c8088', fontWeight:'600'}}>
+                  Ricorda PIN per accesso rapido
+                </span>
+              </div>
+
               {error && (
                 <div style={{
                   color:'#e53935', fontSize:'13px', textAlign:'center',
@@ -307,11 +335,8 @@ function Login({ onLogin }) {
                 boxShadow:'0 8px 24px rgba(8,24,76,0.35)'
               }}>Accedi</button>
               <div style={{
-                textAlign:'center', marginTop:'12px',
-                fontSize:'11px', color:'#bec1cc'
-              }}>
-                💡 PIN demo disponibile per la presentazione
-              </div>
+                textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'
+              }}>💡 PIN demo disponibile per la presentazione</div>
             </>
           ) : (
             <>
@@ -347,21 +372,58 @@ function Login({ onLogin }) {
                 boxShadow:'0 8px 24px rgba(0,191,166,0.3)'
               }}>Accedi come Medico</button>
               <div style={{
-                textAlign:'center', marginTop:'12px',
-                fontSize:'11px', color:'#bec1cc'
-              }}>
-                Il token ti è stato fornito dalla famiglia del paziente
-              </div>
+                textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'
+              }}>Il token ti è stato fornito dalla famiglia del paziente</div>
             </>
           )}
           <div style={{
             textAlign:'center', marginTop:'16px', fontSize:'12px', color:'#bec1cc',
             display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'
-          }}>
-            🔒 Dati cifrati e protetti
-          </div>
+          }}>🔒 Dati cifrati e protetti</div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Navbar condivisa
+export function Navbar({ page, onNavigate }) {
+  const items = [
+    {Icon:'🏠', label:'Home', page:'home'},
+    {Icon:'📋', label:'Diario', page:'diario'},
+    {Icon:'💊', label:'Terapie', page:'terapie'},
+    {Icon:'🚽', label:'Toilet', page:'toilet'},
+    {Icon:'🔗', label:'Condividi', page:'condividi'},
+    {Icon:'⚙️', label:'Altro', page:'altro'},
+  ]
+  return (
+    <div style={{
+      position:'fixed', bottom:0, left:0, right:0,
+      background:'#feffff', borderTop:'1px solid #f0f1f4',
+      display:'flex', padding:'7px 0 14px',
+      boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',
+      zIndex:100, maxWidth:'480px', margin:'0 auto'
+    }}>
+      {items.map(({Icon, label, page:p}) => {
+        const act = page === p || (p === 'home' && page === 'home')
+        return (
+          <div key={p} onClick={() => onNavigate(p)} style={{
+            flex:1, display:'flex', flexDirection:'column',
+            alignItems:'center', gap:'3px', cursor:'pointer'
+          }}>
+            <div style={{
+              width:'34px', height:'24px', display:'flex',
+              alignItems:'center', justifyContent:'center',
+              borderRadius:'8px', background: act ? '#EEF3FD' : 'transparent',
+              fontSize:'15px'
+            }}>{Icon}</div>
+            <span style={{
+              fontSize:'9px', fontWeight: act ? '800' : '500',
+              color: act ? '#193f9e' : '#bec1cc'
+            }}>{label}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -406,37 +468,70 @@ export default function App() {
 
   if (!authenticated) return <Login onLogin={handleLogin} />
 
+  const noNavPages = ['crisi', 'sos']
+
   return (
     <>
       {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo} />}
       {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer} />}
+
       {page === 'crisi'
-  ? <CrisiPage
-      onBack={() => setPage('home')}
-      timerSecInizio={timerSecCrisi}
-      isDemo={isDemo}
-    />
-  : page === 'diario'
-  ? <DiarioCrisi
-      onBack={() => setPage('home')}
-      isDemo={isDemo}
-    />
-  : page === 'terapie'
-  ? <TerapiePage
-      onBack={() => setPage('home')}
-      isDemo={isDemo}
-    />
-  : page === 'sos'
-  ? <SOSPage
-      onBack={() => setPage('home')}
-    />
-  : <Home
-      nomeUtente={nomeEffettivo}
-      frase={getFrase()}
-      isDemo={isDemo}
-      onNavigate={handleNavigate}
-    />
-}
+        ? <CrisiPage onBack={() => setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>
+        : page === 'sos'
+        ? <SOSPage onBack={() => setPage('home')}/>
+        : (
+          <>
+            {page === 'home' && <Home nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} onNavigate={handleNavigate}/>}
+            {page === 'diario' && <DiarioCrisi onBack={() => setPage('home')} isDemo={isDemo}/>}
+            {page === 'terapie' && <TerapiePage onBack={() => setPage('home')} isDemo={isDemo}/>}
+            {page === 'toilet' && <ToiletPage onBack={() => setPage('home')} isDemo={isDemo}/>}
+            {page === 'condividi' && <CondividiPage onBack={() => setPage('home')} isDemo={isDemo}/>}
+            {page === 'altro' && (
+              <div style={{
+                background:'#f3f4f7', minHeight:'100vh', paddingBottom:'80px',
+                fontFamily:"-apple-system,'Segoe UI',sans-serif",
+                maxWidth:'480px', margin:'0 auto'
+              }}>
+                <div style={{
+                  background:'linear-gradient(135deg,#08184c,#193f9e)',
+                  padding:'20px 16px 24px'
+                }}>
+                  <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>⚙️ Altro</div>
+                  <div style={{fontSize:'11px', color:'rgba(255,255,255,0.7)'}}>Altre funzionalità</div>
+                </div>
+                <div style={{padding:'12px'}}>
+                  {[
+                    {ico:'💊', label:'Magazzino medicinali', sub:'Scorte e scadenze'},
+                    {ico:'🎒', label:'Cosa portare', sub:'Liste personalizzate'},
+                    {ico:'📄', label:'Documenti personali', sub:'Archivio documenti'},
+                    {ico:'🏥', label:'Documenti medici', sub:'Referti e visite'},
+                    {ico:'📞', label:'Rubrica', sub:'Contatti medici'},
+                    {ico:'💳', label:'Pagamenti', sub:'Gestione spese'},
+                  ].map((item, i) => (
+                    <div key={i} style={{
+                      background:'#feffff', borderRadius:'14px', padding:'14px',
+                      marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px',
+                      boxShadow:'0 4px 16px rgba(2,21,63,0.08)', cursor:'pointer'
+                    }}>
+                      <div style={{
+                        width:'40px', height:'40px', borderRadius:'12px',
+                        background:'#f3f4f7', display:'flex', alignItems:'center',
+                        justifyContent:'center', fontSize:'20px', flexShrink:0
+                      }}>{item.ico}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px', fontWeight:'700', color:'#02153f'}}>{item.label}</div>
+                        <div style={{fontSize:'11px', color:'#7c8088'}}>{item.sub}</div>
+                      </div>
+                      <span style={{color:'#bec1cc', fontSize:'18px'}}>›</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Navbar page={page} onNavigate={handleNavigate}/>
+          </>
+        )
+      }
     </>
   )
 }
