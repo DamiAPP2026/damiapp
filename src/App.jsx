@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Home from './Home'
 
 const PIN = '261120'
-const VERSION = '05.00.02'
+const VERSION = '05.00.03'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
