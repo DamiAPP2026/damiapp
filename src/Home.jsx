@@ -91,7 +91,7 @@ export default function HomeScreen({ nomeUtente, frase, isDemo, onNavigate }) {
 
         {/* ── HERO CARD ── */}
         <div style={{padding:'12px 12px 0'}}>
-          <div style={{background:'#feffff', borderRadius:'22px', padding:'14px 18px 16px', boxShadow:sh}}>
+          <div style={{background:'#fdfdfd', borderRadius:'22px', padding:'14px 18px 16px', boxShadow:sh}}>
 
             {/* Riga 1: Data + Ora in cima a destra */}
             <div style={{

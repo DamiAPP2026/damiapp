@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Play, Square, RotateCcw, ChevronLeft, Check, Save, ChevronDown } from 'lucide-react'
+import { Play, Square, RotateCcw, ChevronLeft, Check, Save } from 'lucide-react'
 
 const TIPI_CRISI = [
   { value:'Crisi tonico-cloniche', label:'Tonico-cloniche', sub:'Grande male', color:'#F7295A' },
@@ -11,74 +11,89 @@ const TIPI_CRISI = [
 ]
 
 const AREE = [
-  'Braccio dx', 'Braccio sx', 'Gamba dx', 'Gamba sx',
-  'Capo verso dx', 'Capo verso sx', 'Parte dx del corpo',
-  'Parte sx del corpo', 'Crisi generalizzata', 'Desaturazione', 'Scialorrea'
+  'Braccio dx','Braccio sx','Gamba dx','Gamba sx',
+  'Capo verso dx','Capo verso sx','Parte dx del corpo',
+  'Parte sx del corpo','Crisi generalizzata','Desaturazione','Scialorrea'
 ]
 
-const CIBI = ['Nessuno', 'Colazione', 'Pranzo', 'Cena', 'Spuntino', 'Digiuno']
-
 const TRIGGER = [
-  'Nessuno noto', 'Farmaco dimenticato', 'Poco sonno', 'Stress',
-  'Febbre', 'Luci intermittenti', 'Stanchezza', 'Attività fisica intensa',
-  'Altro'
+  'Nessuno noto','Farmaco dimenticato','Poco sonno','Stress',
+  'Febbre','Luci intermittenti','Stanchezza','Attività fisica intensa','Altro'
 ]
 
 const FARMACI_SOCCORSO = [
-  'Nessuno', 'Diazepam (Valium)', 'Midazolam (Buccolam)',
-  'Lorazepam', 'Clonazepam', 'Diazepam rettale', 'Altro'
+  'Nessuno','Diazepam (Valium)','Midazolam (Buccolam)',
+  'Lorazepam','Clonazepam','Diazepam rettale','Altro'
 ]
 
 const ATTIVITA = [
-  'Dormiva', 'Riposava sveglio', 'Mangiava', 'Giocava',
-  'Guardava TV/schermo', 'In bagno', 'Camminava', 'Altro'
+  'Dormiva','Riposava sveglio','Mangiava','Giocava',
+  'Guardava TV/schermo','In bagno','Camminava','Altro'
 ]
 
 const LUOGO = [
-  'Casa — camera', 'Casa — soggiorno', 'Casa — bagno',
-  'Scuola', 'In auto', 'Spazio aperto', 'Altro'
+  'Casa — camera','Casa — soggiorno','Casa — bagno',
+  'Scuola','In auto','Spazio aperto','Altro'
 ]
 
 const POST_CRISI = [
-  'Sonno profondo', 'Confusione', 'Stanchezza', 'Normale',
-  'Agitazione', 'Pianto', 'Dolore', 'Amnesia'
+  'Sonno profondo','Confusione','Stanchezza','Normale',
+  'Agitazione','Pianto','Dolore','Amnesia'
 ]
 
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 
-function SelectMenu({ label, value, onChange, options, placeholder }) {
+function ChipGroup({ options, value, onChange, color = '#2e84e9', colorBg = '#EEF3FD' }) {
   return (
-    <div style={{marginBottom:'10px'}}>
-      {label && (
-        <div style={{
-          fontSize:'11px', fontWeight:'700', color:'#7c8088',
-          textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'6px'
-        }}>{label}</div>
-      )}
-      <div style={{position:'relative'}}>
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          style={{
-            width:'100%', padding:'11px 36px 11px 12px',
-            borderRadius:'12px', border:'1.5px solid #f0f1f4',
-            fontSize:'13px', color: value ? '#02153f' : '#bec1cc',
-            background:'#f3f4f7', fontFamily:'inherit',
-            appearance:'none', outline:'none', cursor:'pointer'
-          }}
-          onFocus={e => e.target.style.borderColor='#2e84e9'}
-          onBlur={e => e.target.style.borderColor='#f0f1f4'}
-        >
-          <option value="">{placeholder || 'Seleziona...'}</option>
-          {options.map(o => (
-            <option key={o} value={o}>{o}</option>
-          ))}
-        </select>
-        <ChevronDown size={16} color="#bec1cc" style={{
-          position:'absolute', right:'12px', top:'50%',
-          transform:'translateY(-50%)', pointerEvents:'none'
-        }}/>
+    <div style={{display:'flex', flexWrap:'wrap', gap:'6px'}}>
+      {options.map(o => {
+        const sel = value === o
+        return (
+          <div key={o} onClick={() => onChange(sel ? '' : o)} style={{
+            padding:'6px 13px', borderRadius:'20px', cursor:'pointer',
+            border:`1.5px solid ${sel ? color : '#f0f1f4'}`,
+            background: sel ? colorBg : '#feffff',
+            fontSize:'12px', fontWeight: sel ? '700' : '500',
+            color: sel ? color : '#7c8088', transition:'all 0.15s'
+          }}>
+            {sel ? '✓ ' : ''}{o}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function MultiChipGroup({ options, values, onChange, color = '#2e84e9', colorBg = '#EEF3FD' }) {
+  return (
+    <div style={{display:'flex', flexWrap:'wrap', gap:'6px'}}>
+      {options.map(o => {
+        const sel = values.includes(o)
+        return (
+          <div key={o} onClick={() => onChange(
+            sel ? values.filter(v => v !== o) : [...values, o]
+          )} style={{
+            padding:'6px 13px', borderRadius:'20px', cursor:'pointer',
+            border:`1.5px solid ${sel ? color : '#f0f1f4'}`,
+            background: sel ? colorBg : '#feffff',
+            fontSize:'12px', fontWeight: sel ? '700' : '500',
+            color: sel ? color : '#7c8088', transition:'all 0.15s'
+          }}>
+            {sel ? '✓ ' : ''}{o}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SectionCard({ title, children }) {
+  return (
+    <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
+      <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'12px'}}>
+        {title}
       </div>
+      {children}
     </div>
   )
 }
@@ -89,13 +104,12 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
   const [saved, setSaved] = useState(false)
   const timerRef = useRef(null)
 
-  // Form fields
   const [tipo, setTipo] = useState('')
   const [aree, setAree] = useState([])
   const [trigger, setTrigger] = useState('')
   const [attivita, setAttivita] = useState('')
   const [luogo, setLuogo] = useState('')
-  const [cibo, setCibo] = useState('')
+  const [ciboDescrizione, setCiboDescrizione] = useState('')
   const [farmaco, setFarmaco] = useState('')
   const [farmacoAltro, setFarmacoAltro] = useState('')
   const [farmacoOra, setFarmacoOra] = useState('')
@@ -122,16 +136,9 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
   }
   function stopTimer() { setRunning(false); clearInterval(timerRef.current) }
   function resetTimer() { stopTimer(); setTimerSec(0) }
-
   function fmt(s) {
     return [Math.floor(s/3600), Math.floor((s%3600)/60), s%60]
       .map(n => String(n).padStart(2,'0')).join(':')
-  }
-
-  function toggleArea(area) {
-    setAree(prev => prev.includes(area)
-      ? prev.filter(a => a !== area)
-      : [...prev, area])
   }
 
   function handleSave() {
@@ -139,31 +146,15 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
     stopTimer()
     const crisi = {
       id: Date.now(),
-      type: tipo,
-      duration: fmt(timerSec),
-      durationSec: timerSec,
-      date: new Date().toLocaleString('it-IT'),
-      timestamp: Date.now(),
-      areas: aree,
-      trigger,
-      attivita,
-      luogo,
-      ciboPreCrisi: cibo,
+      type: tipo, duration: fmt(timerSec), durationSec: timerSec,
+      date: new Date().toLocaleString('it-IT'), timestamp: Date.now(),
+      areas: aree, trigger, attivita, luogo,
+      ciboPreCrisi: ciboDescrizione,
       farmaco: farmaco === 'Altro' ? farmacoAltro : farmaco,
-      farmacoOra,
-      intensita,
-      perdCoscienza,
-      morseLingua,
-      enuresi,
-      cianosi,
-      emissioneVocale,
-      postCrisi,
-      note,
+      farmacoOra, intensita, perdCoscienza, morseLingua,
+      enuresi, cianosi, emissioneVocale, postCrisi, note,
     }
-    if (!isDemo) {
-      console.log('Salvo crisi su Firebase:', crisi)
-      // db.ref('crises').push(encrypt(crisi))
-    }
+    if (!isDemo) console.log('Salvo crisi su Firebase:', crisi)
     setSaved(true)
     setTimeout(() => onBack && onBack(), 2200)
   }
@@ -171,8 +162,8 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
   if (saved) {
     return (
       <div style={{
-        minHeight:'100vh', background:'#f3f4f7',
-        display:'flex', alignItems:'center', justifyContent:'center',
+        minHeight:'100vh', background:'#f3f4f7', display:'flex',
+        alignItems:'center', justifyContent:'center',
         fontFamily:"-apple-system,'Segoe UI',sans-serif"
       }}>
         <div style={{textAlign:'center', padding:'40px'}}>
@@ -180,8 +171,7 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
             width:'80px', height:'80px', borderRadius:'50%',
             background:'linear-gradient(135deg,#00BFA6,#2e84e9)',
             display:'flex', alignItems:'center', justifyContent:'center',
-            margin:'0 auto 20px',
-            boxShadow:'0 8px 24px rgba(0,191,166,0.35)'
+            margin:'0 auto 20px', boxShadow:'0 8px 24px rgba(0,191,166,0.35)'
           }}>
             <Check size={40} color="#fff" strokeWidth={3}/>
           </div>
@@ -203,6 +193,11 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
     )
   }
 
+  const labelStyle = {
+    fontSize:'11px', fontWeight:'700', color:'#7c8088',
+    textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'8px'
+  }
+
   return (
     <>
       <style>{`
@@ -211,37 +206,27 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
         .crisi-wrap{background:#f3f4f7;min-height:100vh;
           font-family:-apple-system,'Segoe UI',sans-serif;
           padding-bottom:40px;width:100%;max-width:480px;margin:0 auto;}
-        .toggle-pill{display:flex;align-items:center;justify-content:space-between;
-          padding:10px 12px;border-radius:12px;cursor:pointer;
-          margin-bottom:7px;transition:all 0.15s;}
       `}</style>
-
       <div className="crisi-wrap">
 
-        {/* ── HEADER + TIMER ── */}
+        {/* HEADER + TIMER */}
         <div style={{
           background:'linear-gradient(135deg,#F7295A,#FF8C42)',
-          padding:'14px 16px 20px',
-          position:'sticky', top:0, zIndex:10
+          padding:'14px 16px 20px', position:'sticky', top:0, zIndex:10
         }}>
           <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'14px'}}>
             <button onClick={onBack} style={{
               width:'36px', height:'36px', borderRadius:'50%',
               background:'rgba(255,255,255,0.2)', border:'none',
               display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'
-            }}>
-              <ChevronLeft size={20} color="#fff"/>
-            </button>
+            }}><ChevronLeft size={20} color="#fff"/></button>
             <div>
-              <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>
-                🚨 Registra crisi
-              </div>
+              <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>🚨 Registra crisi</div>
               <div style={{fontSize:'11px', color:'rgba(255,255,255,0.75)'}}>
                 {running ? '🔴 Timer in corso...' : 'Compila e salva'}
               </div>
             </div>
           </div>
-
           <div style={{
             background:'rgba(255,255,255,0.15)', borderRadius:'18px',
             padding:'14px', textAlign:'center'
@@ -252,39 +237,29 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
               lineHeight:1, marginBottom:'10px'
             }}>{fmt(timerSec)}</div>
             <div style={{display:'flex', justifyContent:'center', gap:'12px'}}>
-              <button onClick={startTimer} style={{
-                width:'44px', height:'44px', borderRadius:'50%', border:'none',
-                background: running ? 'rgba(255,255,255,0.2)' : '#fff',
-                display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer',
-                boxShadow: running ? 'none' : '0 4px 12px rgba(0,0,0,0.2)'
-              }}>
-                <Play size={18} color={running ? '#fff' : '#F7295A'} fill={running ? '#fff' : '#F7295A'}/>
-              </button>
-              <button onClick={stopTimer} style={{
-                width:'44px', height:'44px', borderRadius:'50%', border:'none',
-                background:'rgba(255,255,255,0.2)',
-                display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'
-              }}>
-                <Square size={18} color="#fff" fill="#fff"/>
-              </button>
-              <button onClick={resetTimer} style={{
-                width:'44px', height:'44px', borderRadius:'50%', border:'none',
-                background:'rgba(255,255,255,0.15)',
-                display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'
-              }}>
-                <RotateCcw size={18} color="#fff"/>
-              </button>
+              {[
+                {fn:startTimer, Icon:Play, bg: running ? 'rgba(255,255,255,0.2)' : '#fff',
+                  ic: running ? '#fff' : '#F7295A', fill: true},
+                {fn:stopTimer, Icon:Square, bg:'rgba(255,255,255,0.2)', ic:'#fff', fill:true},
+                {fn:resetTimer, Icon:RotateCcw, bg:'rgba(255,255,255,0.15)', ic:'#fff', fill:false},
+              ].map(({fn, Icon, bg, ic, fill}, i) => (
+                <button key={i} onClick={fn} style={{
+                  width:'44px', height:'44px', borderRadius:'50%', border:'none',
+                  background:bg, display:'flex', alignItems:'center',
+                  justifyContent:'center', cursor:'pointer',
+                  boxShadow: i===0 && !running ? '0 4px 12px rgba(0,0,0,0.2)' : 'none'
+                }}>
+                  <Icon size={18} color={ic} fill={fill ? ic : 'none'}/>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         <div style={{padding:'12px 12px 0'}}>
 
-          {/* ── TIPO CRISI ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
-            <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'12px'}}>
-              ⚡ Tipo di crisi *
-            </div>
+          {/* TIPO CRISI */}
+          <SectionCard title="⚡ Tipo di crisi *">
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'7px'}}>
               {TIPI_CRISI.map(t => (
                 <div key={t.value} onClick={() => setTipo(t.value)} style={{
@@ -310,72 +285,59 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
                 </div>
               ))}
             </div>
-          </div>
+          </SectionCard>
 
-          {/* ── AREE CORPOREE ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
-            <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'10px'}}>
-              🧍 Aree coinvolte
-            </div>
-            <div style={{display:'flex', flexWrap:'wrap', gap:'6px'}}>
-              {AREE.map(area => {
-                const sel = aree.includes(area)
-                return (
-                  <div key={area} onClick={() => toggleArea(area)} style={{
-                    padding:'6px 12px', borderRadius:'20px', cursor:'pointer',
-                    border:`1.5px solid ${sel ? '#2e84e9' : '#f0f1f4'}`,
-                    background: sel ? '#EEF3FD' : '#feffff',
-                    fontSize:'11px', fontWeight: sel ? '700' : '500',
-                    color: sel ? '#193f9e' : '#7c8088', transition:'all 0.15s'
-                  }}>
-                    {sel ? '✓ ' : ''}{area}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          {/* AREE CORPOREE */}
+          <SectionCard title="🧍 Aree coinvolte">
+            <MultiChipGroup
+              options={AREE}
+              values={aree}
+              onChange={setAree}
+              color="#2e84e9"
+              colorBg="#EEF3FD"
+            />
+          </SectionCard>
 
-          {/* ── INTENSITÀ ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
+          {/* INTENSITÀ */}
+          <SectionCard title="📊 Intensità percepita">
             <div style={{
               display:'flex', justifyContent:'space-between',
               alignItems:'center', marginBottom:'10px'
             }}>
-              <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f'}}>
-                📊 Intensità percepita
-              </div>
+              <div style={{fontSize:'12px', color:'#7c8088'}}>Scala da 1 (lieve) a 10 (grave)</div>
               <div style={{
-                width:'32px', height:'32px', borderRadius:'50%',
+                width:'34px', height:'34px', borderRadius:'50%',
                 background: intensita<=3 ? '#00BFA6' : intensita<=6 ? '#FFD93D' : '#F7295A',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:'14px', fontWeight:'900', color:'#fff'
+                fontSize:'15px', fontWeight:'900', color:'#fff'
               }}>{intensita}</div>
             </div>
             <input type="range" min="1" max="10" value={intensita}
               onChange={e => setIntensita(Number(e.target.value))}
               style={{width:'100%', accentColor:'#2e84e9'}}/>
             <div style={{display:'flex', justifyContent:'space-between', marginTop:'4px'}}>
-              <span style={{fontSize:'10px', color:'#00BFA6', fontWeight:'600'}}>Lieve (1)</span>
-              <span style={{fontSize:'10px', color:'#FFD93D', fontWeight:'600'}}>Moderata (5)</span>
-              <span style={{fontSize:'10px', color:'#F7295A', fontWeight:'600'}}>Grave (10)</span>
+              <span style={{fontSize:'10px', color:'#00BFA6', fontWeight:'600'}}>Lieve</span>
+              <span style={{fontSize:'10px', color:'#FFD93D', fontWeight:'600'}}>Moderata</span>
+              <span style={{fontSize:'10px', color:'#F7295A', fontWeight:'600'}}>Grave</span>
             </div>
-          </div>
+          </SectionCard>
 
-          {/* ── SINTOMI ASSOCIATI ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
-            <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'10px'}}>
-              🔍 Sintomi associati
-            </div>
+          {/* SINTOMI ASSOCIATI */}
+          <SectionCard title="🔍 Sintomi associati">
             {[
-              { label:'Perdita di coscienza', value:perdCoscienza, set:setPerdCoscienza, color:'#F7295A' },
-              { label:'Morso della lingua', value:morseLingua, set:setMorseLingua, color:'#FF8C42' },
-              { label:'Enuresi (pipì involontaria)', value:enuresi, set:setEnuresi, color:'#7B5EA7' },
-              { label:'Cianosi (colorito bluastro)', value:cianosi, set:setCianosi, color:'#2e84e9' },
-              { label:'Emissione vocale', value:emissioneVocale, set:setEmissioneVocale, color:'#00BFA6' },
+              {label:'Perdita di coscienza', value:perdCoscienza, set:setPerdCoscienza, color:'#F7295A'},
+              {label:'Morso della lingua', value:morseLingua, set:setMorseLingua, color:'#FF8C42'},
+              {label:'Enuresi (pipì involontaria)', value:enuresi, set:setEnuresi, color:'#7B5EA7'},
+              {label:'Cianosi (colorito bluastro)', value:cianosi, set:setCianosi, color:'#2e84e9'},
+              {label:'Emissione vocale', value:emissioneVocale, set:setEmissioneVocale, color:'#00BFA6'},
             ].map(({label, value, set, color}) => (
-              <div key={label} onClick={() => set(!value)} className="toggle-pill" style={{
+              <div key={label} onClick={() => set(!value)} style={{
+                display:'flex', alignItems:'center', justifyContent:'space-between',
+                padding:'10px 12px', borderRadius:'12px', cursor:'pointer',
+                marginBottom:'7px',
                 background: value ? `${color}12` : '#f3f4f7',
-                border: `1.5px solid ${value ? `${color}44` : 'transparent'}`,
+                border:`1.5px solid ${value ? `${color}44` : 'transparent'}`,
+                transition:'all 0.15s'
               }}>
                 <div style={{fontSize:'12px', fontWeight:'600', color: value ? color : '#394058'}}>
                   {label}
@@ -388,68 +350,76 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
                   <div style={{
                     width:'18px', height:'18px', borderRadius:'50%', background:'#fff',
                     position:'absolute', top:'3px',
-                    left: value ? '23px' : '3px',
-                    transition:'left 0.2s',
+                    left: value ? '23px' : '3px', transition:'left 0.2s',
                     boxShadow:'0 1px 3px rgba(0,0,0,0.2)'
                   }}/>
                 </div>
               </div>
             ))}
-          </div>
+          </SectionCard>
 
-          {/* ── TRIGGER + CONTESTO ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
-            <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'12px'}}>
-              🔎 Contesto e trigger
-            </div>
-            <SelectMenu
-              label="Possibile trigger"
+          {/* TRIGGER */}
+          <SectionCard title="🔎 Trigger scatenante">
+            <ChipGroup
+              options={TRIGGER}
               value={trigger}
               onChange={setTrigger}
-              options={TRIGGER}
-              placeholder="Cosa potrebbe averla scatenata?"
+              color="#F7295A"
+              colorBg="#FEF0F4"
             />
-            <SelectMenu
-              label="Attività in corso"
+          </SectionCard>
+
+          {/* ATTIVITÀ + LUOGO */}
+          <SectionCard title="📍 Contesto">
+            <div style={labelStyle}>Attività in corso</div>
+            <ChipGroup
+              options={ATTIVITA}
               value={attivita}
               onChange={setAttivita}
-              options={ATTIVITA}
-              placeholder="Cosa stava facendo?"
+              color="#2e84e9"
+              colorBg="#EEF3FD"
             />
-            <SelectMenu
-              label="Luogo"
+            <div style={{...labelStyle, marginTop:'14px'}}>Luogo</div>
+            <ChipGroup
+              options={LUOGO}
               value={luogo}
               onChange={setLuogo}
-              options={LUOGO}
-              placeholder="Dove si trovava?"
+              color="#7B5EA7"
+              colorBg="#F5F3FF"
             />
-            <SelectMenu
-              label="Cibo pre-crisi"
-              value={cibo}
-              onChange={setCibo}
-              options={CIBI}
-              placeholder="Aveva mangiato?"
-            />
-          </div>
+          </SectionCard>
 
-          {/* ── FARMACO DI SOCCORSO ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
-            <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'12px'}}>
-              💊 Farmaco di soccorso
-            </div>
-            <SelectMenu
-              label="Farmaco somministrato"
+          {/* CIBO PRE-CRISI */}
+          <SectionCard title="🍽️ Cibo pre-crisi">
+            <textarea
+              value={ciboDescrizione}
+              onChange={e => setCiboDescrizione(e.target.value)}
+              placeholder="Descrivi cosa ha mangiato o bevuto prima della crisi. Es: colazione con latte e biscotti, pranzo leggero, a digiuno..."
+              rows={3}
+              style={{
+                width:'100%', border:'1.5px solid #f0f1f4', borderRadius:'12px',
+                padding:'10px 12px', fontSize:'13px', color:'#02153f',
+                background:'#f3f4f7', fontFamily:'inherit', resize:'none',
+                outline:'none', lineHeight:'1.5', boxSizing:'border-box'
+              }}
+              onFocus={e => e.target.style.borderColor='#2e84e9'}
+              onBlur={e => e.target.style.borderColor='#f0f1f4'}
+            />
+          </SectionCard>
+
+          {/* FARMACO DI SOCCORSO */}
+          <SectionCard title="💊 Farmaco di soccorso">
+            <div style={labelStyle}>Farmaco somministrato</div>
+            <ChipGroup
+              options={FARMACI_SOCCORSO}
               value={farmaco}
               onChange={setFarmaco}
-              options={FARMACI_SOCCORSO}
-              placeholder="È stato dato un farmaco?"
+              color="#00BFA6"
+              colorBg="#F0FDFB"
             />
             {farmaco === 'Altro' && (
-              <div style={{marginBottom:'10px'}}>
-                <div style={{fontSize:'11px', fontWeight:'700', color:'#7c8088',
-                  textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'6px'}}>
-                  Specifica farmaco
-                </div>
+              <div style={{marginTop:'10px'}}>
+                <div style={labelStyle}>Specifica farmaco</div>
                 <input
                   value={farmacoAltro}
                   onChange={e => setFarmacoAltro(e.target.value)}
@@ -466,11 +436,8 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
               </div>
             )}
             {farmaco && farmaco !== 'Nessuno' && (
-              <div>
-                <div style={{fontSize:'11px', fontWeight:'700', color:'#7c8088',
-                  textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'6px'}}>
-                  Ora somministrazione
-                </div>
+              <div style={{marginTop:'10px'}}>
+                <div style={labelStyle}>Ora somministrazione</div>
                 <input
                   type="time"
                   value={farmacoOra}
@@ -486,37 +453,21 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
                 />
               </div>
             )}
-          </div>
+          </SectionCard>
 
-          {/* ── POST CRISI ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
-            <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'12px'}}>
-              😴 Stato post-crisi
-            </div>
-            <SelectMenu
+          {/* POST CRISI */}
+          <SectionCard title="😴 Stato post-crisi">
+            <ChipGroup
+              options={POST_CRISI}
               value={postCrisi}
               onChange={setPostCrisi}
-              options={POST_CRISI}
-              placeholder="Come sta dopo la crisi?"
+              color="#7B5EA7"
+              colorBg="#F5F3FF"
             />
-            <div style={{display:'flex', flexWrap:'wrap', gap:'6px', marginTop:'4px'}}>
-              {POST_CRISI.map(s => (
-                <div key={s} onClick={() => setPostCrisi(s)} style={{
-                  padding:'6px 12px', borderRadius:'20px', cursor:'pointer',
-                  border:`1.5px solid ${postCrisi===s ? '#7B5EA7' : '#f0f1f4'}`,
-                  background: postCrisi===s ? '#F5F3FF' : '#feffff',
-                  fontSize:'11px', fontWeight: postCrisi===s ? '700' : '500',
-                  color: postCrisi===s ? '#7B5EA7' : '#7c8088'
-                }}>{s}</div>
-              ))}
-            </div>
-          </div>
+          </SectionCard>
 
-          {/* ── NOTE ── */}
-          <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'16px', boxShadow:sh}}>
-            <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'8px'}}>
-              📝 Note per il medico
-            </div>
+          {/* NOTE */}
+          <SectionCard title="📝 Note per il medico">
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
@@ -531,34 +482,26 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
               onFocus={e => e.target.style.borderColor='#2e84e9'}
               onBlur={e => e.target.style.borderColor='#f0f1f4'}
             />
-          </div>
+          </SectionCard>
 
-          {/* ── SALVA ── */}
+          {/* SALVA */}
           <button onClick={handleSave} style={{
             width:'100%', padding:'17px', borderRadius:'50px', border:'none',
             cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
-            background: tipo
-              ? 'linear-gradient(135deg,#08184c,#2e84e9)'
-              : '#dde0ed',
+            background: tipo ? 'linear-gradient(135deg,#08184c,#2e84e9)' : '#dde0ed',
             boxShadow: tipo ? '0 8px 24px rgba(8,24,76,0.35)' : 'none',
             display:'flex', alignItems:'center', justifyContent:'center',
             gap:'8px', transition:'all 0.2s', marginBottom:'8px'
           }}>
             <Save size={18} color="#fff"/>
-            {tipo
-              ? `Salva crisi${timerSec > 0 ? ' — '+fmt(timerSec) : ''}`
-              : 'Seleziona prima il tipo di crisi'}
+            {tipo ? `Salva crisi${timerSec>0 ? ' — '+fmt(timerSec) : ''}` : 'Seleziona prima il tipo di crisi'}
           </button>
-
           {isDemo && (
             <div style={{
               textAlign:'center', fontSize:'11px',
               color:'#8B6914', fontWeight:'600', marginBottom:'8px'
-            }}>
-              🎭 Modalità demo — dati non salvati su Firebase
-            </div>
+            }}>🎭 Modalità demo — dati non salvati su Firebase</div>
           )}
-
         </div>
       </div>
     </>

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import Home from './Home'
 import CrisiPage from './CrisiPage'
+import DiarioCrisi from './DiarioCrisi'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
-const VERSION = '05.00.06'
+const VERSION = '05.00.07'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -408,18 +409,23 @@ export default function App() {
       {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo} />}
       {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer} />}
       {page === 'crisi'
-        ? <CrisiPage
-            onBack={() => setPage('home')}
-            timerSecInizio={timerSecCrisi}
-            isDemo={isDemo}
-          />
-        : <Home
-            nomeUtente={nomeEffettivo}
-            frase={getFrase()}
-            isDemo={isDemo}
-            onNavigate={handleNavigate}
-          />
-      }
+  ? <CrisiPage
+      onBack={() => setPage('home')}
+      timerSecInizio={timerSecCrisi}
+      isDemo={isDemo}
+    />
+  : page === 'diario'
+  ? <DiarioCrisi
+      onBack={() => setPage('home')}
+      isDemo={isDemo}
+    />
+  : <Home
+      nomeUtente={nomeEffettivo}
+      frase={getFrase()}
+      isDemo={isDemo}
+      onNavigate={handleNavigate}
+    />
+}
     </>
   )
 }
