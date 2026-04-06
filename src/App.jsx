@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import Home from './Home'
+import CrisiPage from './CrisiPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
-const VERSION = '05.00.05'
+const VERSION = '05.00.06'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -222,19 +223,15 @@ function Login({ onLogin }) {
         width:'100%', maxWidth:'340px',
         boxShadow:'0 20px 60px rgba(2,21,63,0.20), 0 8px 20px rgba(2,21,63,0.10), 0 2px 6px rgba(0,0,0,0.06)'
       }}>
-
-        {/* Header */}
         <div style={{
           background:'linear-gradient(135deg,#08184c,#193f9e)',
           padding:'36px 24px 30px', textAlign:'center', position:'relative'
         }}>
-          {/* Versioning alto destra */}
           <div style={{
             position:'absolute', top:'10px', right:'14px',
             fontSize:'10px', color:'rgba(255,255,255,0.35)',
             fontWeight:'600', letterSpacing:'0.5px'
           }}>v{VERSION}</div>
-
           <img src="/DamiLogo.png" alt="logo" style={{
             width:'100px', height:'100px', borderRadius:'50%',
             objectFit:'cover', marginBottom:'16px',
@@ -249,7 +246,6 @@ function Login({ onLogin }) {
           </div>
         </div>
 
-        {/* Tab */}
         <div style={{
           display:'grid', gridTemplateColumns:'1fr 1fr',
           background:'#f3f4f7', margin:'16px 16px 0',
@@ -271,7 +267,6 @@ function Login({ onLogin }) {
           ))}
         </div>
 
-        {/* Form */}
         <div style={{padding:'20px 24px 28px'}}>
           {tab === 'paziente' ? (
             <>
@@ -371,12 +366,14 @@ function Login({ onLogin }) {
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false)
   const [isDemo, setIsDemo] = useState(false)
+  const [page, setPage] = useState('home')
   const [nomeUtente, setNomeUtente] = useState(
     () => localStorage.getItem('damiapp_nome') || ''
   )
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [pendingNome, setPendingNome] = useState('')
+  const [timerSecCrisi, setTimerSecCrisi] = useState(0)
 
   function handleLogin(demo) {
     setIsDemo(demo)
@@ -395,6 +392,11 @@ export default function App() {
     setShowDisclaimer(false)
   }
 
+  function handleNavigate(dest) {
+    if (dest === 'crisi') setTimerSecCrisi(1)
+    setPage(dest)
+  }
+
   const nomeEffettivo = isDemo
     ? (pendingNome || 'Ospite')
     : (pendingNome || nomeUtente || 'Damiano')
@@ -405,7 +407,19 @@ export default function App() {
     <>
       {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo} />}
       {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer} />}
-      <Home nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} />
+      {page === 'crisi'
+        ? <CrisiPage
+            onBack={() => setPage('home')}
+            timerSecInizio={timerSecCrisi}
+            isDemo={isDemo}
+          />
+        : <Home
+            nomeUtente={nomeEffettivo}
+            frase={getFrase()}
+            isDemo={isDemo}
+            onNavigate={handleNavigate}
+          />
+      }
     </>
   )
 }
