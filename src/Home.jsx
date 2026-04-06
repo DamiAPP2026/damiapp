@@ -181,7 +181,7 @@ export default function HomeScreen({ nomeUtente, frase, isDemo, onNavigate }) {
 
               {/* Soccorso */}
               <button
-                onClick={() => window.location.href = 'tel:112'}
+                onClick={() => onNavigate && onNavigate('sos')}
                 style={{
                   height:'50px', borderRadius:'50px',
                   border:'2.5px solid #e53935', background:'#feffff',

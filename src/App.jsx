@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import Home from './Home'
 import CrisiPage from './CrisiPage'
 import DiarioCrisi from './DiarioCrisi'
+import SOSPage from './SOSPage'
+import TerapiePage from './TerapiePage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
@@ -418,6 +420,15 @@ export default function App() {
   ? <DiarioCrisi
       onBack={() => setPage('home')}
       isDemo={isDemo}
+    />
+  : page === 'terapie'
+  ? <TerapiePage
+      onBack={() => setPage('home')}
+      isDemo={isDemo}
+    />
+  : page === 'sos'
+  ? <SOSPage
+      onBack={() => setPage('home')}
     />
   : <Home
       nomeUtente={nomeEffettivo}
