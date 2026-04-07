@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react'
 import { ChevronLeft, Check, Save } from 'lucide-react'
 import { db } from './firebase'
 import { ref, push, onValue } from 'firebase/database'
+import { processFirebaseSnap, encrypt } from './crypto'
 
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 
 const DEMO_LOG = [
-  {id:1, data:'06/04/2026', ora:'08:30', bisogno:'pippi', modalita:'caa-auto', incidentePippi:false, incidenteCacca:false},
-  {id:2, data:'06/04/2026', ora:'13:15', bisogno:'entrambi', modalita:'adulto', incidentePippi:false, incidenteCacca:false},
-  {id:3, data:'05/04/2026', ora:'09:00', bisogno:'cacca', modalita:'caa-guidata', incidentePippi:false, incidenteCacca:false},
-  {id:4, data:'05/04/2026', ora:'15:30', bisogno:'pippi', modalita:'caa-auto', incidentePippi:true, oraPippi:'15:10', incidenteCacca:false},
+  {id:1, timestamp:Date.now()-3600000, data:'07/04/2026', ora:'08:30', bisogno:'pippi', modalita:'caa-auto', incidentePippi:false, incidenteCacca:false},
+  {id:2, timestamp:Date.now()-7200000, data:'07/04/2026', ora:'13:15', bisogno:'entrambi', modalita:'adulto', incidentePippi:false, incidenteCacca:false},
+  {id:3, timestamp:Date.now()-86400000, data:'06/04/2026', ora:'09:00', bisogno:'cacca', modalita:'caa-guidata', incidentePippi:false, incidenteCacca:false},
+  {id:4, timestamp:Date.now()-90000000, data:'06/04/2026', ora:'15:30', bisogno:'pippi', modalita:'caa-auto', incidentePippi:true, oraPippi:'15:10', incidenteCacca:false},
 ]
 
-export default function ToiletPage({ onBack, isDemo }) {
+export default function ToiletPage({ onBack, isDemo, onNavigate }) {
   const oggi = new Date()
   const [ttDate, setTtDate] = useState(oggi.toISOString().split('T')[0])
   const [ttOra, setTtOra] = useState(oggi.toTimeString().slice(0,5))
@@ -24,20 +25,20 @@ export default function ToiletPage({ onBack, isDemo }) {
   const [ttOraCacca, setTtOraCacca] = useState('')
   const [saved, setSaved] = useState(false)
   const [log, setLog] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (isDemo) { setLog(DEMO_LOG); return }
+    if (isDemo) {
+      setLog(DEMO_LOG)
+      setLoading(false)
+      return
+    }
     const ttRef = ref(db, 'toilet_training')
     const unsubscribe = onValue(ttRef, (snapshot) => {
-      const data = snapshot.val()
-      if (data) {
-        const lista = Object.values(data)
-          .filter(Boolean)
-          .sort((a,b) => b.timestamp - a.timestamp)
-        setLog(lista)
-      } else {
-        setLog([])
-      }
+      const lista = processFirebaseSnap(snapshot)
+        .sort((a,b) => b.timestamp - a.timestamp)
+      setLog(lista)
+      setLoading(false)
     })
     return () => unsubscribe()
   }, [isDemo])
@@ -58,7 +59,7 @@ export default function ToiletPage({ onBack, isDemo }) {
       oraCacca: ttIncidenteCacca ? ttOraCacca : '',
     }
     if (!isDemo) {
-      push(ref(db, 'toilet_training'), sessione)
+      push(ref(db, 'toilet_training'), encrypt(sessione))
     }
     setSaved(true)
     setTimeout(() => {
@@ -81,7 +82,8 @@ export default function ToiletPage({ onBack, isDemo }) {
 
   const labelStyle = {
     fontSize:'11px', fontWeight:'700', color:'#7c8088',
-    textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'6px', display:'block'
+    textTransform:'uppercase', letterSpacing:'0.4px',
+    marginBottom:'6px', display:'block'
   }
 
   return (
@@ -100,7 +102,7 @@ export default function ToiletPage({ onBack, isDemo }) {
           background:'linear-gradient(135deg,#7B5EA7,#2e84e9)',
           padding:'14px 16px 24px'
         }}>
-          <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'4px'}}>
+          <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
             <button onClick={onBack} style={{
               width:'36px', height:'36px', borderRadius:'50%',
               background:'rgba(255,255,255,0.2)', border:'none',
@@ -127,11 +129,13 @@ export default function ToiletPage({ onBack, isDemo }) {
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'12px'}}>
               <div>
                 <label style={labelStyle}>Data</label>
-                <input type="date" value={ttDate} onChange={e => setTtDate(e.target.value)} style={inputStyle}/>
+                <input type="date" value={ttDate}
+                  onChange={e => setTtDate(e.target.value)} style={inputStyle}/>
               </div>
               <div>
                 <label style={labelStyle}>Ora</label>
-                <input type="time" value={ttOra} onChange={e => setTtOra(e.target.value)} style={inputStyle}/>
+                <input type="time" value={ttOra}
+                  onChange={e => setTtOra(e.target.value)} style={inputStyle}/>
               </div>
             </div>
 
@@ -193,13 +197,14 @@ export default function ToiletPage({ onBack, isDemo }) {
             {/* Incidenti */}
             <div style={{marginBottom:'14px'}}>
               <label style={labelStyle}>⚠️ Incidente addosso?</label>
+
               {/* Pipì */}
               <div onClick={() => setTtIncidentePippi(!ttIncidentePippi)} style={{
                 display:'flex', alignItems:'center', justifyContent:'space-between',
                 padding:'10px 12px', borderRadius:'12px', cursor:'pointer',
                 background: ttIncidentePippi ? '#FEF0F4' : '#f3f4f7',
                 border:`1.5px solid ${ttIncidentePippi ? '#F7295A33' : 'transparent'}`,
-                marginBottom:'6px'
+                marginBottom:'6px', transition:'all 0.15s'
               }}>
                 <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
                   <span style={{fontSize:'16px'}}>💧</span>
@@ -233,7 +238,7 @@ export default function ToiletPage({ onBack, isDemo }) {
                 padding:'10px 12px', borderRadius:'12px', cursor:'pointer',
                 background: ttIncidenteCacca ? '#FEF0F4' : '#f3f4f7',
                 border:`1.5px solid ${ttIncidenteCacca ? '#F7295A33' : 'transparent'}`,
-                marginBottom:'6px'
+                marginBottom:'6px', transition:'all 0.15s'
               }}>
                 <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
                   <span style={{fontSize:'16px'}}>💩</span>
@@ -270,11 +275,19 @@ export default function ToiletPage({ onBack, isDemo }) {
                 ? 'linear-gradient(135deg,#00BFA6,#2e84e9)'
                 : 'linear-gradient(135deg,#7B5EA7,#2e84e9)',
               boxShadow:'0 6px 20px rgba(123,94,167,0.35)',
-              display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
-              transition:'all 0.3s'
+              display:'flex', alignItems:'center', justifyContent:'center',
+              gap:'8px', transition:'all 0.3s'
             }}>
-              {saved ? <><Check size={18} color="#fff"/> Salvato!</> : <><Save size={18} color="#fff"/> Salva sessione</>}
+              {saved
+                ? <><Check size={18} color="#fff"/> Salvato!</>
+                : <><Save size={18} color="#fff"/> Salva sessione</>
+              }
             </button>
+            {isDemo && (
+              <div style={{textAlign:'center', marginTop:'8px', fontSize:'11px', color:'#8B6914', fontWeight:'600'}}>
+                🎭 Modalità demo — dati non salvati
+              </div>
+            )}
           </div>
 
           {/* LOG SESSIONI */}
@@ -282,38 +295,44 @@ export default function ToiletPage({ onBack, isDemo }) {
             <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'12px'}}>
               📋 Sessioni recenti
             </div>
-            {log.length === 0 ? (
+            {loading ? (
+              <div style={{textAlign:'center', padding:'20px', color:'#bec1cc', fontSize:'13px'}}>
+                Caricamento...
+              </div>
+            ) : log.length === 0 ? (
               <div style={{textAlign:'center', padding:'20px', color:'#bec1cc', fontSize:'13px'}}>
                 Nessuna sessione registrata
               </div>
             ) : (
-              log.slice(0,10).map((s,i) => (
-                <div key={s.id || i} style={{
-                  padding:'10px 12px', borderRadius:'12px', marginBottom:'7px',
-                  background:'#f3f4f7',
-                  borderLeft:`3px solid ${s.bisogno==='pippi' ? '#2e84e9' : s.bisogno==='cacca' ? '#7B5EA7' : '#00BFA6'}`
-                }}>
-                  <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
-                    <span style={{fontSize:'12px', fontWeight:'800', color:'#02153f'}}>
-                      {s.bisogno==='pippi' ? '💧 Pipì' : s.bisogno==='cacca' ? '💩 Cacca' : '🔄 Entrambi'}
-                    </span>
-                    <span style={{fontSize:'11px', color:'#bec1cc'}}>{s.data} {s.ora}</span>
-                  </div>
-                  <div style={{fontSize:'11px', color:'#7c8088'}}>
-                    {s.modalita==='adulto' ? '👆 Comando adulto' :
-                     s.modalita==='caa-guidata' ? '🤝 CAA guidata' : '⭐ CAA autonoma'}
-                  </div>
-                  {(s.incidentePippi || s.incidenteCacca) && (
-                    <div style={{
-                      fontSize:'10px', color:'#F7295A', fontWeight:'700', marginTop:'4px'
-                    }}>
-                      ⚠️ Incidente {s.incidentePippi ? 'pipì' : ''}{s.incidentePippi && s.incidenteCacca ? ' e ' : ''}{s.incidenteCacca ? 'cacca' : ''}
+              log.slice(0,20).map((s,i) => {
+                const borderColor = s.bisogno==='pippi' ? '#2e84e9' : s.bisogno==='cacca' ? '#7B5EA7' : '#00BFA6'
+                return (
+                  <div key={s.id||i} style={{
+                    padding:'10px 12px', borderRadius:'12px', marginBottom:'7px',
+                    background:'#f3f4f7',
+                    borderLeft:`3px solid ${borderColor}`
+                  }}>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                      <span style={{fontSize:'12px', fontWeight:'800', color:'#02153f'}}>
+                        {s.bisogno==='pippi' ? '💧 Pipì' : s.bisogno==='cacca' ? '💩 Cacca' : '🔄 Entrambi'}
+                      </span>
+                      <span style={{fontSize:'11px', color:'#bec1cc'}}>{s.data} {s.ora}</span>
                     </div>
-                  )}
-                </div>
-              ))
+                    <div style={{fontSize:'11px', color:'#7c8088'}}>
+                      {s.modalita==='adulto' ? '👆 Comando adulto' :
+                       s.modalita==='caa-guidata' ? '🤝 CAA guidata' : '⭐ CAA autonoma'}
+                    </div>
+                    {(s.incidentePippi || s.incidenteCacca) && (
+                      <div style={{fontSize:'10px', color:'#F7295A', fontWeight:'700', marginTop:'4px'}}>
+                        ⚠️ Incidente{s.incidentePippi ? ' pipì' : ''}{s.incidentePippi&&s.incidenteCacca?' e':''}{s.incidenteCacca?' cacca':''}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
+
         </div>
       </div>
     </>

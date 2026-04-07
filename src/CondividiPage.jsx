@@ -6,10 +6,11 @@ import { ref, push, onValue, update } from 'firebase/database'
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 
 function generateToken(medicoName) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  const rand = (n) => Array.from({length:n}, () => chars[Math.floor(Math.random()*chars.length)]).join('')
-  return `DMI·${rand(4)}·${rand(4)}`
-}
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    const rand = (n) => Array.from({length:n}, () => chars[Math.floor(Math.random()*chars.length)]).join('')
+    // Formato: DMI-XXXX-XXXX (solo lettere e numeri facili da leggere, no caratteri speciali)
+    return `DMI${rand(4)}${rand(4)}`
+  }
 
 export default function CondividiPage({ onBack, isDemo }) {
   const [tokens, setTokens] = useState([])
@@ -355,8 +356,8 @@ export default function CondividiPage({ onBack, isDemo }) {
               }}>
                 <div style={{
                   fontFamily:"'Courier New', monospace",
-                  fontSize:'26px', fontWeight:'900', color:'#193f9e',
-                  letterSpacing:'4px', marginBottom:'8px'
+                  fontSize:'22px', fontWeight:'900', color:'#193f9e',
+                  letterSpacing:'3px', marginBottom:'8px'
                 }}>{tokenGenerato.token}</div>
                 <div style={{fontSize:'11px', color:'#7c8088'}}>
                   Valido per {giorni} giorni

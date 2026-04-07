@@ -1,15 +1,22 @@
 import { useState, useEffect } from 'react'
-import Home from './Home'
+import {
+  Home, BookOpen, Pill, Droplets, BarChart2, Settings,
+  Link, Package, ShoppingBag, FileText, Stethoscope,
+  Phone, CreditCard, Shield, ChevronRight
+} from 'lucide-react'
+import Home2 from './Home'
 import CrisiPage from './CrisiPage'
 import DiarioCrisi from './DiarioCrisi'
 import TerapiePage from './TerapiePage'
 import SOSPage from './SOSPage'
 import ToiletPage from './ToiletPage'
 import CondividiPage from './CondividiPage'
+import ReportPage from './ReportPage'
+import MagazzinoPage from './MagazzinoPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
-const VERSION = '05.00.08'
+const VERSION = '05.00.09'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -196,22 +203,15 @@ function Login({ onLogin }) {
   const [token, setToken] = useState('')
   const [ricordaPin, setRicordaPin] = useState(false)
 
-  // Carica PIN salvato
   useEffect(() => {
-    const savedPin = localStorage.getItem('damiapp_saved_pin')
-    if (savedPin) {
-      setPin(savedPin)
-      setRicordaPin(true)
-    }
+    const saved = localStorage.getItem('damiapp_saved_pin')
+    if (saved) { setPin(saved); setRicordaPin(true) }
   }, [])
 
   function handleLogin() {
     if (pin === PIN_REALE || pin === PIN_DEMO) {
-      if (ricordaPin) {
-        localStorage.setItem('damiapp_saved_pin', pin)
-      } else {
-        localStorage.removeItem('damiapp_saved_pin')
-      }
+      if (ricordaPin) localStorage.setItem('damiapp_saved_pin', pin)
+      else localStorage.removeItem('damiapp_saved_pin')
       onLogin(pin === PIN_DEMO)
     } else {
       setError('PIN errato. Riprova.')
@@ -230,15 +230,13 @@ function Login({ onLogin }) {
         width:'100%', maxWidth:'340px',
         boxShadow:'0 20px 60px rgba(2,21,63,0.20), 0 8px 20px rgba(2,21,63,0.10)'
       }}>
-        {/* Header */}
         <div style={{
           background:'linear-gradient(135deg,#08184c,#193f9e)',
           padding:'36px 24px 30px', textAlign:'center', position:'relative'
         }}>
           <div style={{
             position:'absolute', top:'10px', right:'14px',
-            fontSize:'10px', color:'rgba(255,255,255,0.35)',
-            fontWeight:'600'
+            fontSize:'10px', color:'rgba(255,255,255,0.35)', fontWeight:'600'
           }}>v{VERSION}</div>
           <img src="/DamiLogo.png" alt="logo" style={{
             width:'100px', height:'100px', borderRadius:'50%',
@@ -254,7 +252,6 @@ function Login({ onLogin }) {
           </div>
         </div>
 
-        {/* Tab */}
         <div style={{
           display:'grid', gridTemplateColumns:'1fr 1fr',
           background:'#f3f4f7', margin:'16px 16px 0',
@@ -284,12 +281,10 @@ function Login({ onLogin }) {
                 textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
               }}>PIN di accesso</div>
               <input
-                type="password"
-                value={pin}
+                type="password" value={pin}
                 onChange={e => setPin(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                placeholder="• • • • • •"
-                maxLength={6}
+                placeholder="• • • • • •" maxLength={6}
                 style={{
                   width:'100%', padding:'16px', borderRadius:'14px',
                   border:'2px solid #e8eaf0', fontSize:'26px', textAlign:'center',
@@ -300,14 +295,10 @@ function Login({ onLogin }) {
                 onFocus={e => e.target.style.borderColor='#2e84e9'}
                 onBlur={e => e.target.style.borderColor='#e8eaf0'}
               />
-
-              {/* Ricorda PIN */}
-              <div
-                onClick={() => setRicordaPin(!ricordaPin)}
-                style={{
-                  display:'flex', alignItems:'center', gap:'8px',
-                  cursor:'pointer', marginBottom:'14px', userSelect:'none'
-                }}>
+              <div onClick={() => setRicordaPin(!ricordaPin)} style={{
+                display:'flex', alignItems:'center', gap:'8px',
+                cursor:'pointer', marginBottom:'14px', userSelect:'none'
+              }}>
                 <div style={{
                   width:'20px', height:'20px', borderRadius:'6px',
                   border:`2px solid ${ricordaPin ? '#193f9e' : '#dde0ed'}`,
@@ -321,12 +312,10 @@ function Login({ onLogin }) {
                   Ricorda PIN per accesso rapido
                 </span>
               </div>
-
               {error && (
-                <div style={{
-                  color:'#e53935', fontSize:'13px', textAlign:'center',
-                  marginBottom:'12px', fontWeight:'600'
-                }}>❌ {error}</div>
+                <div style={{color:'#e53935', fontSize:'13px', textAlign:'center', marginBottom:'12px', fontWeight:'600'}}>
+                  ❌ {error}
+                </div>
               )}
               <button onClick={handleLogin} style={{
                 width:'100%', padding:'16px', borderRadius:'50px', border:'none',
@@ -334,9 +323,9 @@ function Login({ onLogin }) {
                 background:'linear-gradient(135deg,#08184c,#193f9e)',
                 boxShadow:'0 8px 24px rgba(8,24,76,0.35)'
               }}>Accedi</button>
-              <div style={{
-                textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'
-              }}>💡 PIN demo disponibile per la presentazione</div>
+              <div style={{textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'}}>
+                💡 PIN demo disponibile per la presentazione
+              </div>
             </>
           ) : (
             <>
@@ -345,10 +334,9 @@ function Login({ onLogin }) {
                 textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
               }}>Token di accesso medico</div>
               <input
-                type="text"
-                value={token}
+                type="text" value={token}
                 onChange={e => setToken(e.target.value.toUpperCase())}
-                placeholder="Es: DMI·7K2X·9P4R"
+                placeholder="Es: DMI12345678"
                 style={{
                   width:'100%', padding:'14px', borderRadius:'14px',
                   border:'2px solid #e8eaf0', fontSize:'16px', textAlign:'center',
@@ -360,10 +348,9 @@ function Login({ onLogin }) {
                 onBlur={e => e.target.style.borderColor='#e8eaf0'}
               />
               {error && (
-                <div style={{
-                  color:'#e53935', fontSize:'13px', textAlign:'center',
-                  marginBottom:'12px', fontWeight:'600'
-                }}>❌ {error}</div>
+                <div style={{color:'#e53935', fontSize:'13px', textAlign:'center', marginBottom:'12px', fontWeight:'600'}}>
+                  ❌ {error}
+                </div>
               )}
               <button onClick={() => setError('Token non valido o scaduto.')} style={{
                 width:'100%', padding:'16px', borderRadius:'50px', border:'none',
@@ -371,9 +358,9 @@ function Login({ onLogin }) {
                 background:'linear-gradient(135deg,#00BFA6,#2e84e9)',
                 boxShadow:'0 8px 24px rgba(0,191,166,0.3)'
               }}>Accedi come Medico</button>
-              <div style={{
-                textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'
-              }}>Il token ti è stato fornito dalla famiglia del paziente</div>
+              <div style={{textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'}}>
+                Il token ti è stato fornito dalla famiglia del paziente
+              </div>
             </>
           )}
           <div style={{
@@ -386,15 +373,14 @@ function Login({ onLogin }) {
   )
 }
 
-// Navbar condivisa
-export function Navbar({ page, onNavigate }) {
+function Navbar({ page, onNavigate }) {
   const items = [
-    {Icon:'🏠', label:'Home', page:'home'},
-    {Icon:'📋', label:'Diario', page:'diario'},
-    {Icon:'💊', label:'Terapie', page:'terapie'},
-    {Icon:'🚽', label:'Toilet', page:'toilet'},
-    {Icon:'🔗', label:'Condividi', page:'condividi'},
-    {Icon:'⚙️', label:'Altro', page:'altro'},
+    {Icon:Home, label:'Home', page:'home'},
+    {Icon:BookOpen, label:'Diario', page:'diario'},
+    {Icon:Pill, label:'Terapie', page:'terapie'},
+    {Icon:Droplets, label:'Toilet', page:'toilet'},
+    {Icon:Link, label:'Condividi', page:'condividi'},
+    {Icon:Settings, label:'Altro', page:'altro'},
   ]
   return (
     <div style={{
@@ -402,10 +388,10 @@ export function Navbar({ page, onNavigate }) {
       background:'#feffff', borderTop:'1px solid #f0f1f4',
       display:'flex', padding:'7px 0 14px',
       boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',
-      zIndex:100, maxWidth:'480px', margin:'0 auto'
+      zIndex:100
     }}>
       {items.map(({Icon, label, page:p}) => {
-        const act = page === p || (p === 'home' && page === 'home')
+        const act = page === p
         return (
           <div key={p} onClick={() => onNavigate(p)} style={{
             flex:1, display:'flex', flexDirection:'column',
@@ -414,9 +400,10 @@ export function Navbar({ page, onNavigate }) {
             <div style={{
               width:'34px', height:'24px', display:'flex',
               alignItems:'center', justifyContent:'center',
-              borderRadius:'8px', background: act ? '#EEF3FD' : 'transparent',
-              fontSize:'15px'
-            }}>{Icon}</div>
+              borderRadius:'8px', background: act ? '#EEF3FD' : 'transparent'
+            }}>
+              <Icon size={17} color={act ? '#193f9e' : '#bec1cc'}/>
+            </div>
             <span style={{
               fontSize:'9px', fontWeight: act ? '800' : '500',
               color: act ? '#193f9e' : '#bec1cc'
@@ -424,6 +411,59 @@ export function Navbar({ page, onNavigate }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function AltroPage({ onNavigate }) {
+  const voci = [
+    {Icon:Package, label:'Magazzino medicinali', sub:'Scorte e scadenze', color:'#00BFA6', page:'magazzino'},
+    {Icon:ShoppingBag, label:'Cosa portare', sub:'Liste personalizzate', color:'#FF8C42', page:'cosa_portare'},
+    {Icon:FileText, label:'Documenti personali', sub:'Archivio documenti', color:'#2e84e9', page:'doc_personali'},
+    {Icon:Stethoscope, label:'Documenti medici', sub:'Referti e visite', color:'#7B5EA7', page:'doc_medici'},
+    {Icon:Phone, label:'Rubrica', sub:'Contatti medici', color:'#F7295A', page:'rubrica'},
+    {Icon:CreditCard, label:'Pagamenti', sub:'Gestione spese terapisti', color:'#193f9e', page:'pagamenti'},
+    {Icon:BarChart2, label:'Report', sub:'Statistiche e grafici', color:'#FF8C42', page:'report'},
+    {Icon:Shield, label:'Backup & Admin', sub:'Gestione dati', color:'#7c8088', page:'admin'},
+  ]
+
+  return (
+    <div style={{
+      background:'#f3f4f7', minHeight:'100vh',
+      paddingBottom:'80px', fontFamily:"-apple-system,'Segoe UI',sans-serif",
+      maxWidth:'480px', margin:'0 auto'
+    }}>
+      <div style={{
+        background:'linear-gradient(135deg,#08184c,#193f9e)',
+        padding:'20px 16px 24px'
+      }}>
+        <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>⚙️ Altro</div>
+        <div style={{fontSize:'11px', color:'rgba(255,255,255,0.7)', marginTop:'2px'}}>
+          Altre funzionalità
+        </div>
+      </div>
+      <div style={{padding:'12px'}}>
+        {voci.map(({Icon, label, sub, color, page}, i) => (
+          <div key={i} onClick={() => onNavigate(page)} style={{
+            background:'#feffff', borderRadius:'14px', padding:'14px',
+            marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px',
+            boxShadow:'0 4px 16px rgba(2,21,63,0.08)', cursor:'pointer'
+          }}>
+            <div style={{
+              width:'42px', height:'42px', borderRadius:'12px',
+              background:`${color}18`, border:`1.5px solid ${color}33`,
+              display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0
+            }}>
+              <Icon size={20} color={color}/>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:'13px', fontWeight:'700', color:'#02153f'}}>{label}</div>
+              <div style={{fontSize:'11px', color:'#7c8088', marginTop:'1px'}}>{sub}</div>
+            </div>
+            <ChevronRight size={16} color="#bec1cc"/>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -468,70 +508,76 @@ export default function App() {
 
   if (!authenticated) return <Login onLogin={handleLogin} />
 
-  const noNavPages = ['crisi', 'sos']
+  // Pagine senza navbar
+  const noNav = ['crisi', 'sos']
 
   return (
     <>
       {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo} />}
       {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer} />}
 
-      {page === 'crisi'
-        ? <CrisiPage onBack={() => setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>
-        : page === 'sos'
-        ? <SOSPage onBack={() => setPage('home')}/>
-        : (
-          <>
-            {page === 'home' && <Home nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} onNavigate={handleNavigate}/>}
-            {page === 'diario' && <DiarioCrisi onBack={() => setPage('home')} isDemo={isDemo}/>}
-            {page === 'terapie' && <TerapiePage onBack={() => setPage('home')} isDemo={isDemo}/>}
-            {page === 'toilet' && <ToiletPage onBack={() => setPage('home')} isDemo={isDemo}/>}
-            {page === 'condividi' && <CondividiPage onBack={() => setPage('home')} isDemo={isDemo}/>}
-            {page === 'altro' && (
-              <div style={{
-                background:'#f3f4f7', minHeight:'100vh', paddingBottom:'80px',
-                fontFamily:"-apple-system,'Segoe UI',sans-serif",
-                maxWidth:'480px', margin:'0 auto'
-              }}>
-                <div style={{
-                  background:'linear-gradient(135deg,#08184c,#193f9e)',
-                  padding:'20px 16px 24px'
-                }}>
-                  <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>⚙️ Altro</div>
-                  <div style={{fontSize:'11px', color:'rgba(255,255,255,0.7)'}}>Altre funzionalità</div>
+      {page === 'crisi' && (
+        <CrisiPage onBack={() => setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>
+      )}
+      {page === 'sos' && (
+        <SOSPage onBack={() => setPage('home')}/>
+      )}
+
+      {!noNav.includes(page) && (
+        <>
+          {page === 'home' && (
+            <Home2 nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} onNavigate={handleNavigate}/>
+          )}
+          {page === 'diario' && (
+            <DiarioCrisi onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+          )}
+          {page === 'terapie' && (
+            <TerapiePage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+          )}
+          {page === 'toilet' && (
+            <ToiletPage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+          )}
+          {page === 'condividi' && (
+            <CondividiPage onBack={() => setPage('home')} isDemo={isDemo}/>
+          )}
+          {page === 'report' && (
+            <ReportPage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+          )}
+          {page === 'magazzino' && (
+            <MagazzinoPage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+          )}
+          {page === 'altro' && (
+            <AltroPage onNavigate={handleNavigate}/>
+          )}
+          {/* Pagine da implementare */}
+          {['cosa_portare','doc_personali','doc_medici','rubrica','pagamenti','admin'].includes(page) && (
+            <div style={{
+              minHeight:'100vh', background:'#f3f4f7',
+              display:'flex', flexDirection:'column',
+              alignItems:'center', justifyContent:'center',
+              fontFamily:"-apple-system,'Segoe UI',sans-serif",
+              paddingBottom:'80px'
+            }}>
+              <div style={{textAlign:'center', padding:'40px'}}>
+                <div style={{fontSize:'48px', marginBottom:'16px'}}>🚧</div>
+                <div style={{fontSize:'18px', fontWeight:'900', color:'#02153f', marginBottom:'8px'}}>
+                  In arrivo
                 </div>
-                <div style={{padding:'12px'}}>
-                  {[
-                    {ico:'💊', label:'Magazzino medicinali', sub:'Scorte e scadenze'},
-                    {ico:'🎒', label:'Cosa portare', sub:'Liste personalizzate'},
-                    {ico:'📄', label:'Documenti personali', sub:'Archivio documenti'},
-                    {ico:'🏥', label:'Documenti medici', sub:'Referti e visite'},
-                    {ico:'📞', label:'Rubrica', sub:'Contatti medici'},
-                    {ico:'💳', label:'Pagamenti', sub:'Gestione spese'},
-                  ].map((item, i) => (
-                    <div key={i} style={{
-                      background:'#feffff', borderRadius:'14px', padding:'14px',
-                      marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px',
-                      boxShadow:'0 4px 16px rgba(2,21,63,0.08)', cursor:'pointer'
-                    }}>
-                      <div style={{
-                        width:'40px', height:'40px', borderRadius:'12px',
-                        background:'#f3f4f7', display:'flex', alignItems:'center',
-                        justifyContent:'center', fontSize:'20px', flexShrink:0
-                      }}>{item.ico}</div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:'13px', fontWeight:'700', color:'#02153f'}}>{item.label}</div>
-                        <div style={{fontSize:'11px', color:'#7c8088'}}>{item.sub}</div>
-                      </div>
-                      <span style={{color:'#bec1cc', fontSize:'18px'}}>›</span>
-                    </div>
-                  ))}
+                <div style={{fontSize:'13px', color:'#7c8088', marginBottom:'24px'}}>
+                  Questa sezione è in sviluppo
                 </div>
+                <button onClick={() => setPage('altro')} style={{
+                  padding:'12px 24px', borderRadius:'50px', border:'none',
+                  background:'linear-gradient(135deg,#193f9e,#2e84e9)',
+                  color:'#fff', fontWeight:'700', fontSize:'14px', cursor:'pointer'
+                }}>← Torna indietro</button>
               </div>
-            )}
-            <Navbar page={page} onNavigate={handleNavigate}/>
-          </>
-        )
-      }
+            </div>
+          )}
+
+          <Navbar page={page} onNavigate={handleNavigate}/>
+        </>
+      )}
     </>
   )
 }
