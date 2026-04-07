@@ -13,11 +13,10 @@ import ToiletPage from './ToiletPage'
 import CondividiPage from './CondividiPage'
 import ReportPage from './ReportPage'
 import MagazzinoPage from './MagazzinoPage'
-import CosaPortarePage from './CosaPortarePage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
-const VERSION = '05.00.09'
+const VERSION = '05.00.11'
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -154,7 +153,9 @@ function OnboardingModal({ onDone, isDemo }) {
             {isDemo ? '👋 Benvenuto nella Demo!' : 'Benvenuto in DamiAPP'}
           </div>
           <div style={{fontSize:'13px', color:'#7c8088', lineHeight:'1.5'}}>
-            {isDemo ? 'Come ti chiami? Personalizziamo la demo.' : 'Come ti chiami? Ti saluteremo ogni giorno.'}
+            {isDemo
+              ? 'Come ti chiami? Personalizziamo la demo.'
+              : 'Come ti chiami? Ti saluteremo ogni giorno.'}
           </div>
           {isDemo && (
             <div style={{
@@ -185,7 +186,9 @@ function OnboardingModal({ onDone, isDemo }) {
           disabled={!nome.trim()}
           style={{
             width:'100%', padding:'15px', borderRadius:'50px', border:'none',
-            background: nome.trim() ? 'linear-gradient(135deg,#08184c,#193f9e)' : '#e8eaf0',
+            background: nome.trim()
+              ? 'linear-gradient(135deg,#08184c,#193f9e)'
+              : '#e8eaf0',
             color: nome.trim() ? '#fff' : '#bec1cc',
             fontSize:'15px', fontWeight:'800',
             cursor: nome.trim() ? 'pointer' : 'default',
@@ -203,21 +206,59 @@ function Login({ onLogin }) {
   const [tab, setTab] = useState('paziente')
   const [token, setToken] = useState('')
   const [ricordaPin, setRicordaPin] = useState(false)
+  const [checkingToken, setCheckingToken] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('damiapp_saved_pin')
     if (saved) { setPin(saved); setRicordaPin(true) }
   }, [])
 
-  function handleLogin() {
+  function handlePinLogin() {
     if (pin === PIN_REALE || pin === PIN_DEMO) {
       if (ricordaPin) localStorage.setItem('damiapp_saved_pin', pin)
       else localStorage.removeItem('damiapp_saved_pin')
-      onLogin(pin === PIN_DEMO)
+      onLogin(pin === PIN_DEMO, null)
     } else {
       setError('PIN errato. Riprova.')
       setPin('')
     }
+  }
+
+  async function handleTokenLogin() {
+    if (!token.trim()) { setError('Inserisci il token'); return }
+    setCheckingToken(true)
+    setError('')
+    try {
+      const { ref, get } = await import('firebase/database')
+      const { db } = await import('./firebase')
+      const { decrypt } = await import('./crypto')
+      const snap = await get(ref(db, 'sharetokens'))
+      const val = snap.val()
+      if (!val) {
+        setError('Token non valido o scaduto.')
+        setCheckingToken(false)
+        return
+      }
+      let trovato = null
+      Object.entries(val).forEach(([key, encData]) => {
+        const t = typeof encData === 'object' ? encData : decrypt(encData)
+        if (t && t.token === token.trim().toUpperCase() && t.active) {
+          const scadenza = t.expiresAt ? new Date(t.expiresAt) : null
+          if (!scadenza || scadenza > new Date()) {
+            trovato = { ...t, _firebaseKey: key }
+          }
+        }
+      })
+      if (trovato) {
+        onLogin(false, trovato)
+      } else {
+        setError('Token non valido o scaduto.')
+      }
+    } catch (err) {
+      console.error(err)
+      setError('Errore di connessione. Riprova.')
+    }
+    setCheckingToken(false)
   }
 
   return (
@@ -284,7 +325,7 @@ function Login({ onLogin }) {
               <input
                 type="password" value={pin}
                 onChange={e => setPin(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                onKeyDown={e => e.key === 'Enter' && handlePinLogin()}
                 placeholder="• • • • • •" maxLength={6}
                 style={{
                   width:'100%', padding:'16px', borderRadius:'14px',
@@ -307,24 +348,30 @@ function Login({ onLogin }) {
                   display:'flex', alignItems:'center', justifyContent:'center',
                   flexShrink:0, transition:'all 0.2s'
                 }}>
-                  {ricordaPin && <span style={{color:'#fff', fontSize:'13px', fontWeight:'900'}}>✓</span>}
+                  {ricordaPin && (
+                    <span style={{color:'#fff', fontSize:'13px', fontWeight:'900'}}>✓</span>
+                  )}
                 </div>
                 <span style={{fontSize:'12px', color:'#7c8088', fontWeight:'600'}}>
                   Ricorda PIN per accesso rapido
                 </span>
               </div>
               {error && (
-                <div style={{color:'#e53935', fontSize:'13px', textAlign:'center', marginBottom:'12px', fontWeight:'600'}}>
-                  ❌ {error}
-                </div>
+                <div style={{
+                  color:'#e53935', fontSize:'13px', textAlign:'center',
+                  marginBottom:'12px', fontWeight:'600'
+                }}>❌ {error}</div>
               )}
-              <button onClick={handleLogin} style={{
+              <button onClick={handlePinLogin} style={{
                 width:'100%', padding:'16px', borderRadius:'50px', border:'none',
                 cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
                 background:'linear-gradient(135deg,#08184c,#193f9e)',
                 boxShadow:'0 8px 24px rgba(8,24,76,0.35)'
               }}>Accedi</button>
-              <div style={{textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'}}>
+              <div style={{
+                textAlign:'center', marginTop:'12px',
+                fontSize:'11px', color:'#bec1cc'
+              }}>
                 💡 PIN demo disponibile per la presentazione
               </div>
             </>
@@ -337,7 +384,8 @@ function Login({ onLogin }) {
               <input
                 type="text" value={token}
                 onChange={e => setToken(e.target.value.toUpperCase())}
-                placeholder="Es: DMI12345678"
+                onKeyDown={e => e.key === 'Enter' && handleTokenLogin()}
+                placeholder="Es: DMIABCD12345"
                 style={{
                   width:'100%', padding:'14px', borderRadius:'14px',
                   border:'2px solid #e8eaf0', fontSize:'16px', textAlign:'center',
@@ -349,17 +397,31 @@ function Login({ onLogin }) {
                 onBlur={e => e.target.style.borderColor='#e8eaf0'}
               />
               {error && (
-                <div style={{color:'#e53935', fontSize:'13px', textAlign:'center', marginBottom:'12px', fontWeight:'600'}}>
-                  ❌ {error}
-                </div>
+                <div style={{
+                  color:'#e53935', fontSize:'13px', textAlign:'center',
+                  marginBottom:'12px', fontWeight:'600'
+                }}>❌ {error}</div>
               )}
-              <button onClick={() => setError('Token non valido o scaduto.')} style={{
-                width:'100%', padding:'16px', borderRadius:'50px', border:'none',
-                cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
-                background:'linear-gradient(135deg,#00BFA6,#2e84e9)',
-                boxShadow:'0 8px 24px rgba(0,191,166,0.3)'
-              }}>Accedi come Medico</button>
-              <div style={{textAlign:'center', marginTop:'12px', fontSize:'11px', color:'#bec1cc'}}>
+              <button
+                onClick={handleTokenLogin}
+                disabled={checkingToken}
+                style={{
+                  width:'100%', padding:'16px', borderRadius:'50px', border:'none',
+                  cursor: checkingToken ? 'wait' : 'pointer',
+                  fontWeight:'800', fontSize:'16px', color:'#fff',
+                  background: checkingToken
+                    ? '#bec1cc'
+                    : 'linear-gradient(135deg,#00BFA6,#2e84e9)',
+                  boxShadow: checkingToken ? 'none' : '0 8px 24px rgba(0,191,166,0.3)',
+                  opacity: checkingToken ? 0.7 : 1,
+                  transition:'all 0.2s'
+                }}>
+                {checkingToken ? '⏳ Verifica in corso...' : 'Accedi come Medico'}
+              </button>
+              <div style={{
+                textAlign:'center', marginTop:'12px',
+                fontSize:'11px', color:'#bec1cc'
+              }}>
                 Il token ti è stato fornito dalla famiglia del paziente
               </div>
             </>
@@ -388,8 +450,7 @@ function Navbar({ page, onNavigate }) {
       position:'fixed', bottom:0, left:0, right:0,
       background:'#feffff', borderTop:'1px solid #f0f1f4',
       display:'flex', padding:'7px 0 14px',
-      boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',
-      zIndex:100
+      boxShadow:'0 -4px 16px rgba(2,21,63,0.08)', zIndex:100
     }}>
       {items.map(({Icon, label, page:p}) => {
         const act = page === p
@@ -427,11 +488,11 @@ function AltroPage({ onNavigate }) {
     {Icon:BarChart2, label:'Report', sub:'Statistiche e grafici', color:'#FF8C42', page:'report'},
     {Icon:Shield, label:'Backup & Admin', sub:'Gestione dati', color:'#7c8088', page:'admin'},
   ]
-
   return (
     <div style={{
       background:'#f3f4f7', minHeight:'100vh',
-      paddingBottom:'80px', fontFamily:"-apple-system,'Segoe UI',sans-serif",
+      paddingBottom:'80px',
+      fontFamily:"-apple-system,'Segoe UI',sans-serif",
       maxWidth:'480px', margin:'0 auto'
     }}>
       <div style={{
@@ -469,9 +530,38 @@ function AltroPage({ onNavigate }) {
   )
 }
 
+function PaginaInArrivo({ onBack }) {
+  return (
+    <div style={{
+      minHeight:'100vh', background:'#f3f4f7',
+      display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      fontFamily:"-apple-system,'Segoe UI',sans-serif",
+      paddingBottom:'80px'
+    }}>
+      <div style={{textAlign:'center', padding:'40px'}}>
+        <div style={{fontSize:'48px', marginBottom:'16px'}}>🚧</div>
+        <div style={{fontSize:'18px', fontWeight:'900', color:'#02153f', marginBottom:'8px'}}>
+          In arrivo
+        </div>
+        <div style={{fontSize:'13px', color:'#7c8088', marginBottom:'24px'}}>
+          Questa sezione è in sviluppo
+        </div>
+        <button onClick={onBack} style={{
+          padding:'12px 24px', borderRadius:'50px', border:'none',
+          background:'linear-gradient(135deg,#193f9e,#2e84e9)',
+          color:'#fff', fontWeight:'700', fontSize:'14px', cursor:'pointer'
+        }}>← Torna indietro</button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false)
   const [isDemo, setIsDemo] = useState(false)
+  const [isMedico, setIsMedico] = useState(false)
+  const [tokenMedico, setTokenMedico] = useState(null)
   const [page, setPage] = useState('home')
   const [nomeUtente, setNomeUtente] = useState(
     () => localStorage.getItem('damiapp_nome') || ''
@@ -481,10 +571,17 @@ export default function App() {
   const [pendingNome, setPendingNome] = useState('')
   const [timerSecCrisi, setTimerSecCrisi] = useState(0)
 
-  function handleLogin(demo) {
+  function handleLogin(demo, tokenData) {
     setIsDemo(demo)
     setAuthenticated(true)
-    if (demo || !nomeUtente) setShowOnboarding(true)
+    if (tokenData) {
+      setIsMedico(true)
+      setTokenMedico(tokenData)
+    } else {
+      setIsMedico(false)
+      setTokenMedico(null)
+      if (demo || !nomeUtente) setShowOnboarding(true)
+    }
   }
 
   function handleNome(nome) {
@@ -503,14 +600,16 @@ export default function App() {
     setPage(dest)
   }
 
-  const nomeEffettivo = isDemo
-    ? (pendingNome || 'Ospite')
-    : (pendingNome || nomeUtente || 'Damiano')
+  const nomeEffettivo = isMedico
+    ? `Dr. ${tokenMedico?.medicoName || 'Medico'}`
+    : isDemo
+      ? (pendingNome || 'Ospite')
+      : (pendingNome || nomeUtente || 'Damiano')
 
   if (!authenticated) return <Login onLogin={handleLogin} />
 
-  // Pagine senza navbar
   const noNav = ['crisi', 'sos']
+  const inArrivo = ['cosa_portare','doc_personali','doc_medici','rubrica','pagamenti','admin']
 
   return (
     <>
@@ -518,8 +617,13 @@ export default function App() {
       {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer} />}
 
       {page === 'crisi' && (
-        <CrisiPage onBack={() => setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>
+        <CrisiPage
+          onBack={() => setPage('home')}
+          timerSecInizio={timerSecCrisi}
+          isDemo={isDemo}
+        />
       )}
+
       {page === 'sos' && (
         <SOSPage onBack={() => setPage('home')}/>
       )}
@@ -527,56 +631,59 @@ export default function App() {
       {!noNav.includes(page) && (
         <>
           {page === 'home' && (
-            <Home2 nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} onNavigate={handleNavigate}/>
+            <Home2
+              nomeUtente={nomeEffettivo}
+              frase={getFrase()}
+              isDemo={isDemo}
+              onNavigate={handleNavigate}
+            />
           )}
           {page === 'diario' && (
-            <DiarioCrisi onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+            <DiarioCrisi
+              onBack={() => setPage('home')}
+              isDemo={isDemo}
+              onNavigate={handleNavigate}
+            />
           )}
           {page === 'terapie' && (
-            <TerapiePage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+            <TerapiePage
+              onBack={() => setPage('home')}
+              isDemo={isDemo}
+              onNavigate={handleNavigate}
+            />
           )}
           {page === 'toilet' && (
-            <ToiletPage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+            <ToiletPage
+              onBack={() => setPage('home')}
+              isDemo={isDemo}
+              onNavigate={handleNavigate}
+            />
           )}
           {page === 'condividi' && (
-            <CondividiPage onBack={() => setPage('home')} isDemo={isDemo}/>
+            <CondividiPage
+              onBack={() => setPage('home')}
+              isDemo={isDemo}
+            />
           )}
           {page === 'report' && (
-            <ReportPage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+            <ReportPage
+              onBack={() => setPage('home')}
+              isDemo={isDemo}
+              onNavigate={handleNavigate}
+            />
           )}
           {page === 'magazzino' && (
-            <MagazzinoPage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
-          {page === 'cosa_portare' && (
-            <CosaPortarePage onBack={() => setPage('altro')} isDemo={isDemo}/>
-            )}
+            <MagazzinoPage
+              onBack={() => setPage('home')}
+              isDemo={isDemo}
+              onNavigate={handleNavigate}
+            />
           )}
           {page === 'altro' && (
             <AltroPage onNavigate={handleNavigate}/>
           )}
-          {/* Pagine da implementare */}
-          {['doc_personali','doc_medici','rubrica','pagamenti','admin'].includes(page) && (
-            <div style={{
-              minHeight:'100vh', background:'#f3f4f7',
-              display:'flex', flexDirection:'column',
-              alignItems:'center', justifyContent:'center',
-              fontFamily:"-apple-system,'Segoe UI',sans-serif",
-              paddingBottom:'80px'
-            }}>
-              <div style={{textAlign:'center', padding:'40px'}}>
-                <div style={{fontSize:'48px', marginBottom:'16px'}}>🚧</div>
-                <div style={{fontSize:'18px', fontWeight:'900', color:'#02153f', marginBottom:'8px'}}>
-                  In arrivo
-                </div>
-                <div style={{fontSize:'13px', color:'#7c8088', marginBottom:'24px'}}>
-                  Questa sezione è in sviluppo
-                </div>
-                <button onClick={() => setPage('altro')} style={{
-                  padding:'12px 24px', borderRadius:'50px', border:'none',
-                  background:'linear-gradient(135deg,#193f9e,#2e84e9)',
-                  color:'#fff', fontWeight:'700', fontSize:'14px', cursor:'pointer'
-                }}>← Torna indietro</button>
-              </div>
-            </div>
+          {inArrivo.includes(page) && (
+            <PaginaInArrivo onBack={() => setPage('altro')}/>
           )}
 
           <Navbar page={page} onNavigate={handleNavigate}/>
