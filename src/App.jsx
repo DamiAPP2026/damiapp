@@ -13,10 +13,13 @@ import ToiletPage from './ToiletPage'
 import CondividiPage from './CondividiPage'
 import ReportPage from './ReportPage'
 import MagazzinoPage from './MagazzinoPage'
+import DoctorView from './DoctorView'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
-const VERSION = '05.00.11'
+const VERSION = '05.00.12'
+
+const f = (base) => `${Math.round(base * 1.15)}px`
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -58,72 +61,23 @@ export function getFrase() {
 
 function Disclaimer({ nome, onAccept }) {
   return (
-    <div style={{
-      position:'fixed', inset:0, background:'rgba(2,21,63,0.6)',
-      display:'flex', alignItems:'center', justifyContent:'center',
-      zIndex:2000, padding:'20px',
-      fontFamily:"-apple-system,'Segoe UI',sans-serif"
-    }}>
-      <div style={{
-        background:'#feffff', borderRadius:'24px', padding:'28px 24px',
-        width:'100%', maxWidth:'360px',
-        boxShadow:'0 20px 60px rgba(2,21,63,0.3)'
-      }}>
-        <div style={{textAlign:'center', marginBottom:'20px'}}>
-          <div style={{
-            width:'52px', height:'52px', borderRadius:'50%',
-            background:'linear-gradient(135deg,#F7295A,#FF8C42)',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            margin:'0 auto 14px', fontSize:'24px'
-          }}>⚠️</div>
-          <div style={{fontSize:'18px', fontWeight:'900', color:'#08184c', marginBottom:'6px'}}>
-            Informativa sull'utilizzo
-          </div>
-          <div style={{fontSize:'12px', color:'#7c8088'}}>
-            Leggi attentamente prima di continuare
-          </div>
+    <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,padding:'20px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+      <div style={{background:'#feffff',borderRadius:'24px',padding:'28px 24px',width:'100%',maxWidth:'360px',boxShadow:'0 20px 60px rgba(2,21,63,0.3)'}}>
+        <div style={{textAlign:'center',marginBottom:'20px'}}>
+          <div style={{width:'52px',height:'52px',borderRadius:'50%',background:'linear-gradient(135deg,#F7295A,#FF8C42)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',fontSize:'24px'}}>⚠️</div>
+          <div style={{fontSize:f(18),fontWeight:'900',color:'#08184c',marginBottom:'6px'}}>Informativa sull'utilizzo</div>
+          <div style={{fontSize:f(12),color:'#7c8088'}}>Leggi attentamente prima di continuare</div>
         </div>
-        <div style={{
-          background:'#f3f4f7', borderRadius:'14px', padding:'16px',
-          marginBottom:'20px', fontSize:'12px', color:'#394058',
-          lineHeight:'1.7', maxHeight:'200px', overflowY:'auto'
-        }}>
-          <p style={{marginBottom:'10px'}}>
-            <strong style={{color:'#08184c'}}>Ciao {nome}!</strong> Prima di accedere a DamiAPP,
-            ti chiediamo di leggere e accettare quanto segue:
-          </p>
-          <p style={{marginBottom:'10px'}}>
-            <strong style={{color:'#02153f'}}>1. Responsabilità dei dati</strong><br/>
-            DamiAPP è uno strumento di supporto personale. I dati inseriti
-            sono sotto la tua esclusiva responsabilità.
-          </p>
-          <p style={{marginBottom:'10px'}}>
-            <strong style={{color:'#02153f'}}>2. Protezione dei dati</strong><br/>
-            I dati sono salvati su Firebase (Google).
-            <strong style={{color:'#F7295A'}}> DamiAPP non garantisce
-            la protezione assoluta dei dati.</strong>
-          </p>
-          <p style={{marginBottom:'10px'}}>
-            <strong style={{color:'#02153f'}}>3. Uso medico</strong><br/>
-            DamiAPP <strong>non sostituisce il medico</strong>. In caso di emergenza chiama il 112.
-          </p>
-          <p style={{marginBottom:'10px'}}>
-            <strong style={{color:'#02153f'}}>4. Modalità Demo</strong><br/>
-            In modalità Demo tutti i dati sono fittizi e dimostrativi.
-          </p>
-          <p style={{margin:0, color:'#bec1cc', fontSize:'11px'}}>
-            v{VERSION} — Continuando accetti queste condizioni.
-          </p>
+        <div style={{background:'#f3f4f7',borderRadius:'14px',padding:'16px',marginBottom:'20px',fontSize:f(12),color:'#394058',lineHeight:'1.7',maxHeight:'200px',overflowY:'auto'}}>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#08184c'}}>Ciao {nome}!</strong> Prima di accedere a DamiAPP, ti chiediamo di leggere e accettare quanto segue:</p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>1. Responsabilità dei dati</strong><br/>DamiAPP è uno strumento di supporto personale. I dati inseriti sono sotto la tua esclusiva responsabilità.</p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>2. Protezione dei dati</strong><br/>I dati sono salvati su Firebase (Google).<strong style={{color:'#F7295A'}}> DamiAPP non garantisce la protezione assoluta dei dati.</strong></p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>3. Uso medico</strong><br/>DamiAPP <strong>non sostituisce il medico</strong>. In caso di emergenza chiama il 112.</p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>4. Modalità Demo</strong><br/>In modalità Demo tutti i dati sono fittizi e dimostrativi.</p>
+          <p style={{margin:0,color:'#bec1cc',fontSize:f(11)}}>v{VERSION} — Continuando accetti queste condizioni.</p>
         </div>
-        <button onClick={onAccept} style={{
-          width:'100%', padding:'15px', borderRadius:'50px', border:'none',
-          cursor:'pointer', fontWeight:'800', fontSize:'15px', color:'#fff',
-          background:'linear-gradient(135deg,#08184c,#193f9e)',
-          boxShadow:'0 6px 20px rgba(8,24,76,0.35)', marginBottom:'10px'
-        }}>✅ Ho letto e accetto</button>
-        <div style={{textAlign:'center', fontSize:'11px', color:'#bec1cc'}}>
-          Non accettando non potrai utilizzare l'app
-        </div>
+        <button onClick={onAccept} style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 6px 20px rgba(8,24,76,0.35)',marginBottom:'10px'}}>✅ Ho letto e accetto</button>
+        <div style={{textAlign:'center',fontSize:f(11),color:'#bec1cc'}}>Non accettando non potrai utilizzare l'app</div>
       </div>
     </div>
   )
@@ -132,68 +86,25 @@ function Disclaimer({ nome, onAccept }) {
 function OnboardingModal({ onDone, isDemo }) {
   const [nome, setNome] = useState('')
   return (
-    <div style={{
-      position:'fixed', inset:0, background:'rgba(2,21,63,0.5)',
-      display:'flex', alignItems:'center', justifyContent:'center',
-      zIndex:1000, padding:'20px',
-      fontFamily:"-apple-system,'Segoe UI',sans-serif"
-    }}>
-      <div style={{
-        background:'#feffff', borderRadius:'24px', padding:'32px 24px',
-        width:'100%', maxWidth:'340px',
-        boxShadow:'0 20px 60px rgba(2,21,63,0.25)'
-      }}>
-        <div style={{textAlign:'center', marginBottom:'24px'}}>
-          <img src="/DamiLogo.png" alt="logo" style={{
-            width:'72px', height:'72px', borderRadius:'50%',
-            objectFit:'cover', marginBottom:'14px',
-            boxShadow:'0 4px 16px rgba(8,24,76,0.25)'
-          }}/>
-          <div style={{fontSize:'20px', fontWeight:'900', color:'#08184c', marginBottom:'6px'}}>
-            {isDemo ? '👋 Benvenuto nella Demo!' : 'Benvenuto in DamiAPP'}
-          </div>
-          <div style={{fontSize:'13px', color:'#7c8088', lineHeight:'1.5'}}>
-            {isDemo
-              ? 'Come ti chiami? Personalizziamo la demo.'
-              : 'Come ti chiami? Ti saluteremo ogni giorno.'}
-          </div>
-          {isDemo && (
-            <div style={{
-              marginTop:'10px', padding:'8px 12px',
-              background:'rgba(255,140,66,0.12)', borderRadius:'10px',
-              border:'1px solid rgba(255,140,66,0.3)',
-              fontSize:'11px', color:'#8B6914', fontWeight:'600'
-            }}>🎭 Modalità Demo — dati fittizi</div>
-          )}
+    <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+      <div style={{background:'#feffff',borderRadius:'24px',padding:'32px 24px',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.25)'}}>
+        <div style={{textAlign:'center',marginBottom:'24px'}}>
+          <img src="/DamiLogo.png" alt="logo" style={{width:'72px',height:'72px',borderRadius:'50%',objectFit:'cover',marginBottom:'14px',boxShadow:'0 4px 16px rgba(8,24,76,0.25)'}}/>
+          <div style={{fontSize:f(20),fontWeight:'900',color:'#08184c',marginBottom:'6px'}}>{isDemo?'👋 Benvenuto nella Demo!':'Benvenuto in DamiAPP'}</div>
+          <div style={{fontSize:f(13),color:'#7c8088',lineHeight:'1.5'}}>{isDemo?'Come ti chiami? Personalizziamo la demo.':'Come ti chiami? Ti saluteremo ogni giorno.'}</div>
+          {isDemo&&<div style={{marginTop:'10px',padding:'8px 12px',background:'rgba(255,140,66,0.12)',borderRadius:'10px',border:'1px solid rgba(255,140,66,0.3)',fontSize:f(11),color:'#8B6914',fontWeight:'600'}}>🎭 Modalità Demo — dati fittizi</div>}
         </div>
         <input
-          value={nome}
-          onChange={e => setNome(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && nome.trim() && onDone(nome.trim())}
-          placeholder="Il tuo nome..."
-          autoFocus
-          style={{
-            width:'100%', padding:'14px 16px', borderRadius:'14px',
-            border:'2px solid #e8eaf0', fontSize:'16px', color:'#02153f',
-            marginBottom:'16px', outline:'none', boxSizing:'border-box',
-            fontFamily:'inherit', background:'#f3f4f7'
-          }}
-          onFocus={e => e.target.style.borderColor='#2e84e9'}
-          onBlur={e => e.target.style.borderColor='#e8eaf0'}
+          value={nome} onChange={e=>setNome(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&nome.trim()&&onDone(nome.trim())}
+          placeholder="Il tuo nome..." autoFocus
+          style={{width:'100%',padding:'14px 16px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:f(16),color:'#02153f',marginBottom:'16px',outline:'none',boxSizing:'border-box',fontFamily:'inherit',background:'#f3f4f7'}}
+          onFocus={e=>e.target.style.borderColor='#2e84e9'}
+          onBlur={e=>e.target.style.borderColor='#e8eaf0'}
         />
         <button
-          onClick={() => nome.trim() && onDone(nome.trim())}
-          disabled={!nome.trim()}
-          style={{
-            width:'100%', padding:'15px', borderRadius:'50px', border:'none',
-            background: nome.trim()
-              ? 'linear-gradient(135deg,#08184c,#193f9e)'
-              : '#e8eaf0',
-            color: nome.trim() ? '#fff' : '#bec1cc',
-            fontSize:'15px', fontWeight:'800',
-            cursor: nome.trim() ? 'pointer' : 'default',
-            boxShadow: nome.trim() ? '0 6px 20px rgba(8,24,76,0.35)' : 'none'
-          }}
+          onClick={()=>nome.trim()&&onDone(nome.trim())} disabled={!nome.trim()}
+          style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',background:nome.trim()?'linear-gradient(135deg,#08184c,#193f9e)':'#e8eaf0',color:nome.trim()?'#fff':'#bec1cc',fontSize:f(15),fontWeight:'800',cursor:nome.trim()?'pointer':'default',boxShadow:nome.trim()?'0 6px 20px rgba(8,24,76,0.35)':'none'}}
         >Inizia →</button>
       </div>
     </div>
@@ -234,27 +145,18 @@ function Login({ onLogin }) {
       const { decrypt } = await import('./crypto')
       const snap = await get(ref(db, 'sharetokens'))
       const val = snap.val()
-      if (!val) {
-        setError('Token non valido o scaduto.')
-        setCheckingToken(false)
-        return
-      }
+      if (!val) { setError('Token non valido o scaduto.'); setCheckingToken(false); return }
       let trovato = null
       Object.entries(val).forEach(([key, encData]) => {
         const t = typeof encData === 'object' ? encData : decrypt(encData)
         if (t && t.token === token.trim().toUpperCase() && t.active) {
           const scadenza = t.expiresAt ? new Date(t.expiresAt) : null
-          if (!scadenza || scadenza > new Date()) {
-            trovato = { ...t, _firebaseKey: key }
-          }
+          if (!scadenza || scadenza > new Date()) trovato = {...t, _firebaseKey:key}
         }
       })
-      if (trovato) {
-        onLogin(false, trovato)
-      } else {
-        setError('Token non valido o scaduto.')
-      }
-    } catch (err) {
+      if (trovato) onLogin(false, trovato)
+      else setError('Token non valido o scaduto.')
+    } catch(err) {
       console.error(err)
       setError('Errore di connessione. Riprova.')
     }
@@ -262,174 +164,57 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div style={{
-      minHeight:'100vh', display:'flex', alignItems:'center',
-      justifyContent:'center', background:'#f3f4f7',
-      fontFamily:"-apple-system,'Segoe UI',sans-serif", padding:'20px'
-    }}>
-      <div style={{
-        background:'#feffff', borderRadius:'28px', overflow:'hidden',
-        width:'100%', maxWidth:'340px',
-        boxShadow:'0 20px 60px rgba(2,21,63,0.20), 0 8px 20px rgba(2,21,63,0.10)'
-      }}>
-        <div style={{
-          background:'linear-gradient(135deg,#08184c,#193f9e)',
-          padding:'36px 24px 30px', textAlign:'center', position:'relative'
-        }}>
-          <div style={{
-            position:'absolute', top:'10px', right:'14px',
-            fontSize:'10px', color:'rgba(255,255,255,0.35)', fontWeight:'600'
-          }}>v{VERSION}</div>
-          <img src="/DamiLogo.png" alt="logo" style={{
-            width:'100px', height:'100px', borderRadius:'50%',
-            objectFit:'cover', marginBottom:'16px',
-            border:'3px solid rgba(255,255,255,0.25)',
-            boxShadow:'0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)'
-          }}/>
-          <div style={{fontSize:'28px', fontWeight:'900', color:'#fff', letterSpacing:'-0.5px'}}>
-            DamiAPP
-          </div>
-          <div style={{fontSize:'12px', color:'rgba(255,255,255,0.5)', marginTop:'4px'}}>
-            Il tuo assistente quotidiano
-          </div>
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f3f4f7',fontFamily:"-apple-system,'Segoe UI',sans-serif",padding:'20px'}}>
+      <div style={{background:'#feffff',borderRadius:'28px',overflow:'hidden',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.20),0 8px 20px rgba(2,21,63,0.10)'}}>
+
+        <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'36px 24px 30px',textAlign:'center',position:'relative'}}>
+          <div style={{position:'absolute',top:'10px',right:'14px',fontSize:f(10),color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>v{VERSION}</div>
+          <img src="/DamiLogo.png" alt="logo" style={{width:'100px',height:'100px',borderRadius:'50%',objectFit:'cover',marginBottom:'16px',border:'3px solid rgba(255,255,255,0.25)',boxShadow:'0 12px 40px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.3)'}}/>
+          <div style={{fontSize:f(28),fontWeight:'900',color:'#fff',letterSpacing:'-0.5px'}}>DamiAPP</div>
+          <div style={{fontSize:f(12),color:'rgba(255,255,255,0.5)',marginTop:'4px'}}>Il tuo assistente quotidiano</div>
         </div>
 
-        <div style={{
-          display:'grid', gridTemplateColumns:'1fr 1fr',
-          background:'#f3f4f7', margin:'16px 16px 0',
-          borderRadius:'12px', padding:'3px', gap:'3px'
-        }}>
-          {['paziente','medico'].map(t => (
-            <button key={t}
-              onClick={() => { setTab(t); setError(''); setPin(''); setToken('') }}
-              style={{
-                padding:'9px', borderRadius:'9px', border:'none', cursor:'pointer',
-                fontWeight:'700', fontSize:'12px', fontFamily:'inherit',
-                background: tab===t ? '#feffff' : 'transparent',
-                color: tab===t ? '#08184c' : '#7c8088',
-                boxShadow: tab===t ? '0 2px 8px rgba(2,21,63,0.10)' : 'none',
-                transition:'all 0.2s'
-              }}>
-              {t === 'paziente' ? '👤 Paziente' : '👨‍⚕️ Medico'}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#f3f4f7',margin:'16px 16px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
+          {['paziente','medico'].map(t=>(
+            <button key={t} onClick={()=>{setTab(t);setError('');setPin('');setToken('')}}
+              style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(12),fontFamily:'inherit',background:tab===t?'#feffff':'transparent',color:tab===t?'#08184c':'#7c8088',boxShadow:tab===t?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
+              {t==='paziente'?'👤 Paziente':'👨‍⚕️ Medico'}
             </button>
           ))}
         </div>
 
         <div style={{padding:'20px 24px 28px'}}>
-          {tab === 'paziente' ? (
+          {tab==='paziente'?(
             <>
-              <div style={{
-                fontSize:'11px', fontWeight:'700', color:'#7c8088',
-                textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
-              }}>PIN di accesso</div>
-              <input
-                type="password" value={pin}
-                onChange={e => setPin(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handlePinLogin()}
-                placeholder="• • • • • •" maxLength={6}
-                style={{
-                  width:'100%', padding:'16px', borderRadius:'14px',
-                  border:'2px solid #e8eaf0', fontSize:'26px', textAlign:'center',
-                  letterSpacing:'12px', marginBottom:'10px', outline:'none',
-                  boxSizing:'border-box', color:'#02153f', background:'#f3f4f7',
-                  fontFamily:'inherit'
-                }}
-                onFocus={e => e.target.style.borderColor='#2e84e9'}
-                onBlur={e => e.target.style.borderColor='#e8eaf0'}
-              />
-              <div onClick={() => setRicordaPin(!ricordaPin)} style={{
-                display:'flex', alignItems:'center', gap:'8px',
-                cursor:'pointer', marginBottom:'14px', userSelect:'none'
-              }}>
-                <div style={{
-                  width:'20px', height:'20px', borderRadius:'6px',
-                  border:`2px solid ${ricordaPin ? '#193f9e' : '#dde0ed'}`,
-                  background: ricordaPin ? '#193f9e' : '#fff',
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  flexShrink:0, transition:'all 0.2s'
-                }}>
-                  {ricordaPin && (
-                    <span style={{color:'#fff', fontSize:'13px', fontWeight:'900'}}>✓</span>
-                  )}
+              <div style={{fontSize:f(11),fontWeight:'700',color:'#7c8088',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'10px'}}>PIN di accesso</div>
+              <input type="password" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handlePinLogin()} placeholder="• • • • • •" maxLength={6}
+                style={{width:'100%',padding:'16px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:'26px',textAlign:'center',letterSpacing:'12px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:'inherit'}}
+                onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#e8eaf0'}/>
+              <div onClick={()=>setRicordaPin(!ricordaPin)} style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',marginBottom:'14px',userSelect:'none'}}>
+                <div style={{width:'20px',height:'20px',borderRadius:'6px',border:`2px solid ${ricordaPin?'#193f9e':'#dde0ed'}`,background:ricordaPin?'#193f9e':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.2s'}}>
+                  {ricordaPin&&<span style={{color:'#fff',fontSize:'13px',fontWeight:'900'}}>✓</span>}
                 </div>
-                <span style={{fontSize:'12px', color:'#7c8088', fontWeight:'600'}}>
-                  Ricorda PIN per accesso rapido
-                </span>
+                <span style={{fontSize:f(12),color:'#7c8088',fontWeight:'600'}}>Ricorda PIN per accesso rapido</span>
               </div>
-              {error && (
-                <div style={{
-                  color:'#e53935', fontSize:'13px', textAlign:'center',
-                  marginBottom:'12px', fontWeight:'600'
-                }}>❌ {error}</div>
-              )}
-              <button onClick={handlePinLogin} style={{
-                width:'100%', padding:'16px', borderRadius:'50px', border:'none',
-                cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
-                background:'linear-gradient(135deg,#08184c,#193f9e)',
-                boxShadow:'0 8px 24px rgba(8,24,76,0.35)'
-              }}>Accedi</button>
-              <div style={{
-                textAlign:'center', marginTop:'12px',
-                fontSize:'11px', color:'#bec1cc'
-              }}>
-                💡 PIN demo disponibile per la presentazione
-              </div>
+              {error&&<div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
+              <button onClick={handlePinLogin} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 8px 24px rgba(8,24,76,0.35)'}}>Accedi</button>
+              <div style={{textAlign:'center',marginTop:'12px',fontSize:f(11),color:'#bec1cc'}}>💡 PIN demo disponibile per la presentazione</div>
             </>
-          ) : (
+          ):(
             <>
-              <div style={{
-                fontSize:'11px', fontWeight:'700', color:'#7c8088',
-                textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'10px'
-              }}>Token di accesso medico</div>
-              <input
-                type="text" value={token}
-                onChange={e => setToken(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === 'Enter' && handleTokenLogin()}
-                placeholder="Es: DMIABCD12345"
-                style={{
-                  width:'100%', padding:'14px', borderRadius:'14px',
-                  border:'2px solid #e8eaf0', fontSize:'16px', textAlign:'center',
-                  letterSpacing:'2px', marginBottom:'10px', outline:'none',
-                  boxSizing:'border-box', color:'#02153f', background:'#f3f4f7',
-                  fontFamily:"'Courier New', monospace"
-                }}
-                onFocus={e => e.target.style.borderColor='#2e84e9'}
-                onBlur={e => e.target.style.borderColor='#e8eaf0'}
-              />
-              {error && (
-                <div style={{
-                  color:'#e53935', fontSize:'13px', textAlign:'center',
-                  marginBottom:'12px', fontWeight:'600'
-                }}>❌ {error}</div>
-              )}
-              <button
-                onClick={handleTokenLogin}
-                disabled={checkingToken}
-                style={{
-                  width:'100%', padding:'16px', borderRadius:'50px', border:'none',
-                  cursor: checkingToken ? 'wait' : 'pointer',
-                  fontWeight:'800', fontSize:'16px', color:'#fff',
-                  background: checkingToken
-                    ? '#bec1cc'
-                    : 'linear-gradient(135deg,#00BFA6,#2e84e9)',
-                  boxShadow: checkingToken ? 'none' : '0 8px 24px rgba(0,191,166,0.3)',
-                  opacity: checkingToken ? 0.7 : 1,
-                  transition:'all 0.2s'
-                }}>
-                {checkingToken ? '⏳ Verifica in corso...' : 'Accedi come Medico'}
+              <div style={{fontSize:f(11),fontWeight:'700',color:'#7c8088',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'10px'}}>Token di accesso medico</div>
+              <input type="text" value={token} onChange={e=>setToken(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&handleTokenLogin()} placeholder="Es: DMIABCD12345"
+                style={{width:'100%',padding:'14px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:f(16),textAlign:'center',letterSpacing:'2px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:"'Courier New',monospace"}}
+                onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#e8eaf0'}/>
+              {error&&<div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
+              <button onClick={handleTokenLogin} disabled={checkingToken}
+                style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:checkingToken?'wait':'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:checkingToken?'#bec1cc':'linear-gradient(135deg,#00BFA6,#2e84e9)',boxShadow:checkingToken?'none':'0 8px 24px rgba(0,191,166,0.3)',opacity:checkingToken?0.7:1,transition:'all 0.2s'}}>
+                {checkingToken?'⏳ Verifica in corso...':'Accedi come Medico'}
               </button>
-              <div style={{
-                textAlign:'center', marginTop:'12px',
-                fontSize:'11px', color:'#bec1cc'
-              }}>
-                Il token ti è stato fornito dalla famiglia del paziente
-              </div>
+              <div style={{textAlign:'center',marginTop:'12px',fontSize:f(11),color:'#bec1cc'}}>Il token ti è stato fornito dalla famiglia del paziente</div>
             </>
           )}
-          <div style={{
-            textAlign:'center', marginTop:'16px', fontSize:'12px', color:'#bec1cc',
-            display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'
-          }}>🔒 Dati cifrati e protetti</div>
+          <div style={{textAlign:'center',marginTop:'16px',fontSize:f(12),color:'#bec1cc',display:'flex',alignItems:'center',justifyContent:'center',gap:'5px'}}>🔒 Dati cifrati e protetti</div>
         </div>
       </div>
     </div>
@@ -438,38 +223,23 @@ function Login({ onLogin }) {
 
 function Navbar({ page, onNavigate }) {
   const items = [
-    {Icon:Home, label:'Home', page:'home'},
-    {Icon:BookOpen, label:'Diario', page:'diario'},
-    {Icon:Pill, label:'Terapie', page:'terapie'},
-    {Icon:Droplets, label:'Toilet', page:'toilet'},
-    {Icon:Link, label:'Condividi', page:'condividi'},
-    {Icon:Settings, label:'Altro', page:'altro'},
+    {Icon:Home,label:'Home',page:'home'},
+    {Icon:BookOpen,label:'Diario',page:'diario'},
+    {Icon:Pill,label:'Terapie',page:'terapie'},
+    {Icon:Droplets,label:'Toilet',page:'toilet'},
+    {Icon:Link,label:'Condividi',page:'condividi'},
+    {Icon:Settings,label:'Altro',page:'altro'},
   ]
   return (
-    <div style={{
-      position:'fixed', bottom:0, left:0, right:0,
-      background:'#feffff', borderTop:'1px solid #f0f1f4',
-      display:'flex', padding:'7px 0 14px',
-      boxShadow:'0 -4px 16px rgba(2,21,63,0.08)', zIndex:100
-    }}>
-      {items.map(({Icon, label, page:p}) => {
-        const act = page === p
+    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'#feffff',borderTop:'1px solid #f0f1f4',display:'flex',padding:'7px 0 14px',boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',zIndex:100}}>
+      {items.map(({Icon,label,page:p})=>{
+        const act=page===p
         return (
-          <div key={p} onClick={() => onNavigate(p)} style={{
-            flex:1, display:'flex', flexDirection:'column',
-            alignItems:'center', gap:'3px', cursor:'pointer'
-          }}>
-            <div style={{
-              width:'34px', height:'24px', display:'flex',
-              alignItems:'center', justifyContent:'center',
-              borderRadius:'8px', background: act ? '#EEF3FD' : 'transparent'
-            }}>
-              <Icon size={17} color={act ? '#193f9e' : '#bec1cc'}/>
+          <div key={p} onClick={()=>onNavigate(p)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
+            <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
+              <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
             </div>
-            <span style={{
-              fontSize:'9px', fontWeight: act ? '800' : '500',
-              color: act ? '#193f9e' : '#bec1cc'
-            }}>{label}</span>
+            <span style={{fontSize:`${Math.round(9*1.15)}px`,fontWeight:act?'800':'500',color:act?'#193f9e':'#bec1cc'}}>{label}</span>
           </div>
         )
       })}
@@ -479,48 +249,30 @@ function Navbar({ page, onNavigate }) {
 
 function AltroPage({ onNavigate }) {
   const voci = [
-    {Icon:Package, label:'Magazzino medicinali', sub:'Scorte e scadenze', color:'#00BFA6', page:'magazzino'},
-    {Icon:ShoppingBag, label:'Cosa portare', sub:'Liste personalizzate', color:'#FF8C42', page:'cosa_portare'},
-    {Icon:FileText, label:'Documenti personali', sub:'Archivio documenti', color:'#2e84e9', page:'doc_personali'},
-    {Icon:Stethoscope, label:'Documenti medici', sub:'Referti e visite', color:'#7B5EA7', page:'doc_medici'},
-    {Icon:Phone, label:'Rubrica', sub:'Contatti medici', color:'#F7295A', page:'rubrica'},
-    {Icon:CreditCard, label:'Pagamenti', sub:'Gestione spese terapisti', color:'#193f9e', page:'pagamenti'},
-    {Icon:BarChart2, label:'Report', sub:'Statistiche e grafici', color:'#FF8C42', page:'report'},
-    {Icon:Shield, label:'Backup & Admin', sub:'Gestione dati', color:'#7c8088', page:'admin'},
+    {Icon:Package,label:'Magazzino medicinali',sub:'Scorte e scadenze',color:'#00BFA6',page:'magazzino'},
+    {Icon:ShoppingBag,label:'Cosa portare',sub:'Liste personalizzate',color:'#FF8C42',page:'cosa_portare'},
+    {Icon:FileText,label:'Documenti personali',sub:'Archivio documenti',color:'#2e84e9',page:'doc_personali'},
+    {Icon:Stethoscope,label:'Documenti medici',sub:'Referti e visite',color:'#7B5EA7',page:'doc_medici'},
+    {Icon:Phone,label:'Rubrica',sub:'Contatti medici',color:'#F7295A',page:'rubrica'},
+    {Icon:CreditCard,label:'Pagamenti',sub:'Gestione spese terapisti',color:'#193f9e',page:'pagamenti'},
+    {Icon:BarChart2,label:'Report',sub:'Statistiche e grafici',color:'#FF8C42',page:'report'},
+    {Icon:Shield,label:'Backup & Admin',sub:'Gestione dati',color:'#7c8088',page:'admin'},
   ]
   return (
-    <div style={{
-      background:'#f3f4f7', minHeight:'100vh',
-      paddingBottom:'80px',
-      fontFamily:"-apple-system,'Segoe UI',sans-serif",
-      maxWidth:'480px', margin:'0 auto'
-    }}>
-      <div style={{
-        background:'linear-gradient(135deg,#08184c,#193f9e)',
-        padding:'20px 16px 24px'
-      }}>
-        <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>⚙️ Altro</div>
-        <div style={{fontSize:'11px', color:'rgba(255,255,255,0.7)', marginTop:'2px'}}>
-          Altre funzionalità
-        </div>
+    <div style={{background:'#f3f4f7',minHeight:'100vh',paddingBottom:'80px',fontFamily:"-apple-system,'Segoe UI',sans-serif",maxWidth:'480px',margin:'0 auto'}}>
+      <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'20px 16px 24px'}}>
+        <div style={{fontSize:f(18),fontWeight:'900',color:'#fff'}}>⚙️ Altro</div>
+        <div style={{fontSize:f(11),color:'rgba(255,255,255,0.7)',marginTop:'2px'}}>Altre funzionalità</div>
       </div>
       <div style={{padding:'12px'}}>
-        {voci.map(({Icon, label, sub, color, page}, i) => (
-          <div key={i} onClick={() => onNavigate(page)} style={{
-            background:'#feffff', borderRadius:'14px', padding:'14px',
-            marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px',
-            boxShadow:'0 4px 16px rgba(2,21,63,0.08)', cursor:'pointer'
-          }}>
-            <div style={{
-              width:'42px', height:'42px', borderRadius:'12px',
-              background:`${color}18`, border:`1.5px solid ${color}33`,
-              display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0
-            }}>
+        {voci.map(({Icon,label,sub,color,page},i)=>(
+          <div key={i} onClick={()=>onNavigate(page)} style={{background:'#feffff',borderRadius:'14px',padding:'14px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'12px',boxShadow:'0 4px 16px rgba(2,21,63,0.08)',cursor:'pointer'}}>
+            <div style={{width:'42px',height:'42px',borderRadius:'12px',background:`${color}18`,border:`1.5px solid ${color}33`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <Icon size={20} color={color}/>
             </div>
             <div style={{flex:1}}>
-              <div style={{fontSize:'13px', fontWeight:'700', color:'#02153f'}}>{label}</div>
-              <div style={{fontSize:'11px', color:'#7c8088', marginTop:'1px'}}>{sub}</div>
+              <div style={{fontSize:f(13),fontWeight:'700',color:'#02153f'}}>{label}</div>
+              <div style={{fontSize:f(11),color:'#7c8088',marginTop:'1px'}}>{sub}</div>
             </div>
             <ChevronRight size={16} color="#bec1cc"/>
           </div>
@@ -532,26 +284,12 @@ function AltroPage({ onNavigate }) {
 
 function PaginaInArrivo({ onBack }) {
   return (
-    <div style={{
-      minHeight:'100vh', background:'#f3f4f7',
-      display:'flex', flexDirection:'column',
-      alignItems:'center', justifyContent:'center',
-      fontFamily:"-apple-system,'Segoe UI',sans-serif",
-      paddingBottom:'80px'
-    }}>
-      <div style={{textAlign:'center', padding:'40px'}}>
-        <div style={{fontSize:'48px', marginBottom:'16px'}}>🚧</div>
-        <div style={{fontSize:'18px', fontWeight:'900', color:'#02153f', marginBottom:'8px'}}>
-          In arrivo
-        </div>
-        <div style={{fontSize:'13px', color:'#7c8088', marginBottom:'24px'}}>
-          Questa sezione è in sviluppo
-        </div>
-        <button onClick={onBack} style={{
-          padding:'12px 24px', borderRadius:'50px', border:'none',
-          background:'linear-gradient(135deg,#193f9e,#2e84e9)',
-          color:'#fff', fontWeight:'700', fontSize:'14px', cursor:'pointer'
-        }}>← Torna indietro</button>
+    <div style={{minHeight:'100vh',background:'#f3f4f7',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif",paddingBottom:'80px'}}>
+      <div style={{textAlign:'center',padding:'40px'}}>
+        <div style={{fontSize:'48px',marginBottom:'16px'}}>🚧</div>
+        <div style={{fontSize:f(18),fontWeight:'900',color:'#02153f',marginBottom:'8px'}}>In arrivo</div>
+        <div style={{fontSize:f(13),color:'#7c8088',marginBottom:'24px'}}>Questa sezione è in sviluppo</div>
+        <button onClick={onBack} style={{padding:'12px 24px',borderRadius:'50px',border:'none',background:'linear-gradient(135deg,#193f9e,#2e84e9)',color:'#fff',fontWeight:'700',fontSize:f(14),cursor:'pointer'}}>← Torna indietro</button>
       </div>
     </div>
   )
@@ -563,9 +301,7 @@ export default function App() {
   const [isMedico, setIsMedico] = useState(false)
   const [tokenMedico, setTokenMedico] = useState(null)
   const [page, setPage] = useState('home')
-  const [nomeUtente, setNomeUtente] = useState(
-    () => localStorage.getItem('damiapp_nome') || ''
-  )
+  const [nomeUtente, setNomeUtente] = useState(()=>localStorage.getItem('damiapp_nome')||'')
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [pendingNome, setPendingNome] = useState('')
@@ -580,15 +316,11 @@ export default function App() {
     } else {
       setIsMedico(false)
       setTokenMedico(null)
-      if (demo || !nomeUtente) setShowOnboarding(true)
+      if (demo||!nomeUtente) setShowOnboarding(true)
     }
   }
 
-  function handleNome(nome) {
-    setPendingNome(nome)
-    setShowOnboarding(false)
-    setShowDisclaimer(true)
-  }
+  function handleNome(nome) { setPendingNome(nome); setShowOnboarding(false); setShowDisclaimer(true) }
 
   function handleAcceptDisclaimer() {
     if (!isDemo) localStorage.setItem('damiapp_nome', pendingNome)
@@ -596,96 +328,46 @@ export default function App() {
   }
 
   function handleNavigate(dest) {
-    if (dest === 'crisi') setTimerSecCrisi(1)
+    if (dest==='crisi') setTimerSecCrisi(1)
     setPage(dest)
   }
 
   const nomeEffettivo = isMedico
-    ? `Dr. ${tokenMedico?.medicoName || 'Medico'}`
-    : isDemo
-      ? (pendingNome || 'Ospite')
-      : (pendingNome || nomeUtente || 'Damiano')
+    ? `Dr. ${tokenMedico?.medicoName||'Medico'}`
+    : isDemo ? (pendingNome||'Ospite')
+    : (pendingNome||nomeUtente||'Damiano')
 
-  if (!authenticated) return <Login onLogin={handleLogin} />
+  if (!authenticated) return <Login onLogin={handleLogin}/>
 
-  const noNav = ['crisi', 'sos']
+  if (isMedico && tokenMedico) {
+    return <DoctorView
+      tokenData={tokenMedico}
+      onLogout={()=>{setAuthenticated(false);setIsMedico(false);setTokenMedico(null)}}
+    />
+  }
+
+  const noNav = ['crisi','sos']
   const inArrivo = ['cosa_portare','doc_personali','doc_medici','rubrica','pagamenti','admin']
 
   return (
     <>
-      {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo} />}
-      {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer} />}
+      {showOnboarding&&<OnboardingModal onDone={handleNome} isDemo={isDemo}/>}
+      {showDisclaimer&&<Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
 
-      {page === 'crisi' && (
-        <CrisiPage
-          onBack={() => setPage('home')}
-          timerSecInizio={timerSecCrisi}
-          isDemo={isDemo}
-        />
-      )}
+      {page==='crisi'&&<CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
+      {page==='sos'&&<SOSPage onBack={()=>setPage('home')}/>}
 
-      {page === 'sos' && (
-        <SOSPage onBack={() => setPage('home')}/>
-      )}
-
-      {!noNav.includes(page) && (
+      {!noNav.includes(page)&&(
         <>
-          {page === 'home' && (
-            <Home2
-              nomeUtente={nomeEffettivo}
-              frase={getFrase()}
-              isDemo={isDemo}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {page === 'diario' && (
-            <DiarioCrisi
-              onBack={() => setPage('home')}
-              isDemo={isDemo}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {page === 'terapie' && (
-            <TerapiePage
-              onBack={() => setPage('home')}
-              isDemo={isDemo}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {page === 'toilet' && (
-            <ToiletPage
-              onBack={() => setPage('home')}
-              isDemo={isDemo}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {page === 'condividi' && (
-            <CondividiPage
-              onBack={() => setPage('home')}
-              isDemo={isDemo}
-            />
-          )}
-          {page === 'report' && (
-            <ReportPage
-              onBack={() => setPage('home')}
-              isDemo={isDemo}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {page === 'magazzino' && (
-            <MagazzinoPage
-              onBack={() => setPage('home')}
-              isDemo={isDemo}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {page === 'altro' && (
-            <AltroPage onNavigate={handleNavigate}/>
-          )}
-          {inArrivo.includes(page) && (
-            <PaginaInArrivo onBack={() => setPage('altro')}/>
-          )}
-
+          {page==='home'&&<Home2 nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='diario'&&<DiarioCrisi onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='terapie'&&<TerapiePage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='toilet'&&<ToiletPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='condividi'&&<CondividiPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
+          {page==='report'&&<ReportPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='magazzino'&&<MagazzinoPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='altro'&&<AltroPage onNavigate={handleNavigate}/>}
+          {inArrivo.includes(page)&&<PaginaInArrivo onBack={()=>setPage('altro')}/>}
           <Navbar page={page} onNavigate={handleNavigate}/>
         </>
       )}
