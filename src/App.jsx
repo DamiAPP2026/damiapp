@@ -13,6 +13,7 @@ import ToiletPage from './ToiletPage'
 import CondividiPage from './CondividiPage'
 import ReportPage from './ReportPage'
 import MagazzinoPage from './MagazzinoPage'
+import CosaPortarePage from './CosaPortarePage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
@@ -545,12 +546,15 @@ export default function App() {
           )}
           {page === 'magazzino' && (
             <MagazzinoPage onBack={() => setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>
+          {page === 'cosa_portare' && (
+            <CosaPortarePage onBack={() => setPage('altro')} isDemo={isDemo}/>
+            )}
           )}
           {page === 'altro' && (
             <AltroPage onNavigate={handleNavigate}/>
           )}
           {/* Pagine da implementare */}
-          {['cosa_portare','doc_personali','doc_medici','rubrica','pagamenti','admin'].includes(page) && (
+          {['doc_personali','doc_medici','rubrica','pagamenti','admin'].includes(page) && (
             <div style={{
               minHeight:'100vh', background:'#f3f4f7',
               display:'flex', flexDirection:'column',

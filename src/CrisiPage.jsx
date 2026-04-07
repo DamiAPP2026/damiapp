@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Play, Square, RotateCcw, ChevronLeft, Check, Save } from 'lucide-react'
+import { db } from './firebase'
+import { ref, push } from 'firebase/database'
+import { encrypt } from './crypto'
 
 const TIPI_CRISI = [
   { value:'Crisi tonico-cloniche', label:'Tonico-cloniche', sub:'Grande male', color:'#F7295A' },
@@ -43,7 +46,7 @@ const POST_CRISI = [
 
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 
-function ChipGroup({ options, value, onChange, color = '#2e84e9', colorBg = '#EEF3FD' }) {
+function ChipGroup({ options, value, onChange, color='#2e84e9', colorBg='#EEF3FD' }) {
   return (
     <div style={{display:'flex', flexWrap:'wrap', gap:'6px'}}>
       {options.map(o => {
@@ -64,7 +67,7 @@ function ChipGroup({ options, value, onChange, color = '#2e84e9', colorBg = '#EE
   )
 }
 
-function MultiChipGroup({ options, values, onChange, color = '#2e84e9', colorBg = '#EEF3FD' }) {
+function MultiChipGroup({ options, values, onChange, color='#2e84e9', colorBg='#EEF3FD' }) {
   return (
     <div style={{display:'flex', flexWrap:'wrap', gap:'6px'}}>
       {options.map(o => {
@@ -89,8 +92,14 @@ function MultiChipGroup({ options, values, onChange, color = '#2e84e9', colorBg 
 
 function SectionCard({ title, children }) {
   return (
-    <div style={{background:'#feffff', borderRadius:'18px', padding:'14px', marginBottom:'10px', boxShadow:sh}}>
-      <div style={{fontSize:'13px', fontWeight:'800', color:'#02153f', marginBottom:'12px'}}>
+    <div style={{
+      background:'#feffff', borderRadius:'18px',
+      padding:'14px', marginBottom:'10px', boxShadow:sh
+    }}>
+      <div style={{
+        fontSize:'13px', fontWeight:'800',
+        color:'#02153f', marginBottom:'12px'
+      }}>
         {title}
       </div>
       {children}
@@ -102,8 +111,11 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
   const [timerSec, setTimerSec] = useState(timerSecInizio)
   const [running, setRunning] = useState(timerSecInizio > 0)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const timerRef = useRef(null)
 
+  // Campi del modulo
   const [tipo, setTipo] = useState('')
   const [aree, setAree] = useState([])
   const [trigger, setTrigger] = useState('')
@@ -122,6 +134,7 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
   const [postCrisi, setPostCrisi] = useState('')
   const [note, setNote] = useState('')
 
+  // Avvia timer subito se arriva da Home
   useEffect(() => {
     if (timerSecInizio > 0) {
       timerRef.current = setInterval(() => setTimerSec(s => s + 1), 1000)
@@ -134,36 +147,92 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
     setRunning(true)
     timerRef.current = setInterval(() => setTimerSec(s => s + 1), 1000)
   }
-  function stopTimer() { setRunning(false); clearInterval(timerRef.current) }
+  function stopTimer() {
+    setRunning(false)
+    clearInterval(timerRef.current)
+  }
   function resetTimer() { stopTimer(); setTimerSec(0) }
+
   function fmt(s) {
     return [Math.floor(s/3600), Math.floor((s%3600)/60), s%60]
       .map(n => String(n).padStart(2,'0')).join(':')
   }
 
-  function handleSave() {
-    if (!tipo) { alert('Seleziona il tipo di crisi'); return }
+  async function handleSave() {
+    // Validazione
+    if (!tipo) {
+      alert('Seleziona il tipo di crisi prima di salvare')
+      return
+    }
+    if (timerSec === 0) {
+      alert('Avvia il timer per registrare la durata della crisi')
+      return
+    }
+
     stopTimer()
+    setSaving(true)
+    setSaveError('')
+
+    // Costruisco l'oggetto crisi completo
     const crisi = {
       id: Date.now(),
-      type: tipo, duration: fmt(timerSec), durationSec: timerSec,
-      date: new Date().toLocaleString('it-IT'), timestamp: Date.now(),
-      areas: aree, trigger, attivita, luogo,
+      type: tipo,
+      duration: fmt(timerSec),
+      durationSec: timerSec,
+      date: new Date().toLocaleString('it-IT'),
+      timestamp: Date.now(),
+      areas: aree,
+      trigger: trigger,
+      attivita: attivita,
+      luogo: luogo,
       ciboPreCrisi: ciboDescrizione,
       farmaco: farmaco === 'Altro' ? farmacoAltro : farmaco,
-      farmacoOra, intensita, perdCoscienza, morseLingua,
-      enuresi, cianosi, emissioneVocale, postCrisi, note,
+      farmacoOra: farmacoOra,
+      intensita: intensita,
+      perdCoscienza: perdCoscienza,
+      morseLingua: morseLingua,
+      enuresi: enuresi,
+      cianosi: cianosi,
+      emissioneVocale: emissioneVocale,
+      postCrisi: postCrisi,
+      note: note,
     }
-    if (!isDemo) console.log('Salvo crisi su Firebase:', crisi)
-    setSaved(true)
-    setTimeout(() => onBack && onBack(), 2200)
+
+    try {
+      if (isDemo) {
+        // Modalità demo: simula salvataggio senza toccare Firebase
+        console.log('🎭 DEMO — Crisi NON salvata su Firebase:', crisi)
+        await new Promise(r => setTimeout(r, 800)) // simula attesa
+      } else {
+        // Modalità reale: cifra e salva su Firebase
+        console.log('💾 Salvataggio crisi su Firebase...')
+        await push(ref(db, 'crises'), encrypt(crisi))
+        console.log('✅ Crisi salvata con successo su Firebase')
+      }
+      setSaved(true)
+    } catch (error) {
+      console.error('❌ Errore salvataggio crisi:', error)
+      setSaveError('Errore nel salvataggio. Verifica la connessione e riprova.')
+      setSaving(false)
+      // Riavvia timer in caso di errore
+      startTimer()
+    }
   }
 
+  // Torna alla home dopo salvataggio
+  useEffect(() => {
+    if (saved) {
+      const timer = setTimeout(() => onBack && onBack(), 2500)
+      return () => clearTimeout(timer)
+    }
+  }, [saved])
+
+  // Schermata di successo
   if (saved) {
     return (
       <div style={{
-        minHeight:'100vh', background:'#f3f4f7', display:'flex',
-        alignItems:'center', justifyContent:'center',
+        minHeight:'100vh', background:'#f3f4f7',
+        display:'flex', alignItems:'center', justifyContent:'center',
         fontFamily:"-apple-system,'Segoe UI',sans-serif"
       }}>
         <div style={{textAlign:'center', padding:'40px'}}>
@@ -171,23 +240,43 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
             width:'80px', height:'80px', borderRadius:'50%',
             background:'linear-gradient(135deg,#00BFA6,#2e84e9)',
             display:'flex', alignItems:'center', justifyContent:'center',
-            margin:'0 auto 20px', boxShadow:'0 8px 24px rgba(0,191,166,0.35)'
+            margin:'0 auto 20px',
+            boxShadow:'0 8px 24px rgba(0,191,166,0.35)'
           }}>
             <Check size={40} color="#fff" strokeWidth={3}/>
           </div>
-          <div style={{fontSize:'22px', fontWeight:'900', color:'#08184c', marginBottom:'8px'}}>
+          <div style={{
+            fontSize:'22px', fontWeight:'900',
+            color:'#08184c', marginBottom:'8px'
+          }}>
             Crisi registrata!
           </div>
-          <div style={{fontSize:'14px', color:'#7c8088'}}>
-            Durata: {fmt(timerSec)} · {tipo}
+          <div style={{fontSize:'14px', color:'#7c8088', marginBottom:'6px'}}>
+            Durata: <strong>{fmt(timerSec)}</strong>
           </div>
-          {isDemo && (
+          <div style={{fontSize:'13px', color:'#7c8088', marginBottom:'16px'}}>
+            {tipo}
+          </div>
+          {isDemo ? (
             <div style={{
-              marginTop:'16px', padding:'8px 16px',
-              background:'rgba(255,140,66,0.12)', borderRadius:'20px',
-              fontSize:'12px', color:'#8B6914', fontWeight:'600'
-            }}>🎭 Modalità demo — dati non salvati</div>
+              padding:'10px 18px', background:'rgba(255,140,66,0.12)',
+              borderRadius:'20px', fontSize:'12px',
+              color:'#8B6914', fontWeight:'600', display:'inline-block'
+            }}>
+              🎭 Modalità demo — dati non salvati su Firebase
+            </div>
+          ) : (
+            <div style={{
+              padding:'10px 18px', background:'rgba(0,191,166,0.12)',
+              borderRadius:'20px', fontSize:'12px',
+              color:'#007a6a', fontWeight:'600', display:'inline-block'
+            }}>
+              ✅ Salvato su Firebase
+            </div>
           )}
+          <div style={{fontSize:'11px', color:'#bec1cc', marginTop:'16px'}}>
+            Torno alla home...
+          </div>
         </div>
       </div>
     )
@@ -201,32 +290,47 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
   return (
     <>
       <style>{`
-        *{box-sizing:border-box;}
-        body{margin:0;background:#f3f4f7;}
-        .crisi-wrap{background:#f3f4f7;min-height:100vh;
-          font-family:-apple-system,'Segoe UI',sans-serif;
-          padding-bottom:40px;width:100%;max-width:480px;margin:0 auto;}
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f3f4f7; }
+        .crisi-wrap {
+          background: #f3f4f7; min-height: 100vh;
+          font-family: -apple-system, 'Segoe UI', sans-serif;
+          padding-bottom: 40px; width: 100%;
+          max-width: 480px; margin: 0 auto;
+        }
       `}</style>
+
       <div className="crisi-wrap">
 
-        {/* HEADER + TIMER */}
+        {/* ── HEADER + TIMER ── */}
         <div style={{
           background:'linear-gradient(135deg,#F7295A,#FF8C42)',
-          padding:'14px 16px 20px', position:'sticky', top:0, zIndex:10
+          padding:'14px 16px 20px',
+          position:'sticky', top:0, zIndex:10
         }}>
-          <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'14px'}}>
+          <div style={{
+            display:'flex', alignItems:'center',
+            gap:'12px', marginBottom:'14px'
+          }}>
             <button onClick={onBack} style={{
               width:'36px', height:'36px', borderRadius:'50%',
               background:'rgba(255,255,255,0.2)', border:'none',
-              display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'
-            }}><ChevronLeft size={20} color="#fff"/></button>
+              display:'flex', alignItems:'center',
+              justifyContent:'center', cursor:'pointer'
+            }}>
+              <ChevronLeft size={20} color="#fff"/>
+            </button>
             <div>
-              <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>🚨 Registra crisi</div>
+              <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>
+                🚨 Registra crisi
+              </div>
               <div style={{fontSize:'11px', color:'rgba(255,255,255,0.75)'}}>
                 {running ? '🔴 Timer in corso...' : 'Compila e salva'}
               </div>
             </div>
           </div>
+
+          {/* Timer grande */}
           <div style={{
             background:'rgba(255,255,255,0.15)', borderRadius:'18px',
             padding:'14px', textAlign:'center'
@@ -235,23 +339,37 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
               fontSize:'52px', fontWeight:'900', color:'#fff',
               letterSpacing:'-2px', fontVariantNumeric:'tabular-nums',
               lineHeight:1, marginBottom:'10px'
-            }}>{fmt(timerSec)}</div>
+            }}>
+              {fmt(timerSec)}
+            </div>
             <div style={{display:'flex', justifyContent:'center', gap:'12px'}}>
-              {[
-                {fn:startTimer, Icon:Play, bg: running ? 'rgba(255,255,255,0.2)' : '#fff',
-                  ic: running ? '#fff' : '#F7295A', fill: true},
-                {fn:stopTimer, Icon:Square, bg:'rgba(255,255,255,0.2)', ic:'#fff', fill:true},
-                {fn:resetTimer, Icon:RotateCcw, bg:'rgba(255,255,255,0.15)', ic:'#fff', fill:false},
-              ].map(({fn, Icon, bg, ic, fill}, i) => (
-                <button key={i} onClick={fn} style={{
-                  width:'44px', height:'44px', borderRadius:'50%', border:'none',
-                  background:bg, display:'flex', alignItems:'center',
-                  justifyContent:'center', cursor:'pointer',
-                  boxShadow: i===0 && !running ? '0 4px 12px rgba(0,0,0,0.2)' : 'none'
-                }}>
-                  <Icon size={18} color={ic} fill={fill ? ic : 'none'}/>
-                </button>
-              ))}
+              <button onClick={startTimer} style={{
+                width:'44px', height:'44px', borderRadius:'50%', border:'none',
+                background: running ? 'rgba(255,255,255,0.2)' : '#fff',
+                display:'flex', alignItems:'center',
+                justifyContent:'center', cursor:'pointer',
+                boxShadow: running ? 'none' : '0 4px 12px rgba(0,0,0,0.2)'
+              }}>
+                <Play size={18}
+                  color={running ? '#fff' : '#F7295A'}
+                  fill={running ? '#fff' : '#F7295A'}/>
+              </button>
+              <button onClick={stopTimer} style={{
+                width:'44px', height:'44px', borderRadius:'50%', border:'none',
+                background:'rgba(255,255,255,0.2)',
+                display:'flex', alignItems:'center',
+                justifyContent:'center', cursor:'pointer'
+              }}>
+                <Square size={18} color="#fff" fill="#fff"/>
+              </button>
+              <button onClick={resetTimer} style={{
+                width:'44px', height:'44px', borderRadius:'50%', border:'none',
+                background:'rgba(255,255,255,0.15)',
+                display:'flex', alignItems:'center',
+                justifyContent:'center', cursor:'pointer'
+              }}>
+                <RotateCcw size={18} color="#fff"/>
+              </button>
             </div>
           </div>
         </div>
@@ -272,12 +390,15 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
                     fontSize:'12px', fontWeight:'800',
                     color: tipo===t.value ? t.color : '#02153f'
                   }}>{t.label}</div>
-                  <div style={{fontSize:'10px', color:'#7c8088', marginTop:'1px'}}>{t.sub}</div>
+                  <div style={{
+                    fontSize:'10px', color:'#7c8088', marginTop:'1px'
+                  }}>{t.sub}</div>
                   {tipo===t.value && (
                     <div style={{
                       width:'16px', height:'16px', borderRadius:'50%',
-                      background:t.color, display:'flex', alignItems:'center',
-                      justifyContent:'center', marginTop:'6px'
+                      background:t.color, display:'flex',
+                      alignItems:'center', justifyContent:'center',
+                      marginTop:'6px'
                     }}>
                       <Check size={10} color="#fff" strokeWidth={3}/>
                     </div>
@@ -304,7 +425,9 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
               display:'flex', justifyContent:'space-between',
               alignItems:'center', marginBottom:'10px'
             }}>
-              <div style={{fontSize:'12px', color:'#7c8088'}}>Scala da 1 (lieve) a 10 (grave)</div>
+              <div style={{fontSize:'12px', color:'#7c8088'}}>
+                Scala da 1 (lieve) a 10 (grave)
+              </div>
               <div style={{
                 width:'34px', height:'34px', borderRadius:'50%',
                 background: intensita<=3 ? '#00BFA6' : intensita<=6 ? '#FFD93D' : '#F7295A',
@@ -315,7 +438,9 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
             <input type="range" min="1" max="10" value={intensita}
               onChange={e => setIntensita(Number(e.target.value))}
               style={{width:'100%', accentColor:'#2e84e9'}}/>
-            <div style={{display:'flex', justifyContent:'space-between', marginTop:'4px'}}>
+            <div style={{
+              display:'flex', justifyContent:'space-between', marginTop:'4px'
+            }}>
               <span style={{fontSize:'10px', color:'#00BFA6', fontWeight:'600'}}>Lieve</span>
               <span style={{fontSize:'10px', color:'#FFD93D', fontWeight:'600'}}>Moderata</span>
               <span style={{fontSize:'10px', color:'#F7295A', fontWeight:'600'}}>Grave</span>
@@ -339,7 +464,10 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
                 border:`1.5px solid ${value ? `${color}44` : 'transparent'}`,
                 transition:'all 0.15s'
               }}>
-                <div style={{fontSize:'12px', fontWeight:'600', color: value ? color : '#394058'}}>
+                <div style={{
+                  fontSize:'12px', fontWeight:'600',
+                  color: value ? color : '#394058'
+                }}>
                   {label}
                 </div>
                 <div style={{
@@ -369,7 +497,7 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
             />
           </SectionCard>
 
-          {/* ATTIVITÀ + LUOGO */}
+          {/* CONTESTO */}
           <SectionCard title="📍 Contesto">
             <div style={labelStyle}>Attività in corso</div>
             <ChipGroup
@@ -394,7 +522,7 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
             <textarea
               value={ciboDescrizione}
               onChange={e => setCiboDescrizione(e.target.value)}
-              placeholder="Descrivi cosa ha mangiato o bevuto prima della crisi. Es: colazione con latte e biscotti, pranzo leggero, a digiuno..."
+              placeholder="Descrivi cosa ha mangiato o bevuto prima della crisi. Es: colazione con latte e biscotti, a digiuno..."
               rows={3}
               style={{
                 width:'100%', border:'1.5px solid #f0f1f4', borderRadius:'12px',
@@ -484,24 +612,58 @@ export default function CrisiPage({ onBack, timerSecInizio = 0, isDemo }) {
             />
           </SectionCard>
 
-          {/* SALVA */}
-          <button onClick={handleSave} style={{
-            width:'100%', padding:'17px', borderRadius:'50px', border:'none',
-            cursor:'pointer', fontWeight:'800', fontSize:'16px', color:'#fff',
-            background: tipo ? 'linear-gradient(135deg,#08184c,#2e84e9)' : '#dde0ed',
-            boxShadow: tipo ? '0 8px 24px rgba(8,24,76,0.35)' : 'none',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            gap:'8px', transition:'all 0.2s', marginBottom:'8px'
-          }}>
-            <Save size={18} color="#fff"/>
-            {tipo ? `Salva crisi${timerSec>0 ? ' — '+fmt(timerSec) : ''}` : 'Seleziona prima il tipo di crisi'}
+          {/* ERRORE SALVATAGGIO */}
+          {saveError && (
+            <div style={{
+              background:'#FEF0F4', borderRadius:'14px', padding:'12px 14px',
+              marginBottom:'10px', border:'1.5px solid #F7295A33',
+              fontSize:'13px', color:'#F7295A', fontWeight:'600',
+              textAlign:'center'
+            }}>
+              ❌ {saveError}
+            </div>
+          )}
+
+          {/* PULSANTE SALVA */}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              width:'100%', padding:'17px', borderRadius:'50px', border:'none',
+              cursor: saving ? 'wait' : tipo ? 'pointer' : 'default',
+              fontWeight:'800', fontSize:'16px', color:'#fff',
+              background: saving
+                ? 'linear-gradient(135deg,#7c8088,#bec1cc)'
+                : tipo
+                  ? 'linear-gradient(135deg,#08184c,#2e84e9)'
+                  : '#dde0ed',
+              boxShadow: tipo && !saving
+                ? '0 8px 24px rgba(8,24,76,0.35)'
+                : 'none',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              gap:'8px', transition:'all 0.2s', marginBottom:'8px',
+              opacity: saving ? 0.7 : 1
+            }}>
+            {saving
+              ? <><span style={{fontSize:'16px'}}>⏳</span> Salvataggio in corso...</>
+              : <><Save size={18} color="#fff"/>
+                  {tipo
+                    ? `Salva crisi${timerSec>0 ? ' — '+fmt(timerSec) : ''}`
+                    : 'Seleziona prima il tipo di crisi'
+                  }
+                </>
+            }
           </button>
+
           {isDemo && (
             <div style={{
               textAlign:'center', fontSize:'11px',
-              color:'#8B6914', fontWeight:'600', marginBottom:'8px'
-            }}>🎭 Modalità demo — dati non salvati su Firebase</div>
+              color:'#8B6914', fontWeight:'600', marginBottom:'16px'
+            }}>
+              🎭 Modalità demo — la crisi non verrà salvata su Firebase
+            </div>
           )}
+
         </div>
       </div>
     </>
