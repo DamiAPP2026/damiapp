@@ -112,7 +112,7 @@ export default function TerapiePage({ onBack, isDemo, onNavigate }) {
                       <div style={{display:'flex',alignItems:'center',gap:'4px',marginTop:'4px'}}>
                         <Clock size={11} color={passata&&!assunta?'#F7295A':'#bec1cc'}/>
                         <span style={{fontSize:'11px',fontWeight:'700',color:assunta?'#bec1cc':passata?'#F7295A':'#193f9e'}}>
-                          {t.orario}{passata&&!assunta?' — In ritardo!'}{assunta&&' — Assunta ✓'}
+                        {t.orario}{passata&&!assunta?' — In ritardo!':''}{assunta?' — Assunta ✓':''}
                         </span>
                       </div>
                     </div>
