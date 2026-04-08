@@ -50,7 +50,6 @@ const ALL_QUICK_ACTIONS = [
 
 const DEFAULT_QUICK = ['crisi', 'terapie', 'toilet']
 
-// Navbar principale in basso
 const NAV_BOTTOM = [
   {Icon:Home, label:'Home', page:'home'},
   {Icon:BookOpen, label:'Diario', page:'diario'},
@@ -60,7 +59,6 @@ const NAV_BOTTOM = [
   {Icon:Settings, label:'Altro', page:'altro'},
 ]
 
-// Seconda barra — stile identico navbar — sezioni extra
 const NAV_EXTRA = [
   {Icon:BarChart2, label:'Report', page:'report'},
   {Icon:Package, label:'Magazzino', page:'magazzino'},
@@ -154,6 +152,9 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
 
+  // Calcola altezza doppia navbar per padding bottom
+  const NAVBAR_H = 180
+
   return (
     <>
       <style>{`
@@ -162,11 +163,20 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
         .home-wrap{
           background:#f3f4f7;min-height:100vh;
           font-family:-apple-system,'Segoe UI',sans-serif;
-          padding-bottom:140px;width:100%;max-width:480px;margin:0 auto;
+          padding-bottom:${NAVBAR_H}px;
+          width:100%;max-width:480px;margin:0 auto;
+        }
+        .nav-fixed{
+          position:fixed;bottom:0;left:0;right:0;
+          display:flex;flex-direction:column;
+          z-index:100;
+          max-width:480px;
+          margin:0 auto;
+          left:50%;transform:translateX(-50%);
         }
       `}</style>
 
-      {/* ── MODAL PERSONALIZZA PRIORITÀ ── */}
+      {/* ── MODAL PERSONALIZZA ── */}
       {showQuickEdit && (
         <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',zIndex:500,display:'flex',alignItems:'flex-end',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
           <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto'}}>
@@ -247,6 +257,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
         {/* ── MINI CARDS ── */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'8px 12px'}}>
+
           {/* Giorni senza crisi */}
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
@@ -263,6 +274,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
             </div>
             <div style={{height:'3px',background:`linear-gradient(90deg,${colorGiorni},${colorGiorni}88)`}}/>
           </div>
+
           {/* Prossima terapia */}
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
@@ -279,6 +291,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
             </div>
             <div style={{height:'3px',background:'linear-gradient(90deg,#00BFA6,#2e84e9)'}}/>
           </div>
+
           {/* Scadenze */}
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
@@ -295,18 +308,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
             </div>
             <div style={{height:'3px',background:scadenzeAlert.length>0?'linear-gradient(90deg,#FFD93D,#FF8C42)':'#f0f1f4'}}/>
           </div>
-        </div>
 
-        {/* ── SECONDA NAVBAR — stile identico a quella in basso ── */}
-        <div style={{background:'#feffff',borderTop:'1px solid #f0f1f4',borderBottom:'1px solid #f0f1f4',display:'flex',padding:'7px 0',marginBottom:'10px',boxShadow:'0 2px 8px rgba(2,21,63,0.05)'}}>
-          {NAV_EXTRA.map(({Icon,label,page})=>(
-            <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
-              <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
-                <Icon size={17} color="#bec1cc"/>
-              </div>
-              <span style={{fontSize:f(9),fontWeight:'500',color:'#bec1cc'}}>{label}</span>
-            </div>
-          ))}
         </div>
 
         {/* ── PRIORITÀ RAPIDE ── */}
@@ -406,11 +408,18 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                 </div>
               </div>
               {[
-                {l:'Mattina',c:'#2e84e9',v:toiletData.filter(s=>s.data===oggiStr&&parseInt((s.ora||'00').split(':')[0])>=6&&parseInt((s.ora||'00').split(':')[0])<12).length},
-                {l:'Pomeriggio',c:'#FF8C42',v:toiletData.filter(s=>s.data===oggiStr&&parseInt((s.ora||'00').split(':')[0])>=12&&parseInt((s.ora||'00').split(':')[0])<18).length},
-                {l:'Sera',c:'#F7295A',v:toiletData.filter(s=>s.data===oggiStr&&parseInt((s.ora||'00').split(':')[0])>=18).length},
-              ].map(({l,c,v},idx,arr)=>{
-                const mx=Math.max(...arr.map(x=>x.v),1)
+                {l:'Mattina',c:'#2e84e9',h1:6,h2:12},
+                {l:'Pomeriggio',c:'#FF8C42',h1:12,h2:18},
+                {l:'Sera',c:'#F7295A',h1:18,h2:24},
+              ].map(({l,c,h1,h2},idx,arr)=>{
+                const v=toiletData.filter(s=>{
+                  const h=parseInt((s.ora||'00').split(':')[0])
+                  return s.data===oggiStr&&h>=h1&&h<h2
+                }).length
+                const mx=Math.max(...arr.map(x=>toiletData.filter(s=>{
+                  const h=parseInt((s.ora||'00').split(':')[0])
+                  return s.data===oggiStr&&h>=x.h1&&h<x.h2
+                }).length),1)
                 return (
                   <div key={l} style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
                     <span style={{fontSize:f(8),color:'#7c8088',width:'55px',flexShrink:0}}>{l}</span>
@@ -431,9 +440,9 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                 {label:'Terapie attive',val:terapie.length,color:'#00BFA6'},
                 {label:'Medicinali',val:magazzino.length,color:'#FF8C42'},
               ].map(({label,val,color},i)=>(
-                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:i<2?'1px solid #f0f1f4':'none'}}>
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:i<2?'1px solid #f0f1f4':'none'}}>
                   <span style={{fontSize:f(10),color:'#7c8088'}}>{label}</span>
-                  <span style={{fontSize:f(11),fontWeight:'900',color}}>{val}</span>
+                  <span style={{fontSize:f(12),fontWeight:'900',color}}>{val}</span>
                 </div>
               ))}
             </div>
@@ -441,12 +450,46 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
           </div>
         </div>
 
-        {/* ── NAVBAR PRINCIPALE IN BASSO — fissa ── */}
-        <div style={{position:'fixed',bottom:0,left:0,right:0,background:'#feffff',borderTop:'1px solid #f0f1f4',display:'flex',padding:'7px 0 14px',boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',zIndex:100}}>
-          {NAV_BOTTOM.map(({Icon,label,page},i)=>{
+      </div>
+
+      {/* ── DOPPIA NAVBAR FISSA IN FONDO ── */}
+      <div className="nav-fixed">
+
+        {/* Barra extra — sezioni aggiuntive */}
+        <div style={{
+          background:'#feffff',
+          borderTop:'1px solid #f0f1f4',
+          display:'flex',
+          padding:'6px 0 4px',
+        }}>
+          {NAV_EXTRA.map(({Icon,label,page})=>(
+            <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{
+              flex:1,display:'flex',flexDirection:'column',
+              alignItems:'center',gap:'2px',cursor:'pointer'
+            }}>
+              <div style={{width:'32px',height:'22px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
+                <Icon size={16} color="#bec1cc"/>
+              </div>
+              <span style={{fontSize:f(8),fontWeight:'500',color:'#bec1cc'}}>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Navbar principale */}
+        <div style={{
+          background:'#feffff',
+          borderTop:'1px solid #f0f1f4',
+          display:'flex',
+          padding:'7px 0 14px',
+          boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',
+        }}>
+          {NAV_BOTTOM.map(({Icon,label,page})=>{
             const act = page==='home'
             return (
-              <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
+              <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{
+                flex:1,display:'flex',flexDirection:'column',
+                alignItems:'center',gap:'3px',cursor:'pointer'
+              }}>
                 <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
                   <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
                 </div>
