@@ -3,6 +3,7 @@ import { ChevronLeft, Check, Save } from 'lucide-react'
 import { db } from './firebase'
 import { ref, push, onValue } from 'firebase/database'
 import { processFirebaseSnap, encrypt } from './crypto'
+import ToiletCharts from './ToiletCharts'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
@@ -348,59 +349,56 @@ export default function ToiletPage({ onBack, isDemo }) {
 
           {/* ── LOG SESSIONI ── */}
           {sezione==='log' && (
-            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
-              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>
-                📋 Sessioni recenti ({log.length})
+  <>
+    <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+      <ToiletCharts dati={log} />
+    </div>
+
+    <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+      <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>
+        📋 Sessioni recenti ({log.length})
+      </div>
+      {loading?(
+        <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Caricamento...</div>
+      ):log.length===0?(
+        <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Nessuna sessione registrata</div>
+      ):(
+        log.slice(0,30).map((s,i)=>{
+          const hasBagno = s.bisogno && s.bisogno!=='nessuno'
+          const hasIncidente = s.incidentePippi||s.incidenteCacca
+          const borderColor = hasIncidente?'#F7295A':hasBagno?'#7B5EA7':'#bec1cc'
+          return (
+            <div key={s.id||i} style={{padding:'11px 12px',borderRadius:'12px',marginBottom:'8px',background:'#f3f4f7',borderLeft:`3px solid ${borderColor}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'5px'}}>
+                <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                  {hasBagno&&(
+                    <span style={{fontSize:f(12),fontWeight:'800',color:'#7B5EA7'}}>
+                      {s.bisogno==='pippi'?'💧 Pipì':s.bisogno==='cacca'?'💩 Cacca':'🔄 Entrambi'}
+                    </span>
+                  )}
+                  {hasIncidente&&(
+                    <span style={{fontSize:f(11),fontWeight:'700',color:'#F7295A',background:'#FEF0F4',padding:'1px 8px',borderRadius:'20px'}}>
+                      ⚠️ Incidente{s.incidentePippi&&s.incidenteCacca?' pipì+cacca':s.incidentePippi?' pipì':' cacca'}
+                    </span>
+                  )}
+                  {!hasBagno&&!hasIncidente&&<span style={{fontSize:f(11),color:'#bec1cc'}}>Sessione vuota</span>}
+                </div>
+                <span style={{fontSize:f(10),color:'#bec1cc',flexShrink:0}}>{s.data} {s.ora}</span>
               </div>
-              {loading?(
-                <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Caricamento...</div>
-              ):log.length===0?(
-                <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Nessuna sessione registrata</div>
-              ):(
-                log.slice(0,30).map((s,i)=>{
-                  const hasBagno = s.bisogno && s.bisogno!=='nessuno'
-                  const hasIncidente = s.incidentePippi||s.incidenteCacca
-                  const borderColor = hasIncidente?'#F7295A':hasBagno?'#7B5EA7':'#bec1cc'
-                  return (
-                    <div key={s.id||i} style={{
-                      padding:'11px 12px',borderRadius:'12px',marginBottom:'8px',
-                      background:'#f3f4f7',borderLeft:`3px solid ${borderColor}`
-                    }}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'5px'}}>
-                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          {hasBagno&&(
-                            <span style={{fontSize:f(12),fontWeight:'800',color:'#7B5EA7'}}>
-                              {s.bisogno==='pippi'?'💧 Pipì':s.bisogno==='cacca'?'💩 Cacca':'🔄 Entrambi'}
-                            </span>
-                          )}
-                          {hasIncidente&&(
-                            <span style={{fontSize:f(11),fontWeight:'700',color:'#F7295A',background:'#FEF0F4',padding:'1px 8px',borderRadius:'20px'}}>
-                              ⚠️ Incidente{s.incidentePippi&&s.incidenteCacca?' pipì+cacca':s.incidentePippi?' pipì':' cacca'}
-                            </span>
-                          )}
-                          {!hasBagno&&!hasIncidente&&(
-                            <span style={{fontSize:f(11),color:'#bec1cc'}}>Sessione vuota</span>
-                          )}
-                        </div>
-                        <span style={{fontSize:f(10),color:'#bec1cc',flexShrink:0}}>{s.data} {s.ora}</span>
-                      </div>
-                      {hasBagno&&s.modalita&&(
-                        <div style={{fontSize:f(11),color:'#7c8088'}}>
-                          {s.modalita==='adulto'?'👆 Comando adulto':s.modalita==='caa-guidata'?'🤝 CAA guidata':'⭐ CAA autonoma'}
-                        </div>
-                      )}
-                      {s.incidentePippi&&s.oraPippi&&(
-                        <div style={{fontSize:f(10),color:'#F7295A',marginTop:'3px'}}>💧 Pipì addosso alle {s.oraPippi}</div>
-                      )}
-                      {s.incidenteCacca&&s.oraCacca&&(
-                        <div style={{fontSize:f(10),color:'#F7295A',marginTop:'2px'}}>💩 Cacca addosso alle {s.oraCacca}</div>
-                      )}
-                    </div>
-                  )
-                })
+              {hasBagno&&s.modalita&&(
+                <div style={{fontSize:f(11),color:'#7c8088'}}>
+                  {s.modalita==='adulto'?'👆 Comando adulto':s.modalita==='caa-guidata'?'🤝 CAA guidata':'⭐ CAA autonoma'}
+                </div>
               )}
+              {s.incidentePippi&&s.oraPippi&&<div style={{fontSize:f(10),color:'#F7295A',marginTop:'3px'}}>💧 Pipì addosso alle {s.oraPippi}</div>}
+              {s.incidenteCacca&&s.oraCacca&&<div style={{fontSize:f(10),color:'#F7295A',marginTop:'2px'}}>💩 Cacca addosso alle {s.oraCacca}</div>}
             </div>
-          )}
+          )
+        })
+      )}
+    </div>
+  </>
+)}
 
         </div>
       </div>
