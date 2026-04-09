@@ -124,7 +124,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
     const u1 = onValue(ref(db,'crises'), snap => setCrisi(processFirebaseSnap(snap)))
     const u2 = onValue(ref(db,'terapies'), snap => setTerapie(processFirebaseSnap(snap)))
     const u3 = onValue(ref(db,'magazzino'), snap => setMagazzino(processFirebaseSnap(snap)))
-    const u4 = onValue(ref(db,'toilet_training'), snap => setToiletData(processFirebaseSnap(snap)))
+    const u4 = onValue(ref(db,'toilettraining'), snap => setToiletData(processFirebaseSnap(snap)))
     return () => { u1(); u2(); u3(); u4() }
   }, [isDemo])
 
@@ -164,7 +164,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
 
-  const navPaddingBottom = showExtra ? '185px' : '80px'
+  const navPaddingBottom = showExtra ? '170px' : '80px'
 
   return (
     <>
@@ -176,50 +176,51 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
           font-family:-apple-system,'Segoe UI',sans-serif;
           padding-bottom:${navPaddingBottom};
           width:100%;max-width:480px;margin:0 auto;
-          transition:padding-bottom 0.3s ease;
+          transition:padding-bottom 0.3s cubic-bezier(0.4,0,0.2,1);
         }
-        .nav-fixed{
-          position:fixed;bottom:0;left:0;right:0;z-index:100;
-        }
+        .nav-fixed{position:fixed;bottom:0;left:0;right:0;z-index:100;}
         .nav-extra-bar{
-          background:#feffff;
-          border-top:1px solid #f0f1f4;
-          display:flex;
-          padding:6px 0 4px;
-          width:100%;
+          background:#feffff;border-top:1px solid #f0f1f4;
+          display:flex;padding:6px 0 4px;width:100%;
           transform:translateY(${showExtra?'0':'100%'});
           transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);
         }
         .nav-main-bar{
-          background:#feffff;
-          border-top:1px solid #f0f1f4;
-          display:flex;
-          padding:7px 0 14px;
-          box-shadow:0 -4px 16px rgba(2,21,63,0.08);
+          background:#feffff;border-top:1px solid #f0f1f4;
+          display:flex;padding:7px 0 14px;box-shadow:0 -4px 16px rgba(2,21,63,0.08);
           width:100%;
         }
         .nav-item{
-          flex:1;display:flex;flex-direction:column;
-          align-items:center;gap:3px;cursor:pointer;
+          flex:1;display:flex;flex-direction:column;align-items:center;
+          gap:3px;cursor:pointer;transition:all 0.2s;
         }
+        .nav-item:hover .nav-icon{transform:scale(1.1);}
+        .nav-icon{
+          width:34px;height:24px;display:flex;align-items:center;
+          justify-content:center;border-radius:8px;transition:all 0.2s;
+        }
+        .nav-label{font-size:${f(9)};font-weight:500;}
+        .nav-item.active .nav-icon{
+          background:#EEF3FD;box-shadow:0 2px 8px rgba(25,63,158,0.2);
+        }
+        .nav-item.active .nav-label{font-weight:800;}
         .overlay-extra{
-          position:fixed;inset:0;z-index:99;
-          background:rgba(2,21,63,0.15);
-          opacity:${showExtra?'1':'0'};
-          pointer-events:${showExtra?'auto':'none'};
+          position:fixed;inset:0;z-index:99;background:rgba(2,21,63,0.15);
+          opacity:${showExtra?'1':'0'};pointer-events:${showExtra?'auto':'none'};
           transition:opacity 0.3s ease;
         }
+        @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
       `}</style>
 
-      {/* Overlay chiude la barra extra */}
+      {/* Overlay chiude extra */}
       <div className="overlay-extra" onClick={onToggleExtra}/>
 
-      {/* ── MODAL PERSONALIZZA ── */}
+      {/* Modal personalizza quick */}
       {showQuickEdit && (
-        <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',zIndex:600,display:'flex',alignItems:'flex-end',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+        <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',zIndex:600,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
-              <div style={{fontSize:f(16),fontWeight:'900',color:'#02153f'}}>Personalizza priorità rapide</div>
+              <div style={{fontSize:f(16),fontWeight:'900',color:'#02153f'}}>Priorità rapide</div>
               <button onClick={()=>setShowQuickEdit(false)} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <X size={16} color="#7c8088"/>
               </button>
@@ -237,7 +238,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:f(13),fontWeight:'700',color:sel?color:'#02153f'}}>{label}</div>
-                    <div style={{fontSize:f(10),color:'#7c8088'}}>{sub}</div>
+                    <div style={{fontSize:f(10),color:'#7c8088',marginTop:'1px'}}>{sub}</div>
                   </div>
                   {sel&&<Check size={18} color={color}/>}
                 </div>
@@ -252,7 +253,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
 
       <div className="home-wrap">
 
-        {/* ── HERO CARD ── */}
+        {/* HERO CARD */}
         <div style={{padding:'12px 12px 0'}}>
           <div style={{background:'#fdfdfd',borderRadius:'22px',padding:'14px 18px 16px',boxShadow:sh}}>
             <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
@@ -293,7 +294,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
           </div>
         </div>
 
-        {/* ── MINI CARDS ── */}
+        {/* MINI CARDS */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'8px 12px'}}>
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
@@ -330,7 +331,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
           </div>
         </div>
 
-        {/* ── PRIORITÀ RAPIDE ── */}
+        {/* PRIORITÀ RAPIDE */}
         <div style={{padding:'0 12px',marginBottom:'10px'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
             <span style={{fontSize:f(14),fontWeight:'800',color:'#02153f'}}>Priorità rapide</span>
@@ -353,7 +354,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
           ))}
         </div>
 
-        {/* ── DASHBOARD 2x2 ── */}
+        {/* DASHBOARD 2x2 */}
         <div style={{padding:'0 12px',marginBottom:'12px'}}>
           <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Dashboard</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
@@ -454,17 +455,17 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         </div>
       </div>
 
-      {/* ── DOPPIA NAVBAR FISSA ── */}
+      {/* DOPPIA NAVBAR FISSA */}
       <div className="nav-fixed">
 
-        {/* Barra extra a scomparsa — grigia come navbar */}
+        {/* Barra extra grigia a scomparsa */}
         <div className="nav-extra-bar">
           {NAV_EXTRA.map(({Icon,label,page})=>(
-            <div key={page} onClick={()=>{onNavigate&&onNavigate(page);onToggleExtra&&onToggleExtra()}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
-              <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
+            <div key={page} onClick={()=>{onNavigate&&onNavigate(page);onToggleExtra&&onToggleExtra()}} className="nav-item">
+              <div className="nav-icon">
                 <Icon size={17} color="#bec1cc"/>
               </div>
-              <span style={{fontSize:f(9),fontWeight:'500',color:'#bec1cc'}}>{label}</span>
+              <span className="nav-label">{label}</span>
             </div>
           ))}
         </div>
@@ -479,14 +480,14 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
               <div key={page} onClick={()=>{
                 if(isAltro) onToggleExtra&&onToggleExtra()
                 else { onNavigate&&onNavigate(page); if(showExtra) onToggleExtra&&onToggleExtra() }
-              }} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
-                <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:(act||altroAct)?'#EEF3FD':'transparent'}}>
+              }} className={`nav-item ${act||altroAct ? 'active' : ''}`}>
+                <div className="nav-icon">
                   {isAltro
                     ? <ChevronUp size={17} color={altroAct?'#193f9e':'#bec1cc'} style={{transform:showExtra?'rotate(0deg)':'rotate(180deg)',transition:'transform 0.3s'}}/>
-                    : <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
+                    : <Icon size={17} color={act||altroAct ? '#193f9e' : '#bec1cc'}/>
                   }
                 </div>
-                <span style={{fontSize:f(9),fontWeight:(act||altroAct)?'800':'500',color:(act||altroAct)?'#193f9e':'#bec1cc'}}>
+                <span className="nav-label">
                   {isAltro ? (showExtra?'Chiudi':'Altro') : label}
                 </span>
               </div>
