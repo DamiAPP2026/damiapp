@@ -59,16 +59,15 @@ const NAV_BOTTOM = [
 ]
 
 const NAV_EXTRA = [
-  {Icon:BarChart2, label:'Report', page:'report'},
-  {Icon:Package, label:'Magazzino', page:'magazzino'},
-  {Icon:Phone, label:'Rubrica', page:'rubrica'},
-  {Icon:ShoppingBag, label:'Portare', page:'cosa_portare'},
-  {Icon:FileText, label:'Documenti', page:'doc_medici'},
-  {Icon:CreditCard, label:'Pagamenti', page:'pagamenti'},
+  {Icon:BarChart2, label:'Report', page:'report', color:'#FF8C42'},
+  {Icon:Package, label:'Magazzino', page:'magazzino', color:'#00BFA6'},
+  {Icon:Phone, label:'Rubrica', page:'rubrica', color:'#F7295A'},
+  {Icon:ShoppingBag, label:'Portare', page:'cosa_portare', color:'#FF8C42'},
+  {Icon:FileText, label:'Documenti', page:'doc_medici', color:'#2e84e9'},
+  {Icon:CreditCard, label:'Pagamenti', page:'pagamenti', color:'#193f9e'},
 ]
 
-// Formatta data come dd/mm/yyyy per confronto coerente
-function oggiFormattato() {
+function oggiStr() {
   const d = new Date()
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
 }
@@ -94,8 +93,11 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
   useEffect(() => {
     if (isDemo) {
-      const oggi = oggiFormattato()
-      const ieri = (() => { const d=new Date(Date.now()-86400000); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` })()
+      const oggi = oggiStr()
+      const ieri = (() => {
+        const d = new Date(Date.now()-86400000)
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+      })()
       setCrisi([
         {id:1,type:'Crisi tonico-cloniche',timestamp:Date.now()-3*86400000,duration:'00:02:34',intensita:7},
         {id:2,type:'Crisi di assenza',timestamp:Date.now()-10*86400000,duration:'00:00:18',intensita:4},
@@ -135,31 +137,40 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
   const mesi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
   const dataStr = `${giorni[time.getDay()]} ${time.getDate()} ${mesi[time.getMonth()]} ${time.getFullYear()}`
   const timeStr = time.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
-  const ora = time.getHours()*60+time.getMinutes()
+  const oraMinuti = time.getHours()*60+time.getMinutes()
 
+  const oggi = oggiStr()
+
+  // Dati calcolati real-time
   const ultimaCrisi = [...crisi].sort((a,b)=>b.timestamp-a.timestamp)[0]
   const giorniSenzaCrisi = ultimaCrisi ? Math.floor((Date.now()-ultimaCrisi.timestamp)/86400000) : null
-  const colorGiorni = giorniSenzaCrisi===null?'#bec1cc':giorniSenzaCrisi>=30?'#00BFA6':giorniSenzaCrisi>=7?'#FF8C42':'#F7295A'
+  const colorGiorni = giorniSenzaCrisi===null ? '#bec1cc'
+    : giorniSenzaCrisi>=30 ? '#00BFA6'
+    : giorniSenzaCrisi>=7 ? '#FF8C42'
+    : '#F7295A'
 
   const prossimaTerapia = [...terapie]
-    .map(t=>{const[h,m]=(t.orario||'00:00').split(':').map(Number);return{...t,min:h*60+m}})
-    .filter(t=>t.min>ora).sort((a,b)=>a.min-b.min)[0]
+    .map(t => {
+      const [h,m] = (t.orario||'00:00').split(':').map(Number)
+      return {...t, min:h*60+m}
+    })
+    .filter(t => t.min > oraMinuti)
+    .sort((a,b) => a.min-b.min)[0]
 
-  const scadenzeAlert = magazzino.filter(m=>{
+  const scadenzeAlert = magazzino.filter(m => {
     if(!m.scadenza) return false
-    const gg=Math.ceil((new Date(m.scadenza)-Date.now())/86400000)
-    return gg>=0&&gg<=30
+    const gg = Math.ceil((new Date(m.scadenza)-Date.now())/86400000)
+    return gg>=0 && gg<=30
   })
 
-  // FIX: usa formato coerente dd/mm/yyyy
-  const oggiStr = oggiFormattato()
+  // Toilet oggi — formato coerente dd/mm/yyyy
+  const bagnoOggi = toiletData.filter(s => s.data===oggi && s.bisogno && s.bisogno!=='nessuno').length
+  const incOggi = toiletData.filter(s => s.data===oggi && (s.incidentePippi||s.incidenteCacca)).length
+  const toilet7gg = toiletData.filter(s => Date.now()-(s.timestamp||0) < 7*86400000 && s.bisogno && s.bisogno!=='nessuno').length
 
-  const bagnoOggi = toiletData.filter(s=>s.data===oggiStr&&s.bisogno&&s.bisogno!=='nessuno').length
-  const incOggi = toiletData.filter(s=>s.data===oggiStr&&(s.incidentePippi||s.incidenteCacca)).length
-
-  const fasceMattina = toiletData.filter(s=>{const h=parseInt((s.ora||'00').split(':')[0]);return s.data===oggiStr&&h>=6&&h<12}).length
-  const fascePomeriggio = toiletData.filter(s=>{const h=parseInt((s.ora||'00').split(':')[0]);return s.data===oggiStr&&h>=12&&h<18}).length
-  const fasceSera = toiletData.filter(s=>{const h=parseInt((s.ora||'00').split(':')[0]);return s.data===oggiStr&&h>=18}).length
+  const fasceMattina = toiletData.filter(s => { const h=parseInt((s.ora||'00').split(':')[0]); return s.data===oggi&&h>=6&&h<12 }).length
+  const fascePomeriggio = toiletData.filter(s => { const h=parseInt((s.ora||'00').split(':')[0]); return s.data===oggi&&h>=12&&h<18 }).length
+  const fasceSera = toiletData.filter(s => { const h=parseInt((s.ora||'00').split(':')[0]); return s.data===oggi&&h>=18 }).length
   const fasceMax = Math.max(fasceMattina, fascePomeriggio, fasceSera, 1)
 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
@@ -167,33 +178,34 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
   return (
     <>
       <style>{`
-        *{box-sizing:border-box;}
-        body{margin:0;background:#f3f4f7;}
-        .home-wrap{
-          background:#f3f4f7;min-height:100vh;
-          font-family:-apple-system,'Segoe UI',sans-serif;
-          padding-bottom:185px;
-          width:100%;max-width:480px;margin:0 auto;
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f3f4f7; }
+        .home-wrap {
+          background: #f3f4f7;
+          min-height: 100vh;
+          font-family: -apple-system, 'Segoe UI', sans-serif;
+          padding-bottom: 185px;
+          width: 100%; max-width: 480px; margin: 0 auto;
         }
-        .nav-fixed{
-          position:fixed;bottom:0;
-          left:0;right:0;
-          z-index:100;
+        .nav-fixed {
+          position: fixed;
+          bottom: 0; left: 0; right: 0;
+          z-index: 100;
         }
-        .nav-extra-bar{
-          background:#feffff;
-          border-top:1px solid #f0f1f4;
-          display:flex;
-          padding:6px 0 4px;
-          width:100%;
+        .nav-extra-bar {
+          background: #feffff;
+          border-top: 1px solid #f0f1f4;
+          display: flex;
+          padding: 6px 0 4px;
+          width: 100%;
         }
-        .nav-main-bar{
-          background:#feffff;
-          border-top:1px solid #f0f1f4;
-          display:flex;
-          padding:7px 0 14px;
-          box-shadow:0 -4px 16px rgba(2,21,63,0.08);
-          width:100%;
+        .nav-main-bar {
+          background: #feffff;
+          border-top: 1px solid #f0f1f4;
+          display: flex;
+          padding: 7px 0 14px;
+          box-shadow: 0 -4px 16px rgba(2,21,63,0.08);
+          width: 100%;
         }
       `}</style>
 
@@ -211,7 +223,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
               Seleziona fino a 3 azioni da mostrare in Home
             </div>
             {ALL_QUICK_ACTIONS.map(({key,Icon,label,sub,color,grad})=>{
-              const sel=quickActions.includes(key)
+              const sel = quickActions.includes(key)
               return (
                 <div key={key} onClick={()=>{
                   if(sel) saveQuickActions(quickActions.filter(k=>k!==key))
@@ -224,7 +236,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                     <div style={{fontSize:f(13),fontWeight:'700',color:sel?color:'#02153f'}}>{label}</div>
                     <div style={{fontSize:f(10),color:'#7c8088'}}>{sub}</div>
                   </div>
-                  {sel&&<Check size={18} color={color}/>}
+                  {sel && <Check size={18} color={color}/>}
                 </div>
               )
             })}
@@ -247,17 +259,18 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
             <div style={{display:'flex',justifyContent:'center',marginBottom:'10px'}}>
               <img src="/DamiLogo.png" alt="logo" style={{width:'62px',height:'62px',borderRadius:'50%',objectFit:'cover',boxShadow:'0 6px 20px rgba(8,24,76,0.18)'}}/>
             </div>
-            {isDemo&&(
+            {isDemo && (
               <div style={{textAlign:'center',marginBottom:'8px'}}>
                 <span style={{background:'linear-gradient(135deg,#FFD93D,#FF8C42)',color:'#5a3000',fontSize:f(10),fontWeight:'800',padding:'3px 12px',borderRadius:'20px'}}>
                   🎭 MODALITÀ DEMO
                 </span>
               </div>
             )}
-            <div style={{fontSize:f(26),fontWeight:'900',color:'#08184c',letterSpacing:'-0.5px',marginBottom:'4px'}}>
+            <div style={{fontSize:f(26),fontWeight:'900',color:'#08184c',letterSpacing:'-0.5px',marginBottom:'6px'}}>
               Ciao {nomeUtente}!
             </div>
-            <div style={{fontSize:f(12),color:'#7c8088',marginBottom:'18px',lineHeight:'1.5',fontStyle:'italic'}}>
+            <div style={{fontSize:f(13),color:'#7c8088',marginBottom:'18px',lineHeight:'1.6',fontStyle:'italic',
+              padding:'8px 12px',background:'#f3f4f7',borderRadius:'12px',borderLeft:'3px solid #2e84e9'}}>
               {frase}
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
@@ -280,6 +293,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
         {/* ── MINI CARDS ── */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'8px 12px'}}>
+
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
               <div style={{width:'28px',height:'28px',borderRadius:'8px',background:colorGiorni,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
@@ -287,10 +301,10 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
               </div>
               <div style={{fontSize:f(8),color:'#7c8088',fontWeight:'700',textTransform:'uppercase',marginBottom:'2px'}}>Senza crisi</div>
               <div style={{fontSize:f(16),fontWeight:'900',color:'#02153f',lineHeight:1}}>
-                {giorniSenzaCrisi!==null?`${giorniSenzaCrisi}g`:'—'}
+                {giorniSenzaCrisi!==null ? `${giorniSenzaCrisi}g` : '—'}
               </div>
               <div style={{fontSize:f(9),color:'#bec1cc',marginTop:'2px'}}>
-                {ultimaCrisi?`ul. ${new Date(ultimaCrisi.timestamp).toLocaleDateString('it-IT').slice(0,5)}`:'Nessuna'}
+                {ultimaCrisi ? `ul. ${new Date(ultimaCrisi.timestamp).toLocaleDateString('it-IT').slice(0,5)}` : 'Nessuna'}
               </div>
             </div>
             <div style={{height:'3px',background:`linear-gradient(90deg,${colorGiorni},${colorGiorni}88)`}}/>
@@ -303,10 +317,10 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
               </div>
               <div style={{fontSize:f(8),color:'#7c8088',fontWeight:'700',textTransform:'uppercase',marginBottom:'2px'}}>Prossima ter.</div>
               <div style={{fontSize:f(14),fontWeight:'900',color:'#02153f',lineHeight:1}}>
-                {prossimaTerapia?prossimaTerapia.orario:'—'}
+                {prossimaTerapia ? prossimaTerapia.orario : '—'}
               </div>
               <div style={{fontSize:f(9),color:'#bec1cc',marginTop:'2px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                {prossimaTerapia?prossimaTerapia.nome:'Finite per oggi'}
+                {prossimaTerapia ? prossimaTerapia.nome : 'Finite per oggi'}
               </div>
             </div>
             <div style={{height:'3px',background:'linear-gradient(90deg,#00BFA6,#2e84e9)'}}/>
@@ -314,7 +328,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
-              <div style={{width:'28px',height:'28px',borderRadius:'8px',background:scadenzeAlert.length>0?'#FF8C42':'#bec1cc',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
+              <div style={{width:'28px',height:'28px',borderRadius:'8px',background:scadenzeAlert.length>0?'#FF8C42':'#00BFA6',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
                 <Bell size={13} color="#fff"/>
               </div>
               <div style={{fontSize:f(8),color:'#7c8088',fontWeight:'700',textTransform:'uppercase',marginBottom:'2px'}}>Scadenze</div>
@@ -322,11 +336,12 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                 {scadenzeAlert.length}
               </div>
               <div style={{fontSize:f(9),color:'#bec1cc',marginTop:'2px'}}>
-                {scadenzeAlert.length>0?'entro 30g':'tutto ok'}
+                {scadenzeAlert.length>0 ? 'entro 30g' : 'tutto ok'}
               </div>
             </div>
             <div style={{height:'3px',background:scadenzeAlert.length>0?'linear-gradient(90deg,#FFD93D,#FF8C42)':'#f0f1f4'}}/>
           </div>
+
         </div>
 
         {/* ── PRIORITÀ RAPIDE ── */}
@@ -353,11 +368,11 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
         </div>
 
         {/* ── DASHBOARD 2x2 ── */}
-        <div style={{padding:'0 12px',marginBottom:'10px'}}>
+        <div style={{padding:'0 12px',marginBottom:'12px'}}>
           <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Dashboard</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
 
-            {/* Crisi 7 giorni — clic → diario */}
+            {/* Crisi 7 giorni → diario */}
             <div onClick={()=>onNavigate&&onNavigate('diario')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Crisi 7 giorni</span>
@@ -384,23 +399,23 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                   <span key={i} style={{flex:1,textAlign:'center',fontSize:f(7),color:'#bec1cc'}}>{g}</span>
                 ))}
               </div>
-              <div style={{textAlign:'right',marginTop:'4px'}}>
-                <span style={{fontSize:f(9),color:'#2e84e9',fontWeight:'700'}}>Vedi diario →</span>
+              <div style={{textAlign:'right',marginTop:'5px'}}>
+                <span style={{fontSize:f(9),color:'#F7295A',fontWeight:'700'}}>Vedi diario →</span>
               </div>
             </div>
 
-            {/* Terapie oggi — clic → terapie */}
+            {/* Terapie oggi → terapie */}
             <div onClick={()=>onNavigate&&onNavigate('terapie')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Terapie oggi</span>
                 <ChevronRight size={12} color="#00BFA6"/>
               </div>
-              {terapie.length===0?(
+              {terapie.length===0 ? (
                 <div style={{fontSize:f(10),color:'#bec1cc',textAlign:'center',padding:'8px'}}>Nessuna terapia</div>
-              ):(
+              ) : (
                 [...terapie].sort((a,b)=>(a.orario||'').localeCompare(b.orario||'')).slice(0,3).map((t,i,arr)=>{
-                  const[h,m]=(t.orario||'00:00').split(':').map(Number)
-                  const passata=h*60+m<ora
+                  const [h,m]=(t.orario||'00:00').split(':').map(Number)
+                  const passata=h*60+m<oraMinuti
                   return (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:'6px',padding:'3px 0',borderBottom:i<arr.length-1?'1px solid #f0f1f4':'none'}}>
                       <div style={{width:'6px',height:'6px',borderRadius:'50%',background:passata?'#bec1cc':'#00BFA6',flexShrink:0}}/>
@@ -410,53 +425,60 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                   )
                 })
               )}
-              <div style={{textAlign:'right',marginTop:'6px'}}>
+              <div style={{textAlign:'right',marginTop:'5px'}}>
                 <span style={{fontSize:f(9),color:'#00BFA6',fontWeight:'700'}}>Vedi terapie →</span>
               </div>
             </div>
 
-            {/* Toilet oggi — clic → toilet — FIX dati */}
+            {/* Toilet oggi — FIX dati + 7gg → toilet */}
             <div onClick={()=>onNavigate&&onNavigate('toilet')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Toilet oggi</span>
                 <ChevronRight size={12} color="#7B5EA7"/>
               </div>
-              <div style={{display:'flex',gap:'6px',marginBottom:'8px'}}>
+              <div style={{display:'flex',gap:'5px',marginBottom:'8px'}}>
                 <div style={{flex:1,background:'#F5F3FF',borderRadius:'8px',padding:'5px',textAlign:'center'}}>
-                  <div style={{fontSize:f(18),fontWeight:'900',color:'#7B5EA7'}}>{bagnoOggi}</div>
+                  <div style={{fontSize:f(17),fontWeight:'900',color:'#7B5EA7'}}>{bagnoOggi}</div>
                   <div style={{fontSize:f(8),color:'#7c8088'}}>In bagno</div>
                 </div>
                 <div style={{flex:1,background:incOggi>0?'#FEF0F4':'#E8FBF8',borderRadius:'8px',padding:'5px',textAlign:'center'}}>
-                  <div style={{fontSize:f(18),fontWeight:'900',color:incOggi>0?'#F7295A':'#00BFA6'}}>{incOggi}</div>
+                  <div style={{fontSize:f(17),fontWeight:'900',color:incOggi>0?'#F7295A':'#00BFA6'}}>{incOggi}</div>
                   <div style={{fontSize:f(8),color:'#7c8088'}}>Incidenti</div>
+                </div>
+                <div style={{flex:1,background:'#f3f4f7',borderRadius:'8px',padding:'5px',textAlign:'center'}}>
+                  <div style={{fontSize:f(17),fontWeight:'900',color:'#394058'}}>{toilet7gg}</div>
+                  <div style={{fontSize:f(8),color:'#7c8088'}}>Sett.</div>
                 </div>
               </div>
               {[
                 {l:'Mattina',c:'#2e84e9',v:fasceMattina},
-                {l:'Pomeriggio',c:'#FF8C42',v:fascePomeriggio},
+                {l:'Pomerigg.',c:'#FF8C42',v:fascePomeriggio},
                 {l:'Sera',c:'#F7295A',v:fasceSera},
               ].map(({l,c,v})=>(
                 <div key={l} style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
-                  <span style={{fontSize:f(8),color:'#7c8088',width:'55px',flexShrink:0}}>{l}</span>
+                  <span style={{fontSize:f(8),color:'#7c8088',width:'50px',flexShrink:0}}>{l}</span>
                   <div style={{flex:1,height:'5px',borderRadius:'3px',background:'#f3f4f7',overflow:'hidden'}}>
                     <div style={{height:'100%',borderRadius:'3px',width:`${(v/fasceMax)*100}%`,background:c}}/>
                   </div>
-                  <span style={{fontSize:f(8),fontWeight:'700',color:c,width:'14px',textAlign:'right'}}>{v}</span>
+                  <span style={{fontSize:f(8),fontWeight:'700',color:c,width:'12px',textAlign:'right'}}>{v}</span>
                 </div>
               ))}
             </div>
 
-            {/* Totali */}
+            {/* Totali — ogni voce cliccabile */}
             <div style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm}}>
               <div style={{fontSize:f(11),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Totali</div>
               {[
-                {label:'Crisi registrate',val:crisi.length,color:'#F7295A',page:'diario'},
-                {label:'Terapie attive',val:terapie.length,color:'#00BFA6',page:'terapie'},
-                {label:'Medicinali',val:magazzino.length,color:'#FF8C42',page:'magazzino'},
+                {label:'Crisi registrate', val:crisi.length, color:'#F7295A', page:'diario'},
+                {label:'Terapie attive', val:terapie.length, color:'#00BFA6', page:'terapie'},
+                {label:'Medicinali', val:magazzino.length, color:'#FF8C42', page:'magazzino'},
               ].map(({label,val,color,page},i)=>(
-                <div key={i} onClick={()=>onNavigate&&onNavigate(page)} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:i<2?'1px solid #f0f1f4':'none',cursor:'pointer'}}>
+                <div key={i} onClick={()=>onNavigate&&onNavigate(page)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:i<2?'1px solid #f0f1f4':'none',cursor:'pointer'}}>
                   <span style={{fontSize:f(10),color:'#7c8088'}}>{label}</span>
-                  <span style={{fontSize:f(12),fontWeight:'900',color}}>{val}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                    <span style={{fontSize:f(13),fontWeight:'900',color}}>{val}</span>
+                    <ChevronRight size={10} color={color}/>
+                  </div>
                 </div>
               ))}
             </div>
@@ -466,17 +488,17 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
       </div>
 
-      {/* ── DOPPIA NAVBAR FISSA IN FONDO — larghezza piena ── */}
+      {/* ── DOPPIA NAVBAR FISSA IN FONDO ── */}
       <div className="nav-fixed">
 
-        {/* Barra extra — identica stile navbar principale */}
+        {/* Barra extra — stile identico navbar, icone colorate */}
         <div className="nav-extra-bar">
-          {NAV_EXTRA.map(({Icon,label,page})=>(
+          {NAV_EXTRA.map(({Icon,label,page,color})=>(
             <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
               <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
-                <Icon size={17} color="#bec1cc"/>
+                <Icon size={17} color={color}/>
               </div>
-              <span style={{fontSize:f(9),fontWeight:'500',color:'#bec1cc'}}>{label}</span>
+              <span style={{fontSize:f(9),fontWeight:'600',color:'#7c8088'}}>{label}</span>
             </div>
           ))}
         </div>
@@ -484,7 +506,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
         {/* Navbar principale */}
         <div className="nav-main-bar">
           {NAV_BOTTOM.map(({Icon,label,page})=>{
-            const act=page==='home'
+            const act = page==='home'
             return (
               <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
                 <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
@@ -497,6 +519,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
         </div>
 
       </div>
+
     </>
   )
 }
