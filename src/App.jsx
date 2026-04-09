@@ -17,7 +17,7 @@ import DoctorView from './DoctorView'
 
 const PIN_REALE = '261120'
 const PIN_DEMO = '010101'
-const VERSION = '05.00.13'
+const VERSION = '05.00.16'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 
