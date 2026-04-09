@@ -306,6 +306,7 @@ export default function App() {
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [pendingNome, setPendingNome] = useState('')
   const [timerSecCrisi, setTimerSecCrisi] = useState(0)
+  const [showExtra, setShowExtra] = useState(false)
 
   function handleLogin(demo, tokenData) {
     setIsDemo(demo)
@@ -359,14 +360,23 @@ export default function App() {
 
       {!noNav.includes(page)&&(
         <>
-          {page==='home'&&<Home2 nomeUtente={nomeEffettivo} frase={getFrase()} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='home'&&<Home2
+  nomeUtente={nomeEffettivo}
+  isDemo={isDemo}
+  onNavigate={(dest)=>{
+    if(showExtra) setShowExtra(false)
+    handleNavigate(dest)
+  }}
+  showExtra={showExtra}
+  onToggleExtra={()=>setShowExtra(p=>!p)}
+/>}
           {page==='diario'&&<DiarioCrisi onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
           {page==='terapie'&&<TerapiePage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
           {page==='toilet'&&<ToiletPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
           {page==='condividi'&&<CondividiPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
           {page==='report'&&<ReportPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
           {page==='magazzino'&&<MagazzinoPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='altro'&&<AltroPage onNavigate={handleNavigate}/>}
+          {page==='altro'&&null}
           {inArrivo.includes(page)&&<PaginaInArrivo onBack={()=>setPage('altro')}/>}
           <Navbar page={page} onNavigate={handleNavigate}/>
         </>
