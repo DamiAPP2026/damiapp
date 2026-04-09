@@ -8,7 +8,6 @@ import {
 import { db } from './firebase'
 import { ref, onValue } from 'firebase/database'
 import { processFirebaseSnap } from './crypto'
-import ToiletCharts from './ToiletCharts'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
@@ -68,6 +67,12 @@ const NAV_EXTRA = [
   {Icon:CreditCard, label:'Pagamenti', page:'pagamenti'},
 ]
 
+// Formatta data come dd/mm/yyyy per confronto coerente
+function oggiFormattato() {
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+}
+
 export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
   const [time, setTime] = useState(new Date())
   const [crisi, setCrisi] = useState([])
@@ -89,8 +94,8 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
   useEffect(() => {
     if (isDemo) {
-      const oggiStr = new Date().toLocaleDateString('it-IT')
-      const ieriStr = new Date(Date.now()-86400000).toLocaleDateString('it-IT')
+      const oggi = oggiFormattato()
+      const ieri = (() => { const d=new Date(Date.now()-86400000); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` })()
       setCrisi([
         {id:1,type:'Crisi tonico-cloniche',timestamp:Date.now()-3*86400000,duration:'00:02:34',intensita:7},
         {id:2,type:'Crisi di assenza',timestamp:Date.now()-10*86400000,duration:'00:00:18',intensita:4},
@@ -106,11 +111,11 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
         {id:2,nome:'Depakine',scadenza:'2026-04-20',scatole:1},
       ])
       setToiletData([
-        {id:1,data:oggiStr,ora:'08:30',bisogno:'pippi',modalita:'caa-auto',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-3600000},
-        {id:2,data:oggiStr,ora:'13:15',bisogno:'cacca',modalita:'adulto',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-7200000},
-        {id:3,data:oggiStr,ora:'15:00',bisogno:'nessuno',modalita:'',incidentePippi:true,incidenteCacca:false,timestamp:Date.now()-3000000},
-        {id:4,data:ieriStr,ora:'09:00',bisogno:'entrambi',modalita:'caa-guidata',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-86400000},
-        {id:5,data:ieriStr,ora:'16:00',bisogno:'pippi',modalita:'caa-auto',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-79200000},
+        {id:1,data:oggi,ora:'08:30',bisogno:'pippi',modalita:'caa-auto',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-3600000},
+        {id:2,data:oggi,ora:'13:15',bisogno:'cacca',modalita:'adulto',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-7200000},
+        {id:3,data:oggi,ora:'15:00',bisogno:'nessuno',modalita:'',incidentePippi:true,incidenteCacca:false,timestamp:Date.now()-3000000},
+        {id:4,data:ieri,ora:'09:00',bisogno:'entrambi',modalita:'caa-guidata',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-86400000},
+        {id:5,data:ieri,ora:'16:00',bisogno:'pippi',modalita:'caa-auto',incidentePippi:false,incidenteCacca:false,timestamp:Date.now()-79200000},
       ])
       return
     }
@@ -146,14 +151,18 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
     return gg>=0&&gg<=30
   })
 
-  const oggiStr = new Date().toLocaleDateString('it-IT')
+  // FIX: usa formato coerente dd/mm/yyyy
+  const oggiStr = oggiFormattato()
+
   const bagnoOggi = toiletData.filter(s=>s.data===oggiStr&&s.bisogno&&s.bisogno!=='nessuno').length
   const incOggi = toiletData.filter(s=>s.data===oggiStr&&(s.incidentePippi||s.incidenteCacca)).length
 
-  const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
+  const fasceMattina = toiletData.filter(s=>{const h=parseInt((s.ora||'00').split(':')[0]);return s.data===oggiStr&&h>=6&&h<12}).length
+  const fascePomeriggio = toiletData.filter(s=>{const h=parseInt((s.ora||'00').split(':')[0]);return s.data===oggiStr&&h>=12&&h<18}).length
+  const fasceSera = toiletData.filter(s=>{const h=parseInt((s.ora||'00').split(':')[0]);return s.data===oggiStr&&h>=18}).length
+  const fasceMax = Math.max(fasceMattina, fascePomeriggio, fasceSera, 1)
 
-  // Calcola altezza doppia navbar per padding bottom
-  const NAVBAR_H = 180
+  const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
 
   return (
     <>
@@ -163,16 +172,28 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
         .home-wrap{
           background:#f3f4f7;min-height:100vh;
           font-family:-apple-system,'Segoe UI',sans-serif;
-          padding-bottom:${NAVBAR_H}px;
+          padding-bottom:185px;
           width:100%;max-width:480px;margin:0 auto;
         }
         .nav-fixed{
-          position:fixed;bottom:0;left:0;right:0;
-          display:flex;flex-direction:column;
+          position:fixed;bottom:0;
+          left:0;right:0;
           z-index:100;
-          max-width:480px;
-          margin:0 auto;
-          left:50%;transform:translateX(-50%);
+        }
+        .nav-extra-bar{
+          background:#feffff;
+          border-top:1px solid #f0f1f4;
+          display:flex;
+          padding:6px 0 4px;
+          width:100%;
+        }
+        .nav-main-bar{
+          background:#feffff;
+          border-top:1px solid #f0f1f4;
+          display:flex;
+          padding:7px 0 14px;
+          box-shadow:0 -4px 16px rgba(2,21,63,0.08);
+          width:100%;
         }
       `}</style>
 
@@ -186,7 +207,9 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                 <X size={16} color="#7c8088"/>
               </button>
             </div>
-            <div style={{fontSize:f(12),color:'#7c8088',marginBottom:'14px'}}>Seleziona fino a 3 azioni da mostrare in Home</div>
+            <div style={{fontSize:f(12),color:'#7c8088',marginBottom:'14px'}}>
+              Seleziona fino a 3 azioni da mostrare in Home
+            </div>
             {ALL_QUICK_ACTIONS.map(({key,Icon,label,sub,color,grad})=>{
               const sel=quickActions.includes(key)
               return (
@@ -257,8 +280,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
         {/* ── MINI CARDS ── */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'8px 12px'}}>
-
-          {/* Giorni senza crisi */}
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
               <div style={{width:'28px',height:'28px',borderRadius:'8px',background:colorGiorni,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
@@ -275,7 +296,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
             <div style={{height:'3px',background:`linear-gradient(90deg,${colorGiorni},${colorGiorni}88)`}}/>
           </div>
 
-          {/* Prossima terapia */}
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
               <div style={{width:'28px',height:'28px',borderRadius:'8px',background:'#00BFA6',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
@@ -292,7 +312,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
             <div style={{height:'3px',background:'linear-gradient(90deg,#00BFA6,#2e84e9)'}}/>
           </div>
 
-          {/* Scadenze */}
           <div style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
               <div style={{width:'28px',height:'28px',borderRadius:'8px',background:scadenzeAlert.length>0?'#FF8C42':'#bec1cc',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
@@ -308,7 +327,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
             </div>
             <div style={{height:'3px',background:scadenzeAlert.length>0?'linear-gradient(90deg,#FFD93D,#FF8C42)':'#f0f1f4'}}/>
           </div>
-
         </div>
 
         {/* ── PRIORITÀ RAPIDE ── */}
@@ -339,8 +357,8 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
           <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Dashboard</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
 
-            {/* Crisi 7 giorni */}
-            <div style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm}}>
+            {/* Crisi 7 giorni — clic → diario */}
+            <div onClick={()=>onNavigate&&onNavigate('diario')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Crisi 7 giorni</span>
                 <span style={{fontSize:f(16),fontWeight:'900',color:'#F7295A'}}>
@@ -366,13 +384,16 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                   <span key={i} style={{flex:1,textAlign:'center',fontSize:f(7),color:'#bec1cc'}}>{g}</span>
                 ))}
               </div>
+              <div style={{textAlign:'right',marginTop:'4px'}}>
+                <span style={{fontSize:f(9),color:'#2e84e9',fontWeight:'700'}}>Vedi diario →</span>
+              </div>
             </div>
 
-            {/* Terapie oggi */}
-            <div style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm}}>
+            {/* Terapie oggi — clic → terapie */}
+            <div onClick={()=>onNavigate&&onNavigate('terapie')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Terapie oggi</span>
-                <ChevronRight size={12} color="#2e84e9"/>
+                <ChevronRight size={12} color="#00BFA6"/>
               </div>
               {terapie.length===0?(
                 <div style={{fontSize:f(10),color:'#bec1cc',textAlign:'center',padding:'8px'}}>Nessuna terapia</div>
@@ -389,9 +410,12 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
                   )
                 })
               )}
+              <div style={{textAlign:'right',marginTop:'6px'}}>
+                <span style={{fontSize:f(9),color:'#00BFA6',fontWeight:'700'}}>Vedi terapie →</span>
+              </div>
             </div>
 
-            {/* Toilet oggi */}
+            {/* Toilet oggi — clic → toilet — FIX dati */}
             <div onClick={()=>onNavigate&&onNavigate('toilet')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Toilet oggi</span>
@@ -399,48 +423,38 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
               </div>
               <div style={{display:'flex',gap:'6px',marginBottom:'8px'}}>
                 <div style={{flex:1,background:'#F5F3FF',borderRadius:'8px',padding:'5px',textAlign:'center'}}>
-                  <div style={{fontSize:f(16),fontWeight:'900',color:'#7B5EA7'}}>{bagnoOggi}</div>
-                  <div style={{fontSize:f(8),color:'#7c8088'}}>Bagno</div>
+                  <div style={{fontSize:f(18),fontWeight:'900',color:'#7B5EA7'}}>{bagnoOggi}</div>
+                  <div style={{fontSize:f(8),color:'#7c8088'}}>In bagno</div>
                 </div>
                 <div style={{flex:1,background:incOggi>0?'#FEF0F4':'#E8FBF8',borderRadius:'8px',padding:'5px',textAlign:'center'}}>
-                  <div style={{fontSize:f(16),fontWeight:'900',color:incOggi>0?'#F7295A':'#00BFA6'}}>{incOggi}</div>
+                  <div style={{fontSize:f(18),fontWeight:'900',color:incOggi>0?'#F7295A':'#00BFA6'}}>{incOggi}</div>
                   <div style={{fontSize:f(8),color:'#7c8088'}}>Incidenti</div>
                 </div>
               </div>
               {[
-                {l:'Mattina',c:'#2e84e9',h1:6,h2:12},
-                {l:'Pomeriggio',c:'#FF8C42',h1:12,h2:18},
-                {l:'Sera',c:'#F7295A',h1:18,h2:24},
-              ].map(({l,c,h1,h2},idx,arr)=>{
-                const v=toiletData.filter(s=>{
-                  const h=parseInt((s.ora||'00').split(':')[0])
-                  return s.data===oggiStr&&h>=h1&&h<h2
-                }).length
-                const mx=Math.max(...arr.map(x=>toiletData.filter(s=>{
-                  const h=parseInt((s.ora||'00').split(':')[0])
-                  return s.data===oggiStr&&h>=x.h1&&h<x.h2
-                }).length),1)
-                return (
-                  <div key={l} style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
-                    <span style={{fontSize:f(8),color:'#7c8088',width:'55px',flexShrink:0}}>{l}</span>
-                    <div style={{flex:1,height:'5px',borderRadius:'3px',background:'#f3f4f7',overflow:'hidden'}}>
-                      <div style={{height:'100%',borderRadius:'3px',width:`${(v/mx)*100}%`,background:c}}/>
-                    </div>
-                    <span style={{fontSize:f(8),fontWeight:'700',color:c,width:'14px',textAlign:'right'}}>{v}</span>
+                {l:'Mattina',c:'#2e84e9',v:fasceMattina},
+                {l:'Pomeriggio',c:'#FF8C42',v:fascePomeriggio},
+                {l:'Sera',c:'#F7295A',v:fasceSera},
+              ].map(({l,c,v})=>(
+                <div key={l} style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
+                  <span style={{fontSize:f(8),color:'#7c8088',width:'55px',flexShrink:0}}>{l}</span>
+                  <div style={{flex:1,height:'5px',borderRadius:'3px',background:'#f3f4f7',overflow:'hidden'}}>
+                    <div style={{height:'100%',borderRadius:'3px',width:`${(v/fasceMax)*100}%`,background:c}}/>
                   </div>
-                )
-              })}
+                  <span style={{fontSize:f(8),fontWeight:'700',color:c,width:'14px',textAlign:'right'}}>{v}</span>
+                </div>
+              ))}
             </div>
 
             {/* Totali */}
             <div style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm}}>
               <div style={{fontSize:f(11),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Totali</div>
               {[
-                {label:'Crisi registrate',val:crisi.length,color:'#F7295A'},
-                {label:'Terapie attive',val:terapie.length,color:'#00BFA6'},
-                {label:'Medicinali',val:magazzino.length,color:'#FF8C42'},
-              ].map(({label,val,color},i)=>(
-                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:i<2?'1px solid #f0f1f4':'none'}}>
+                {label:'Crisi registrate',val:crisi.length,color:'#F7295A',page:'diario'},
+                {label:'Terapie attive',val:terapie.length,color:'#00BFA6',page:'terapie'},
+                {label:'Medicinali',val:magazzino.length,color:'#FF8C42',page:'magazzino'},
+              ].map(({label,val,color,page},i)=>(
+                <div key={i} onClick={()=>onNavigate&&onNavigate(page)} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:i<2?'1px solid #f0f1f4':'none',cursor:'pointer'}}>
                   <span style={{fontSize:f(10),color:'#7c8088'}}>{label}</span>
                   <span style={{fontSize:f(12),fontWeight:'900',color}}>{val}</span>
                 </div>
@@ -452,44 +466,27 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate }) {
 
       </div>
 
-      {/* ── DOPPIA NAVBAR FISSA IN FONDO ── */}
+      {/* ── DOPPIA NAVBAR FISSA IN FONDO — larghezza piena ── */}
       <div className="nav-fixed">
 
-        {/* Barra extra — sezioni aggiuntive */}
-        <div style={{
-          background:'#feffff',
-          borderTop:'1px solid #f0f1f4',
-          display:'flex',
-          padding:'6px 0 4px',
-        }}>
+        {/* Barra extra — identica stile navbar principale */}
+        <div className="nav-extra-bar">
           {NAV_EXTRA.map(({Icon,label,page})=>(
-            <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{
-              flex:1,display:'flex',flexDirection:'column',
-              alignItems:'center',gap:'2px',cursor:'pointer'
-            }}>
-              <div style={{width:'32px',height:'22px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
-                <Icon size={16} color="#bec1cc"/>
+            <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
+              <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
+                <Icon size={17} color="#bec1cc"/>
               </div>
-              <span style={{fontSize:f(8),fontWeight:'500',color:'#bec1cc'}}>{label}</span>
+              <span style={{fontSize:f(9),fontWeight:'500',color:'#bec1cc'}}>{label}</span>
             </div>
           ))}
         </div>
 
         {/* Navbar principale */}
-        <div style={{
-          background:'#feffff',
-          borderTop:'1px solid #f0f1f4',
-          display:'flex',
-          padding:'7px 0 14px',
-          boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',
-        }}>
+        <div className="nav-main-bar">
           {NAV_BOTTOM.map(({Icon,label,page})=>{
-            const act = page==='home'
+            const act=page==='home'
             return (
-              <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{
-                flex:1,display:'flex',flexDirection:'column',
-                alignItems:'center',gap:'3px',cursor:'pointer'
-              }}>
+              <div key={page} onClick={()=>onNavigate&&onNavigate(page)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
                 <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
                   <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
                 </div>
