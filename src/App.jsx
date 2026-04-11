@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  Home, BookOpen, Pill, Droplets, BarChart2, Settings,
-  Link, Package, ShoppingBag, FileText, Stethoscope,
-  Phone, CreditCard, Shield, ChevronRight
+  Home, BookOpen, Pill, Droplets, Link, Settings
 } from 'lucide-react'
 import Home2 from './Home'
 import CrisiPage from './CrisiPage'
@@ -16,8 +14,8 @@ import MagazzinoPage from './MagazzinoPage'
 import DoctorView from './DoctorView'
 
 const PIN_REALE = '261120'
-const PIN_DEMO = '010101'
-const VERSION = '05.00.19'
+const PIN_DEMO  = '010101'
+const VERSION   = '05.00.21'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 
@@ -55,8 +53,7 @@ const FRASI = [
 ]
 
 export function getFrase() {
-  const idx = (new Date().getDate() + new Date().getMonth()) % FRASI.length
-  return FRASI[idx]
+  return FRASI[(new Date().getDate() + new Date().getMonth()) % FRASI.length]
 }
 
 function Disclaimer({ nome, onAccept }) {
@@ -70,13 +67,15 @@ function Disclaimer({ nome, onAccept }) {
         </div>
         <div style={{background:'#f3f4f7',borderRadius:'14px',padding:'16px',marginBottom:'20px',fontSize:f(12),color:'#394058',lineHeight:'1.7',maxHeight:'200px',overflowY:'auto'}}>
           <p style={{marginBottom:'10px'}}><strong style={{color:'#08184c'}}>Ciao {nome}!</strong> Prima di accedere a DamiAPP, ti chiediamo di leggere e accettare quanto segue:</p>
-          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>1. Responsabilità dei dati</strong><br/>DamiAPP è uno strumento di supporto personale. I dati inseriti sono sotto la tua esclusiva responsabilità.</p>
-          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>2. Protezione dei dati</strong><br/>I dati sono salvati su Firebase (Google).<strong style={{color:'#F7295A'}}> DamiAPP non garantisce la protezione assoluta dei dati.</strong></p>
-          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>3. Uso medico</strong><br/>DamiAPP <strong>non sostituisce il medico</strong>. In caso di emergenza chiama il 112.</p>
-          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>4. Modalità Demo</strong><br/>In modalità Demo tutti i dati sono fittizi e dimostrativi.</p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>1. Responsabilità dei dati</strong><br/>DamiAPP è uno strumento di supporto personale.</p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>2. Protezione dei dati</strong><br/>Dati salvati su Firebase (Google).<strong style={{color:'#F7295A'}}> DamiAPP non garantisce la protezione assoluta.</strong></p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>3. Uso medico</strong><br/>DamiAPP <strong>non sostituisce il medico</strong>. Emergenze → chiama il 112.</p>
+          <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>4. Modalità Demo</strong><br/>In modalità Demo tutti i dati sono fittizi.</p>
           <p style={{margin:0,color:'#bec1cc',fontSize:f(11)}}>v{VERSION} — Continuando accetti queste condizioni.</p>
         </div>
-        <button onClick={onAccept} style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 6px 20px rgba(8,24,76,0.35)',marginBottom:'10px'}}>✅ Ho letto e accetto</button>
+        <button onClick={onAccept} style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 6px 20px rgba(8,24,76,0.35)',marginBottom:'10px'}}>
+          ✅ Ho letto e accetto
+        </button>
         <div style={{textAlign:'center',fontSize:f(11),color:'#bec1cc'}}>Non accettando non potrai utilizzare l'app</div>
       </div>
     </div>
@@ -90,9 +89,17 @@ function OnboardingModal({ onDone, isDemo }) {
       <div style={{background:'#feffff',borderRadius:'24px',padding:'32px 24px',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.25)'}}>
         <div style={{textAlign:'center',marginBottom:'24px'}}>
           <img src="/DamiLogo.png" alt="logo" style={{width:'72px',height:'72px',borderRadius:'50%',objectFit:'cover',marginBottom:'14px',boxShadow:'0 4px 16px rgba(8,24,76,0.25)'}}/>
-          <div style={{fontSize:f(20),fontWeight:'900',color:'#08184c',marginBottom:'6px'}}>{isDemo?'👋 Benvenuto nella Demo!':'Benvenuto in DamiAPP'}</div>
-          <div style={{fontSize:f(13),color:'#7c8088',lineHeight:'1.5'}}>{isDemo?'Come ti chiami? Personalizziamo la demo.':'Come ti chiami? Ti saluteremo ogni giorno.'}</div>
-          {isDemo&&<div style={{marginTop:'10px',padding:'8px 12px',background:'rgba(255,140,66,0.12)',borderRadius:'10px',border:'1px solid rgba(255,140,66,0.3)',fontSize:f(11),color:'#8B6914',fontWeight:'600'}}>🎭 Modalità Demo — dati fittizi</div>}
+          <div style={{fontSize:f(20),fontWeight:'900',color:'#08184c',marginBottom:'6px'}}>
+            {isDemo ? '👋 Benvenuto nella Demo!' : 'Benvenuto in DamiAPP'}
+          </div>
+          <div style={{fontSize:f(13),color:'#7c8088',lineHeight:'1.5'}}>
+            {isDemo ? 'Come ti chiami? Personalizziamo la demo.' : 'Come ti chiami? Ti saluteremo ogni giorno.'}
+          </div>
+          {isDemo && (
+            <div style={{marginTop:'10px',padding:'8px 12px',background:'rgba(255,140,66,0.12)',borderRadius:'10px',border:'1px solid rgba(255,140,66,0.3)',fontSize:f(11),color:'#8B6914',fontWeight:'600'}}>
+              🎭 Modalità Demo — dati fittizi
+            </div>
+          )}
         </div>
         <input
           value={nome} onChange={e=>setNome(e.target.value)}
@@ -103,7 +110,8 @@ function OnboardingModal({ onDone, isDemo }) {
           onBlur={e=>e.target.style.borderColor='#e8eaf0'}
         />
         <button
-          onClick={()=>nome.trim()&&onDone(nome.trim())} disabled={!nome.trim()}
+          onClick={()=>nome.trim()&&onDone(nome.trim())}
+          disabled={!nome.trim()}
           style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',background:nome.trim()?'linear-gradient(135deg,#08184c,#193f9e)':'#e8eaf0',color:nome.trim()?'#fff':'#bec1cc',fontSize:f(15),fontWeight:'800',cursor:nome.trim()?'pointer':'default',boxShadow:nome.trim()?'0 6px 20px rgba(8,24,76,0.35)':'none'}}
         >Inizia →</button>
       </div>
@@ -143,13 +151,13 @@ function Login({ onLogin }) {
       const { ref, get } = await import('firebase/database')
       const { db } = await import('./firebase')
       const { decrypt } = await import('./crypto')
-      const snap = await get(ref(db, 'sharetokens'))
+      const snap = await get(ref(db,'sharetokens'))
       const val = snap.val()
       if (!val) { setError('Token non valido o scaduto.'); setCheckingToken(false); return }
       let trovato = null
-      Object.entries(val).forEach(([key, encData]) => {
-        const t = typeof encData === 'object' ? encData : decrypt(encData)
-        if (t && t.token === token.trim().toUpperCase() && t.active) {
+      Object.entries(val).forEach(([key,encData]) => {
+        const t = typeof encData==='object' ? encData : decrypt(encData)
+        if (t && t.token===token.trim().toUpperCase() && t.active) {
           const scadenza = t.expiresAt ? new Date(t.expiresAt) : null
           if (!scadenza || scadenza > new Date()) trovato = {...t, _firebaseKey:key}
         }
@@ -184,99 +192,54 @@ function Login({ onLogin }) {
         </div>
 
         <div style={{padding:'20px 24px 28px'}}>
-          {tab==='paziente'?(
+          {tab==='paziente' ? (
             <>
               <div style={{fontSize:f(11),fontWeight:'700',color:'#7c8088',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'10px'}}>PIN di accesso</div>
-              <input type="password" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handlePinLogin()} placeholder="• • • • • •" maxLength={6}
+              <input
+                type="password" value={pin}
+                onChange={e=>setPin(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&handlePinLogin()}
+                placeholder="• • • • • •" maxLength={6}
                 style={{width:'100%',padding:'16px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:'26px',textAlign:'center',letterSpacing:'12px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:'inherit'}}
-                onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#e8eaf0'}/>
+                onFocus={e=>e.target.style.borderColor='#2e84e9'}
+                onBlur={e=>e.target.style.borderColor='#e8eaf0'}
+              />
               <div onClick={()=>setRicordaPin(!ricordaPin)} style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',marginBottom:'14px',userSelect:'none'}}>
                 <div style={{width:'20px',height:'20px',borderRadius:'6px',border:`2px solid ${ricordaPin?'#193f9e':'#dde0ed'}`,background:ricordaPin?'#193f9e':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.2s'}}>
-                  {ricordaPin&&<span style={{color:'#fff',fontSize:'13px',fontWeight:'900'}}>✓</span>}
+                  {ricordaPin && <span style={{color:'#fff',fontSize:'13px',fontWeight:'900'}}>✓</span>}
                 </div>
                 <span style={{fontSize:f(12),color:'#7c8088',fontWeight:'600'}}>Ricorda PIN per accesso rapido</span>
               </div>
-              {error&&<div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
-              <button onClick={handlePinLogin} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 8px 24px rgba(8,24,76,0.35)'}}>Accedi</button>
+              {error && <div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
+              <button onClick={handlePinLogin} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 8px 24px rgba(8,24,76,0.35)'}}>
+                Accedi
+              </button>
               <div style={{textAlign:'center',marginTop:'12px',fontSize:f(11),color:'#bec1cc'}}>💡 PIN demo disponibile per la presentazione</div>
             </>
-          ):(
+          ) : (
             <>
               <div style={{fontSize:f(11),fontWeight:'700',color:'#7c8088',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'10px'}}>Token di accesso medico</div>
-              <input type="text" value={token} onChange={e=>setToken(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&handleTokenLogin()} placeholder="Es: DMIABCD12345"
+              <input
+                type="text" value={token}
+                onChange={e=>setToken(e.target.value.toUpperCase())}
+                onKeyDown={e=>e.key==='Enter'&&handleTokenLogin()}
+                placeholder="Es: DMIABCD12345"
                 style={{width:'100%',padding:'14px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:f(16),textAlign:'center',letterSpacing:'2px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:"'Courier New',monospace"}}
-                onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#e8eaf0'}/>
-              {error&&<div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
+                onFocus={e=>e.target.style.borderColor='#2e84e9'}
+                onBlur={e=>e.target.style.borderColor='#e8eaf0'}
+              />
+              {error && <div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
               <button onClick={handleTokenLogin} disabled={checkingToken}
                 style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:checkingToken?'wait':'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:checkingToken?'#bec1cc':'linear-gradient(135deg,#00BFA6,#2e84e9)',boxShadow:checkingToken?'none':'0 8px 24px rgba(0,191,166,0.3)',opacity:checkingToken?0.7:1,transition:'all 0.2s'}}>
-                {checkingToken?'⏳ Verifica in corso...':'Accedi come Medico'}
+                {checkingToken ? '⏳ Verifica in corso...' : 'Accedi come Medico'}
               </button>
               <div style={{textAlign:'center',marginTop:'12px',fontSize:f(11),color:'#bec1cc'}}>Il token ti è stato fornito dalla famiglia del paziente</div>
             </>
           )}
-          <div style={{textAlign:'center',marginTop:'16px',fontSize:f(12),color:'#bec1cc',display:'flex',alignItems:'center',justifyContent:'center',gap:'5px'}}>🔒 Dati cifrati e protetti</div>
+          <div style={{textAlign:'center',marginTop:'16px',fontSize:f(12),color:'#bec1cc',display:'flex',alignItems:'center',justifyContent:'center',gap:'5px'}}>
+            🔒 Dati cifrati e protetti
+          </div>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function Navbar({ page, onNavigate }) {
-  const items = [
-    {Icon:Home,label:'Home',page:'home'},
-    {Icon:BookOpen,label:'Diario',page:'diario'},
-    {Icon:Pill,label:'Terapie',page:'terapie'},
-    {Icon:Droplets,label:'Toilet',page:'toilet'},
-    {Icon:Link,label:'Condividi',page:'condividi'},
-    {Icon:Settings,label:'Altro',page:'altro'},
-  ]
-  return (
-    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'#feffff',borderTop:'1px solid #f0f1f4',display:'flex',padding:'7px 0 14px',boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',zIndex:100}}>
-      {items.map(({Icon,label,page:p})=>{
-        const act=page===p
-        return (
-          <div key={p} onClick={()=>onNavigate(p)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer'}}>
-            <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
-              <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
-            </div>
-            <span style={{fontSize:`${Math.round(9*1.15)}px`,fontWeight:act?'800':'500',color:act?'#193f9e':'#bec1cc'}}>{label}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function AltroPage({ onNavigate }) {
-  const voci = [
-    {Icon:Package,label:'Magazzino medicinali',sub:'Scorte e scadenze',color:'#00BFA6',page:'magazzino'},
-    {Icon:ShoppingBag,label:'Cosa portare',sub:'Liste personalizzate',color:'#FF8C42',page:'cosa_portare'},
-    {Icon:FileText,label:'Documenti personali',sub:'Archivio documenti',color:'#2e84e9',page:'doc_personali'},
-    {Icon:Stethoscope,label:'Documenti medici',sub:'Referti e visite',color:'#7B5EA7',page:'doc_medici'},
-    {Icon:Phone,label:'Rubrica',sub:'Contatti medici',color:'#F7295A',page:'rubrica'},
-    {Icon:CreditCard,label:'Pagamenti',sub:'Gestione spese terapisti',color:'#193f9e',page:'pagamenti'},
-    {Icon:BarChart2,label:'Report',sub:'Statistiche e grafici',color:'#FF8C42',page:'report'},
-    {Icon:Shield,label:'Backup & Admin',sub:'Gestione dati',color:'#7c8088',page:'admin'},
-  ]
-  return (
-    <div style={{background:'#f3f4f7',minHeight:'100vh',paddingBottom:'80px',fontFamily:"-apple-system,'Segoe UI',sans-serif",maxWidth:'480px',margin:'0 auto'}}>
-      <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'20px 16px 24px'}}>
-        <div style={{fontSize:f(18),fontWeight:'900',color:'#fff'}}>⚙️ Altro</div>
-        <div style={{fontSize:f(11),color:'rgba(255,255,255,0.7)',marginTop:'2px'}}>Altre funzionalità</div>
-      </div>
-      <div style={{padding:'12px'}}>
-        {voci.map(({Icon,label,sub,color,page},i)=>(
-          <div key={i} onClick={()=>onNavigate(page)} style={{background:'#feffff',borderRadius:'14px',padding:'14px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'12px',boxShadow:'0 4px 16px rgba(2,21,63,0.08)',cursor:'pointer'}}>
-            <div style={{width:'42px',height:'42px',borderRadius:'12px',background:`${color}18`,border:`1.5px solid ${color}33`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-              <Icon size={20} color={color}/>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:f(13),fontWeight:'700',color:'#02153f'}}>{label}</div>
-              <div style={{fontSize:f(11),color:'#7c8088',marginTop:'1px'}}>{sub}</div>
-            </div>
-            <ChevronRight size={16} color="#bec1cc"/>
-          </div>
-        ))}
       </div>
     </div>
   )
@@ -289,7 +252,9 @@ function PaginaInArrivo({ onBack }) {
         <div style={{fontSize:'48px',marginBottom:'16px'}}>🚧</div>
         <div style={{fontSize:f(18),fontWeight:'900',color:'#02153f',marginBottom:'8px'}}>In arrivo</div>
         <div style={{fontSize:f(13),color:'#7c8088',marginBottom:'24px'}}>Questa sezione è in sviluppo</div>
-        <button onClick={onBack} style={{padding:'12px 24px',borderRadius:'50px',border:'none',background:'linear-gradient(135deg,#193f9e,#2e84e9)',color:'#fff',fontWeight:'700',fontSize:f(14),cursor:'pointer'}}>← Torna indietro</button>
+        <button onClick={onBack} style={{padding:'12px 24px',borderRadius:'50px',border:'none',background:'linear-gradient(135deg,#193f9e,#2e84e9)',color:'#fff',fontWeight:'700',fontSize:f(14),cursor:'pointer'}}>
+          ← Torna indietro
+        </button>
       </div>
     </div>
   )
@@ -321,7 +286,11 @@ export default function App() {
     }
   }
 
-  function handleNome(nome) { setPendingNome(nome); setShowOnboarding(false); setShowDisclaimer(true) }
+  function handleNome(nome) {
+    setPendingNome(nome)
+    setShowOnboarding(false)
+    setShowDisclaimer(true)
+  }
 
   function handleAcceptDisclaimer() {
     if (!isDemo) localStorage.setItem('damiapp_nome', pendingNome)
@@ -329,6 +298,7 @@ export default function App() {
   }
 
   function handleNavigate(dest) {
+    setShowExtra(false)
     if (dest==='crisi') setTimerSecCrisi(1)
     setPage(dest)
   }
@@ -352,33 +322,60 @@ export default function App() {
 
   return (
     <>
-      {showOnboarding&&<OnboardingModal onDone={handleNome} isDemo={isDemo}/>}
-      {showDisclaimer&&<Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
+      {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo}/>}
+      {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
 
-      {page==='crisi'&&<CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
-      {page==='sos'&&<SOSPage onBack={()=>setPage('home')}/>}
+      {page==='crisi' && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
+      {page==='sos' && <SOSPage onBack={()=>setPage('home')}/>}
 
-      {!noNav.includes(page)&&(
+      {!noNav.includes(page) && (
         <>
-          {page==='home'&&<Home2
-  nomeUtente={nomeEffettivo}
-  isDemo={isDemo}
-  onNavigate={(dest)=>{
-    if(showExtra) setShowExtra(false)
-    handleNavigate(dest)
-  }}
-  showExtra={showExtra}
-  onToggleExtra={()=>setShowExtra(p=>!p)}
-/>}
-          {page==='diario'&&<DiarioCrisi onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='terapie'&&<TerapiePage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='toilet'&&<ToiletPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='condividi'&&<CondividiPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
-          {page==='report'&&<ReportPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='magazzino'&&<MagazzinoPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='altro'&&null}
-          {inArrivo.includes(page)&&<PaginaInArrivo onBack={()=>setPage('altro')}/>}
-          <Navbar page={page} onNavigate={handleNavigate}/>
+          {page==='home' && (
+            <Home2
+              nomeUtente={nomeEffettivo}
+              isDemo={isDemo}
+              onNavigate={handleNavigate}
+              showExtra={showExtra}
+              onToggleExtra={()=>setShowExtra(p=>!p)}
+            />
+          )}
+          {page==='diario' && <DiarioCrisi onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='terapie' && <TerapiePage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='toilet' && <ToiletPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='condividi' && <CondividiPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
+          {page==='report' && <ReportPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='magazzino' && <MagazzinoPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='altro' && null}
+          {inArrivo.includes(page) && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
+
+          {/* Navbar solo fuori da Home — Home ha la sua doppia navbar integrata */}
+          {page !== 'home' && (
+            <div style={{
+              position:'fixed',bottom:0,left:0,right:0,
+              background:'#feffff',borderTop:'1px solid #f0f1f4',
+              display:'flex',padding:'7px 0 14px',
+              boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',zIndex:100
+            }}>
+              {[
+                {Icon:Home,label:'Home',p:'home'},
+                {Icon:BookOpen,label:'Diario',p:'diario'},
+                {Icon:Pill,label:'Terapie',p:'terapie'},
+                {Icon:Droplets,label:'Toilet',p:'toilet'},
+                {Icon:Link,label:'Condividi',p:'condividi'},
+                {Icon:Settings,label:'Altro',p:'home'},
+              ].map(({Icon,label,p})=>{
+                const act = page===p
+                return (
+                  <div key={label} onClick={()=>handleNavigate(p)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',touchAction:'manipulation'}}>
+                    <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
+                      <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
+                    </div>
+                    <span style={{fontSize:`${Math.round(9*1.15)}px`,fontWeight:act?'800':'500',color:act?'#193f9e':'#bec1cc'}}>{label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </>
       )}
     </>
