@@ -195,8 +195,16 @@ function FormMedicinale({ initial={}, onSave, onCancel, title='Aggiungi medicina
         </div>
         <div>
           <label style={labelStyle}>Scadenza *</label>
-          <input type="date" value={scadenza} onChange={e=>setScadenza(e.target.value)} style={inputStyle}
-            onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+          <input
+  type="date"
+  value={scadenza}
+  onChange={e=>setScadenza(e.target.value)}
+  min="2020-01-01"
+  max="2040-12-31"
+  style={{...inputStyle, WebkitAppearance:'none', appearance:'none'}}
+  onFocus={e=>e.target.style.borderColor='#2e84e9'}
+  onBlur={e=>e.target.style.borderColor='#f0f1f4'}
+/>
         </div>
       </div>
 

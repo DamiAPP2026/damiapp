@@ -12,9 +12,8 @@ import { processFirebaseSnap } from './crypto'
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh   = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
-
-const NAV_H   = 64
-const EXTRA_H = 56
+const NAV_H   = 58
+const EXTRA_H = 52
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -76,17 +75,17 @@ function matchOggi(dataField) {
   const oggi = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
   const raw = String(dataField).replace(/[\/\-\s]/g,'')
   const oggiRaw = oggi.replace(/[\/\-\s]/g,'')
-  return raw===oggiRaw || String(dataField)===oggi
+  return raw === oggiRaw || String(dataField) === oggi
 }
 
 export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, onToggleExtra }) {
-  const [time,       setTime]       = useState(new Date())
-  const [crisi,      setCrisi]      = useState([])
-  const [terapie,    setTerapie]    = useState([])
-  const [magazzino,  setMagazzino]  = useState([])
-  const [toiletData, setToilet]     = useState([])
-  const [showQEdit,  setShowQEdit]  = useState(false)
-  const [quickActions, setQuickActions] = useState(() => {
+  const [time,       setTime]     = useState(new Date())
+  const [crisi,      setCrisi]    = useState([])
+  const [terapie,    setTerapie]  = useState([])
+  const [magazzino,  setMag]      = useState([])
+  const [toiletData, setToilet]   = useState([])
+  const [showQEdit,  setShowQEdit]= useState(false)
+  const [quickActions, setQA]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('damiapp_quick_actions')) || DEFAULT_QUICK }
     catch { return DEFAULT_QUICK }
   })
@@ -100,8 +99,9 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
 
   useEffect(() => {
     if (isDemo) {
-      const oggi = (() => { const d=new Date(); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` })()
-      const ieri = (() => { const d=new Date(Date.now()-86400000); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` })()
+      const fmt = (d) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+      const oggi = fmt(new Date())
+      const ieri = fmt(new Date(Date.now()-86400000))
       setCrisi([
         {id:1,type:'Crisi tonico-cloniche',timestamp:Date.now()-3*86400000,duration:'00:02:34',intensita:7},
         {id:2,type:'Crisi di assenza',timestamp:Date.now()-10*86400000,duration:'00:00:18',intensita:4},
@@ -112,7 +112,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         {id:2,nome:'Depakine',orario:'13:00',quantita:'5ml'},
         {id:3,nome:'Keppra 750mg',orario:'20:00',quantita:'1 cp'},
       ])
-      setMagazzino([
+      setMag([
         {id:1,nome:'Keppra 500mg',scadenza:'2026-05-15',scatole:2},
         {id:2,nome:'Depakine',scadenza:'2026-04-20',scatole:1},
       ])
@@ -124,20 +124,20 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
       ])
       return
     }
-    const u1=onValue(ref(db,'crises'),s=>setCrisi(processFirebaseSnap(s)))
-    const u2=onValue(ref(db,'terapies'),s=>setTerapie(processFirebaseSnap(s)))
-    const u3=onValue(ref(db,'magazzino'),s=>setMagazzino(processFirebaseSnap(s)))
+    const u1=onValue(ref(db,'crises'),       s=>setCrisi(processFirebaseSnap(s)))
+    const u2=onValue(ref(db,'terapies'),     s=>setTerapie(processFirebaseSnap(s)))
+    const u3=onValue(ref(db,'magazzino'),    s=>setMag(processFirebaseSnap(s)))
     const u4=onValue(ref(db,'toilet_training'),s=>setToilet(processFirebaseSnap(s)))
     return ()=>{u1();u2();u3();u4()}
   }, [isDemo])
 
-  function saveQuick(keys) {
-    setQuickActions(keys)
+  function saveQA(keys) {
+    setQA(keys)
     localStorage.setItem('damiapp_quick_actions', JSON.stringify(keys))
   }
 
   function go(page) {
-    if (showExtra) onToggleExtra()
+    if (showExtra && onToggleExtra) onToggleExtra()
     onNavigate && onNavigate(page)
   }
 
@@ -147,7 +147,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
   const timeStr = time.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
   const oraMin  = time.getHours()*60+time.getMinutes()
 
-  const ultimaCrisi = [...crisi].sort((a,b)=>b.timestamp-a.timestamp)[0]
+  const ultimaCrisi      = [...crisi].sort((a,b)=>b.timestamp-a.timestamp)[0]
   const giorniSenzaCrisi = ultimaCrisi ? Math.floor((Date.now()-ultimaCrisi.timestamp)/86400000) : null
   const cGiorni = giorniSenzaCrisi===null?'#bec1cc':giorniSenzaCrisi>=30?'#00BFA6':giorniSenzaCrisi>=7?'#FF8C42':'#F7295A'
 
@@ -163,114 +163,92 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
   const bagnoOggi = toiletData.filter(s=>matchOggi(s.data)&&s.bisogno&&s.bisogno!=='nessuno').length
   const incOggi   = toiletData.filter(s=>matchOggi(s.data)&&(s.incidentePippi||s.incidenteCacca)).length
   const toilet7gg = toiletData.filter(s=>(s.timestamp||0)>=Date.now()-7*86400000&&s.bisogno&&s.bisogno!=='nessuno').length
-
-  const fasceMat = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=6&&h<12}).length
-  const fascePom = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=12&&h<18}).length
-  const fasceSer = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=18}).length
-  const fasceMax = Math.max(fasceMat,fascePom,fasceSer,1)
+  const fasceMat  = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=6&&h<12}).length
+  const fascePom  = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=12&&h<18}).length
+  const fasceSer  = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=18}).length
+  const fasceMax  = Math.max(fasceMat,fascePom,fasceSer,1)
 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
+  const pbContent = showExtra ? NAV_H+EXTRA_H+4 : NAV_H+4
 
-  // padding bottom cresce quando barra extra è visibile
-  const pbContent = showExtra ? NAV_H + EXTRA_H + 8 : NAV_H + 8
-
-  // stile item navbar — ottimizzato per touch
   const niStyle = {
-    flex:1, display:'flex', flexDirection:'column', alignItems:'center',
-    gap:'3px', cursor:'pointer', touchAction:'manipulation',
-    WebkitTapHighlightColor:'transparent', userSelect:'none',
-    padding:'4px 2px'
+    flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+    gap:'3px',cursor:'pointer',touchAction:'manipulation',
+    WebkitTapHighlightColor:'transparent',userSelect:'none',padding:'3px 2px'
   }
 
   return (
     <>
       <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #f3f4f7; }
-        .home-wrap {
-          background: #f3f4f7;
-          min-height: 100vh;
-          font-family: -apple-system, 'Segoe UI', sans-serif;
-          width: 100%; max-width: 480px; margin: 0 auto;
-          transition: padding-bottom 0.3s ease;
-        }
-        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+        *{box-sizing:border-box;}
+        body{margin:0;background:#e8eaf0;display:flex;justify-content:center;}
+        #root{width:100%;max-width:480px;background:#f3f4f7;min-height:100vh;position:relative;}
+        .home-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;width:100%;}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
       `}</style>
 
-      {/* ── OVERLAY chiude barra extra ── */}
+      {/* OVERLAY */}
       {showExtra && (
-        <div
-          onClick={onToggleExtra}
-          style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(2,21,63,0.15)',backdropFilter:'blur(1px)',WebkitBackdropFilter:'blur(1px)',animation:'fadeIn 0.2s ease'}}
-        />
+        <div onClick={onToggleExtra} style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(2,21,63,0.12)'}}/>
       )}
 
-      {/* ── BARRA EXTRA — animazione basso→alto ── */}
+      {/* BARRA EXTRA — sale sopra navbar */}
       <div style={{
         position:'fixed',
-        bottom: showExtra ? NAV_H : -EXTRA_H - 2,
-        left:'50%', transform:'translateX(-50%)',
-        width:'100%', maxWidth:'480px',
+        bottom: showExtra ? NAV_H : -(EXTRA_H+2),
+        left:'50%',transform:'translateX(-50%)',
+        width:'100%',maxWidth:'480px',
         height:`${EXTRA_H}px`,
         background:'#feffff',
         borderTop:'1px solid #eef0f5',
-        display:'flex', alignItems:'center',
-        boxShadow:'0 -3px 14px rgba(2,21,63,0.10)',
+        display:'flex',alignItems:'center',
+        boxShadow:'0 -2px 12px rgba(2,21,63,0.08)',
         zIndex:1100,
-        transition:'bottom 0.32s cubic-bezier(.4,0,.2,1)',
-        willChange:'transform',
+        transition:'bottom 0.30s cubic-bezier(.4,0,.2,1)',
+        willChange:'bottom',
       }}>
         {NAV_EXTRA.map(({Icon,label,page})=>(
           <div key={page} style={niStyle} onClick={()=>go(page)}>
-            <div style={{width:'32px',height:'22px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
+            <div style={{width:'30px',height:'22px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
               <Icon size={16} color="#bec1cc"/>
             </div>
-            <span style={{fontSize:f(8.5),fontWeight:'500',color:'#7c8088'}}>{label}</span>
+            <span style={{fontSize:'10px',fontWeight:'500',color:'#7c8088'}}>{label}</span>
           </div>
         ))}
       </div>
 
-      {/* ── NAVBAR PRINCIPALE ── */}
+      {/* NAVBAR PRINCIPALE */}
       <div style={{
         position:'fixed',
-        bottom:0, left:'50%', transform:'translateX(-50%)',
-        width:'100%', maxWidth:'480px',
+        bottom:0,left:'50%',transform:'translateX(-50%)',
+        width:'100%',maxWidth:'480px',
         height:`${NAV_H}px`,
         background:'#feffff',
         borderTop:'1px solid #eef0f5',
-        display:'flex', alignItems:'center',
+        display:'flex',alignItems:'center',
         boxShadow:'0 -4px 16px rgba(2,21,63,0.09)',
         zIndex:1200,
       }}>
         {NAV_BOTTOM.map(({Icon,label,page})=>{
           const isAltro = page==='altro'
-          const isHome  = page==='home'
-          const active  = isHome || (isAltro && showExtra)
+          const active  = page==='home' || (isAltro && showExtra)
           return (
-            <div key={page} style={niStyle}
-              onClick={()=>isAltro ? onToggleExtra() : go(page)}>
-              <div style={{
-                width:'34px', height:'26px',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                borderRadius:'10px',
-                background: active ? '#EEF3FD' : 'transparent',
-                transition:'background 0.2s'
-              }}>
+            <div key={page} style={niStyle} onClick={()=>isAltro?onToggleExtra&&onToggleExtra():go(page)}>
+              <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'10px',background:active?'#EEF3FD':'transparent',transition:'background 0.2s'}}>
                 {isAltro
-                  ? <ChevronUp size={17} color={showExtra?'#193f9e':'#bec1cc'}
-                      style={{transform:showExtra?'rotate(0deg)':'rotate(180deg)',transition:'transform 0.32s ease'}}/>
+                  ? <ChevronUp size={17} color={showExtra?'#193f9e':'#bec1cc'} style={{transform:showExtra?'rotate(0)':'rotate(180deg)',transition:'transform 0.30s ease'}}/>
                   : <Icon size={17} color={active?'#193f9e':'#bec1cc'}/>
                 }
               </div>
               <span style={{fontSize:f(9),fontWeight:active?'800':'500',color:active?'#193f9e':'#bec1cc',transition:'color 0.2s'}}>
-                {isAltro ? (showExtra?'Chiudi':'Altro') : label}
+                {isAltro?(showExtra?'Chiudi':'Altro'):label}
               </span>
             </div>
           )
         })}
       </div>
 
-      {/* ── MODAL PERSONALIZZA ── */}
+      {/* MODAL PERSONALIZZA */}
       {showQEdit && (
         <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.50)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto'}}>
@@ -284,10 +262,8 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             {ALL_QUICK_ACTIONS.map(({key,Icon,label,sub,color,grad})=>{
               const sel=quickActions.includes(key)
               return (
-                <div key={key} onClick={()=>{
-                  if(sel) saveQuick(quickActions.filter(k=>k!==key))
-                  else if(quickActions.length<3) saveQuick([...quickActions,key])
-                }} style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px',borderRadius:'14px',marginBottom:'8px',cursor:'pointer',background:sel?`${color}10`:'#f3f4f7',border:`2px solid ${sel?color:'transparent'}`,transition:'all 0.15s'}}>
+                <div key={key} onClick={()=>sel?saveQA(quickActions.filter(k=>k!==key)):quickActions.length<3&&saveQA([...quickActions,key])}
+                  style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px',borderRadius:'14px',marginBottom:'8px',cursor:'pointer',background:sel?`${color}10`:'#f3f4f7',border:`2px solid ${sel?color:'transparent'}`,transition:'all 0.15s'}}>
                   <div style={{width:'40px',height:'40px',borderRadius:'12px',background:grad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                     <Icon size={18} color="#fff"/>
                   </div>
@@ -295,7 +271,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
                     <div style={{fontSize:f(13),fontWeight:'700',color:sel?color:'#02153f'}}>{label}</div>
                     <div style={{fontSize:f(10),color:'#7c8088',marginTop:'1px'}}>{sub}</div>
                   </div>
-                  {sel && <Check size={18} color={color}/>}
+                  {sel&&<Check size={18} color={color}/>}
                 </div>
               )
             })}
@@ -306,7 +282,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         </div>
       )}
 
-      {/* ══════════ CONTENUTO ══════════ */}
+      {/* CONTENUTO */}
       <div className="home-wrap" style={{paddingBottom:`${pbContent}px`}}>
 
         {/* HERO */}
@@ -319,19 +295,11 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             <div style={{display:'flex',justifyContent:'center',marginBottom:'10px'}}>
               <img src="/DamiLogo.png" alt="logo" style={{width:'62px',height:'62px',borderRadius:'50%',objectFit:'cover',boxShadow:'0 6px 20px rgba(8,24,76,0.18)'}}/>
             </div>
-            {isDemo && (
-              <div style={{textAlign:'center',marginBottom:'8px'}}>
-                <span style={{background:'linear-gradient(135deg,#FFD93D,#FF8C42)',color:'#5a3000',fontSize:f(10),fontWeight:'800',padding:'3px 12px',borderRadius:'20px'}}>
-                  🎭 MODALITÀ DEMO
-                </span>
-              </div>
-            )}
-            <div style={{fontSize:f(26),fontWeight:'900',color:'#08184c',letterSpacing:'-0.5px',marginBottom:'6px'}}>
-              Ciao {nomeUtente}!
-            </div>
-            <div style={{fontSize:f(13),color:'#7c8088',marginBottom:'18px',lineHeight:'1.6',fontStyle:'italic',padding:'8px 12px',background:'#f3f4f7',borderRadius:'12px',borderLeft:'3px solid #2e84e9'}}>
-              {frase}
-            </div>
+            {isDemo&&<div style={{textAlign:'center',marginBottom:'8px'}}>
+              <span style={{background:'linear-gradient(135deg,#FFD93D,#FF8C42)',color:'#5a3000',fontSize:f(10),fontWeight:'800',padding:'3px 12px',borderRadius:'20px'}}>🎭 MODALITÀ DEMO</span>
+            </div>}
+            <div style={{fontSize:f(26),fontWeight:'900',color:'#08184c',letterSpacing:'-0.5px',marginBottom:'6px'}}>Ciao {nomeUtente}!</div>
+            <div style={{fontSize:f(13),color:'#7c8088',marginBottom:'18px',lineHeight:'1.6',fontStyle:'italic',padding:'8px 12px',background:'#f3f4f7',borderRadius:'12px',borderLeft:'3px solid #2e84e9'}}>{frase}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
               <button onClick={()=>go('crisi')} style={{position:'relative',height:'50px',borderRadius:'50px',border:'none',overflow:'hidden',cursor:'pointer',boxShadow:'0 6px 20px rgba(25,63,158,0.35)',touchAction:'manipulation'}}>
                 <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#193f9e,#2e84e9)'}}/>
@@ -353,15 +321,13 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         {/* MINI CARDS */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'8px 12px'}}>
           {[
-            {label:'Senza crisi', val:giorniSenzaCrisi!==null?`${giorniSenzaCrisi}g`:'—', hint:ultimaCrisi?`ul. ${new Date(ultimaCrisi.timestamp).toLocaleDateString('it-IT').slice(0,5)}`:'Nessuna', color:cGiorni, Icon:AlertTriangle, bar:`linear-gradient(90deg,${cGiorni},${cGiorni}88)`},
-            {label:'Prossima ter.', val:prossimaTerapia?prossimaTerapia.orario:'—', hint:prossimaTerapia?prossimaTerapia.nome:'Finite', color:'#00BFA6', Icon:Clock, bar:'linear-gradient(90deg,#00BFA6,#2e84e9)'},
-            {label:'Scadenze', val:scadenzeAlert.length, hint:scadenzeAlert.length>0?'entro 30g':'tutto ok', color:scadenzeAlert.length>0?'#FF8C42':'#00BFA6', Icon:Bell, bar:scadenzeAlert.length>0?'linear-gradient(90deg,#FFD93D,#FF8C42)':'#f0f1f4'},
+            {label:'Senza crisi',val:giorniSenzaCrisi!==null?`${giorniSenzaCrisi}g`:'—',hint:ultimaCrisi?`ul. ${new Date(ultimaCrisi.timestamp).toLocaleDateString('it-IT').slice(0,5)}`:'Nessuna',color:cGiorni,Icon:AlertTriangle,bar:`linear-gradient(90deg,${cGiorni},${cGiorni}88)`},
+            {label:'Prossima ter.',val:prossimaTerapia?prossimaTerapia.orario:'—',hint:prossimaTerapia?prossimaTerapia.nome:'Finite',color:'#00BFA6',Icon:Clock,bar:'linear-gradient(90deg,#00BFA6,#2e84e9)'},
+            {label:'Scadenze',val:scadenzeAlert.length,hint:scadenzeAlert.length>0?'entro 30g':'tutto ok',color:scadenzeAlert.length>0?'#FF8C42':'#00BFA6',Icon:Bell,bar:scadenzeAlert.length>0?'linear-gradient(90deg,#FFD93D,#FF8C42)':'#f0f1f4'},
           ].map(({label,val,hint,color,Icon,bar},i)=>(
             <div key={i} style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
               <div style={{padding:'9px 8px 7px'}}>
-                <div style={{width:'28px',height:'28px',borderRadius:'8px',background:color,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
-                  <Icon size={13} color="#fff"/>
-                </div>
+                <div style={{width:'28px',height:'28px',borderRadius:'8px',background:color,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}><Icon size={13} color="#fff"/></div>
                 <div style={{fontSize:f(8),color:'#7c8088',fontWeight:'700',textTransform:'uppercase',marginBottom:'2px'}}>{label}</div>
                 <div style={{fontSize:f(16),fontWeight:'900',color:'#02153f',lineHeight:1}}>{val}</div>
                 <div style={{fontSize:f(9),color:'#bec1cc',marginTop:'2px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{hint}</div>
@@ -394,18 +360,16 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
           ))}
         </div>
 
-        {/* DASHBOARD 2x2 */}
+        {/* DASHBOARD */}
         <div style={{padding:'0 12px',marginBottom:'12px'}}>
           <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Dashboard</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
 
-            {/* Crisi 7gg → diario */}
+            {/* Crisi 7gg */}
             <div onClick={()=>go('diario')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Crisi 7 giorni</span>
-                <span style={{fontSize:f(16),fontWeight:'900',color:'#F7295A'}}>
-                  {crisi.filter(c=>Date.now()-c.timestamp<7*86400000).length}
-                </span>
+                <span style={{fontSize:f(16),fontWeight:'900',color:'#F7295A'}}>{crisi.filter(c=>Date.now()-c.timestamp<7*86400000).length}</span>
               </div>
               <div style={{display:'flex',alignItems:'flex-end',gap:'3px',height:'34px'}}>
                 {[6,5,4,3,2,1,0].map(i=>{
@@ -420,37 +384,33 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
               <div style={{display:'flex',marginTop:'3px'}}>
                 {['L','M','M','G','V','S','D'].map((g,i)=><span key={i} style={{flex:1,textAlign:'center',fontSize:f(7),color:'#bec1cc'}}>{g}</span>)}
               </div>
-              <div style={{textAlign:'right',marginTop:'5px'}}>
-                <span style={{fontSize:f(9),color:'#F7295A',fontWeight:'700'}}>Vedi diario →</span>
-              </div>
+              <div style={{textAlign:'right',marginTop:'4px'}}><span style={{fontSize:f(9),color:'#F7295A',fontWeight:'700'}}>Vedi diario →</span></div>
             </div>
 
-            {/* Terapie → terapie */}
+            {/* Terapie */}
             <div onClick={()=>go('terapie')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Terapie oggi</span>
                 <ChevronRight size={12} color="#00BFA6"/>
               </div>
               {terapie.length===0
-                ? <div style={{fontSize:f(10),color:'#bec1cc',textAlign:'center',padding:'8px'}}>Nessuna terapia</div>
-                : [...terapie].sort((a,b)=>(a.orario||'').localeCompare(b.orario||'')).slice(0,3).map((t,i,arr)=>{
-                    const[h,m]=(t.orario||'00:00').split(':').map(Number)
-                    const passata=h*60+m<oraMin
-                    return (
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:'6px',padding:'3px 0',borderBottom:i<arr.length-1?'1px solid #f0f1f4':'none'}}>
-                        <div style={{width:'6px',height:'6px',borderRadius:'50%',background:passata?'#bec1cc':'#00BFA6',flexShrink:0}}/>
-                        <span style={{fontSize:f(10),color:passata?'#bec1cc':'#394058',fontWeight:'600',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:passata?'line-through':'none'}}>{t.nome}</span>
-                        <span style={{fontSize:f(9),color:'#bec1cc'}}>{t.orario}</span>
-                      </div>
-                    )
-                  })
+                ?<div style={{fontSize:f(10),color:'#bec1cc',textAlign:'center',padding:'8px'}}>Nessuna terapia</div>
+                :[...terapie].sort((a,b)=>(a.orario||'').localeCompare(b.orario||'')).slice(0,3).map((t,i,arr)=>{
+                  const[h,m]=(t.orario||'00:00').split(':').map(Number)
+                  const passata=h*60+m<oraMin
+                  return (
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'6px',padding:'3px 0',borderBottom:i<arr.length-1?'1px solid #f0f1f4':'none'}}>
+                      <div style={{width:'6px',height:'6px',borderRadius:'50%',background:passata?'#bec1cc':'#00BFA6',flexShrink:0}}/>
+                      <span style={{fontSize:f(10),color:passata?'#bec1cc':'#394058',fontWeight:'600',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:passata?'line-through':'none'}}>{t.nome}</span>
+                      <span style={{fontSize:f(9),color:'#bec1cc'}}>{t.orario}</span>
+                    </div>
+                  )
+                })
               }
-              <div style={{textAlign:'right',marginTop:'5px'}}>
-                <span style={{fontSize:f(9),color:'#00BFA6',fontWeight:'700'}}>Vedi terapie →</span>
-              </div>
+              <div style={{textAlign:'right',marginTop:'5px'}}><span style={{fontSize:f(9),color:'#00BFA6',fontWeight:'700'}}>Vedi terapie →</span></div>
             </div>
 
-            {/* Toilet → toilet */}
+            {/* Toilet */}
             <div onClick={()=>go('toilet')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                 <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Toilet oggi</span>
