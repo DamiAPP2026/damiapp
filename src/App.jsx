@@ -321,6 +321,46 @@ export default function App() {
   const [pendingNome, setPendingNome] = useState('')
   const [timerSecCrisi, setTimerSecCrisi] = useState(0)
   const [showExtra, setShowExtra] = useState(false)
+// ── PWA Install Prompt ──
+const [installPrompt, setInstallPrompt]     = useState(null)
+const [showInstallBanner, setInstallBanner] = useState(false)
+
+useEffect(() => {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const isInStandaloneMode = window.navigator.standalone === true
+  const hasDismissed = localStorage.getItem('damiapp_install_dismissed')
+
+  if (isIOS && !isInStandaloneMode && !hasDismissed) {
+    const t = setTimeout(() => setInstallBanner('ios'), 3000)
+    return () => clearTimeout(t)
+  }
+
+  function handleBeforeInstall(e) {
+    e.preventDefault()
+    setInstallPrompt(e)
+    if (!hasDismissed) {
+      setTimeout(() => setInstallBanner('android'), 4000)
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', handleBeforeInstall)
+  return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
+}, [])
+
+async function handleInstall() {
+  if (!installPrompt) return
+  installPrompt.prompt()
+  const { outcome } = await installPrompt.userChoice
+  if (outcome === 'accepted') {
+    setInstallBanner(false)
+    setInstallPrompt(null)
+  }
+}
+
+function dismissInstall() {
+  setInstallBanner(false)
+  localStorage.setItem('damiapp_install_dismissed', '1')
+}
 
   function handleLogin(demo, tokenData) {
     setIsDemo(demo)
@@ -413,6 +453,37 @@ export default function App() {
               {page !== 'home' && (
                 <NavbarInterna page={page} onNavigate={handleNavigate}/>
               )}
+              {/* BANNER INSTALLAZIONE PWA */}
+      {showInstallBanner && (
+        <div style={{
+          position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
+          width:'calc(100% - 24px)', maxWidth:'456px',
+          background:'#08184c', borderRadius:'20px', padding:'14px 16px',
+          boxShadow:'0 8px 32px rgba(2,21,63,0.45)', zIndex:3000,
+          display:'flex', alignItems:'center', gap:'12px',
+          fontFamily:"-apple-system,'Segoe UI',sans-serif",
+        }}>
+          <img src="/DamiLogo.png" alt="logo"
+            style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'cover',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:'14px',fontWeight:'900',color:'#fff',marginBottom:'2px'}}>Installa DamiAPP</div>
+            {showInstallBanner==='ios'
+              ? <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)',lineHeight:'1.4'}}>Tocca <strong style={{color:'#fff'}}>⎋ Condividi</strong> poi <strong style={{color:'#fff'}}>"Aggiungi a Home"</strong></div>
+              : <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)'}}>Accesso rapido dalla schermata Home</div>
+            }
+          </div>
+          <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+            {showInstallBanner==='android' && (
+              <button onClick={handleInstall} style={{padding:'8px 14px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:'12px',color:'#08184c',background:'#fff',fontFamily:'inherit'}}>
+                Installa
+              </button>
+            )}
+            <button onClick={dismissInstall} style={{width:'30px',height:'30px',borderRadius:'50%',border:'none',cursor:'pointer',background:'rgba(255,255,255,0.15)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>
+              ×
+            </button>
+          </div>
+        </div>
+      )}
             </>
           )}
         </>

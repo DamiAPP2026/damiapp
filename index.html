@@ -1,30 +1,29 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Titolo e descrizione -->
     <title>DamiAPP</title>
+    <meta name="description" content="Assistente quotidiano per la gestione delle crisi epilettiche" />
 
-    <!-- PWA Meta -->
-    <meta name="theme-color" content="#08184c"/>
-    <meta name="apple-mobile-web-app-capable" content="yes"/>
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-    <meta name="apple-mobile-web-app-title" content="DamiAPP"/>
-    <meta name="mobile-web-app-capable" content="yes"/>
-    <meta name="description" content="Il tuo assistente quotidiano"/>
+    <!-- PWA / Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#08184c" />
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="/DamiLogo.png"/>
-    <link rel="shortcut icon" href="/DamiLogo.png"/>
+    <!-- Favicon browser -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
 
-    <!-- Apple Touch Icons (logo sul desktop iPhone/iPad) -->
-    <link rel="apple-touch-icon" href="/DamiLogo.png"/>
-    <link rel="apple-touch-icon" sizes="120x120" href="/DamiLogo.png"/>
-    <link rel="apple-touch-icon" sizes="152x152" href="/DamiLogo.png"/>
-    <link rel="apple-touch-icon" sizes="180x180" href="/DamiLogo.png"/>
+    <!-- Apple / iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DamiAPP" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-    <!-- Manifest PWA -->
-    <link rel="manifest" href="/manifest.json"/>
+    <!-- Android splash (opzionale) -->
+    <meta name="mobile-web-app-capable" content="yes" />
   </head>
   <body>
     <div id="root"></div>
