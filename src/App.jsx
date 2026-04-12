@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
-import {
-  Home, BookOpen, Pill, Droplets, Link, Settings
-} from 'lucide-react'
+import { Home, BookOpen, Pill, Droplets, Link, Settings } from 'lucide-react'
 import Home2 from './Home'
 import CrisiPage from './CrisiPage'
 import DiarioCrisi from './DiarioCrisi'
@@ -12,13 +10,10 @@ import CondividiPage from './CondividiPage'
 import ReportPage from './ReportPage'
 import MagazzinoPage from './MagazzinoPage'
 import DoctorView from './DoctorView'
-import MagazzinoPage from './MagazzinoPage'
-import DoctorView from './DoctorView'
-import DisturbPage from './DisturbPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
-const VERSION   = '05.00.21'
+const VERSION   = '05.00.23'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 
@@ -58,6 +53,21 @@ const FRASI = [
 export function getFrase() {
   return FRASI[(new Date().getDate() + new Date().getMonth()) % FRASI.length]
 }
+
+// ── CSS GLOBALE — centralizza app a 480px su desktop ──────────
+const GLOBAL_CSS = `
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #e8eaf0; }
+  body { display: flex; justify-content: center; min-height: 100vh; }
+  #root {
+    width: 100%;
+    max-width: 480px;
+    background: #f3f4f7;
+    min-height: 100vh;
+    position: relative;
+    box-shadow: 0 0 60px rgba(2,21,63,0.12);
+  }
+`
 
 function Disclaimer({ nome, onAccept }) {
   return (
@@ -263,6 +273,39 @@ function PaginaInArrivo({ onBack }) {
   )
 }
 
+// ── NAVBAR per pagine interne (non Home) ──────────────────────
+function NavbarInterna({ page, onNavigate }) {
+  const items = [
+    {Icon:Home,     label:'Home',      p:'home'},
+    {Icon:BookOpen, label:'Diario',    p:'diario'},
+    {Icon:Pill,     label:'Terapie',   p:'terapie'},
+    {Icon:Droplets, label:'Toilet',    p:'toilet'},
+    {Icon:Link,     label:'Condividi', p:'condividi'},
+    {Icon:Settings, label:'Altro',     p:'home'},
+  ]
+  return (
+    <div style={{
+      position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
+      width:'100%', maxWidth:'480px',
+      background:'#feffff', borderTop:'1px solid #f0f1f4',
+      display:'flex', padding:'7px 0 14px',
+      boxShadow:'0 -4px 16px rgba(2,21,63,0.08)', zIndex:100
+    }}>
+      {items.map(({Icon,label,p})=>{
+        const act = page===p
+        return (
+          <div key={label} onClick={()=>onNavigate(p)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',touchAction:'manipulation'}}>
+            <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
+              <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
+            </div>
+            <span style={{fontSize:`${Math.round(9*1.15)}px`,fontWeight:act?'800':'500',color:act?'#193f9e':'#bec1cc'}}>{label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false)
   const [isDemo, setIsDemo] = useState(false)
@@ -311,74 +354,58 @@ export default function App() {
     : isDemo ? (pendingNome||'Ospite')
     : (pendingNome||nomeUtente||'Damiano')
 
-  if (!authenticated) return <Login onLogin={handleLogin}/>
-
-  if (isMedico && tokenMedico) {
-    return <DoctorView
-      tokenData={tokenMedico}
-      onLogout={()=>{setAuthenticated(false);setIsMedico(false);setTokenMedico(null)}}
-    />
-  }
-
-  const noNav = ['crisi','sos']
+  const noNav   = ['crisi','sos']
   const inArrivo = ['cosa_portare','doc_personali','doc_medici','rubrica','pagamenti','admin']
 
   return (
     <>
-      {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo}/>}
-      {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
+      {/* CSS GLOBALE — fix navbar desktop */}
+      <style>{GLOBAL_CSS}</style>
 
-      {page==='crisi' && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
-      {page==='sos' && <SOSPage onBack={()=>setPage('home')}/>}
+      {!authenticated && <Login onLogin={handleLogin}/>}
 
-      {!noNav.includes(page) && (
+      {authenticated && isMedico && tokenMedico && (
+        <DoctorView
+          tokenData={tokenMedico}
+          onLogout={()=>{setAuthenticated(false);setIsMedico(false);setTokenMedico(null)}}
+        />
+      )}
+
+      {authenticated && !isMedico && (
         <>
-          {page==='home' && (
-            <Home2
-              nomeUtente={nomeEffettivo}
-              isDemo={isDemo}
-              onNavigate={handleNavigate}
-              showExtra={showExtra}
-              onToggleExtra={()=>setShowExtra(p=>!p)}
-            />
-          )}
-          {page==='diario' && <DiarioCrisi onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='terapie' && <TerapiePage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='toilet' && <ToiletPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='condividi' && <CondividiPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
-          {page==='report' && <ReportPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='magazzino' && <MagazzinoPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-          {page==='disturbi' && <DisturbPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
-          {page==='altro' && null}
-          {inArrivo.includes(page) && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
+          {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo}/>}
+          {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
 
-          {/* Navbar solo fuori da Home — Home ha la sua doppia navbar integrata */}
-          {page !== 'home' && (
-            <div style={{
-              position:'fixed',bottom:0,left:0,right:0,
-              background:'#feffff',borderTop:'1px solid #f0f1f4',
-              display:'flex',padding:'7px 0 14px',
-              boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',zIndex:100
-            }}>
-              {[
-                {Icon:Home,label:'Home',p:'home'},
-                {Icon:BookOpen,label:'Diario',p:'diario'},
-                {Icon:Pill,label:'Terapie',p:'terapie'},
-                {Icon:Droplets,label:'Toilet',p:'toilet'},
-                {Icon:Link,label:'Condividi',p:'condividi'},
-                {Icon:Settings,label:'Altro',p:'home'},
-              ].map(({Icon,label,p})=>{
-                const act = page===p
-                return (
-                  <div key={label} onClick={()=>handleNavigate(p)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',touchAction:'manipulation'}}>
-                    <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
-                      <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
-                    </div>
-                    <span style={{fontSize:`${Math.round(9*1.15)}px`,fontWeight:act?'800':'500',color:act?'#193f9e':'#bec1cc'}}>{label}</span>
-                  </div>
-                )
-              })}
-            </div>
+          {/* Pagine senza navbar */}
+          {page==='crisi' && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
+          {page==='sos'   && <SOSPage onBack={()=>setPage('home')}/>}
+
+          {/* Pagine con navbar */}
+          {!noNav.includes(page) && (
+            <>
+              {page==='home' && (
+                <Home2
+                  nomeUtente={nomeEffettivo}
+                  isDemo={isDemo}
+                  onNavigate={handleNavigate}
+                  showExtra={showExtra}
+                  onToggleExtra={()=>setShowExtra(p=>!p)}
+                />
+              )}
+              {page==='diario'    && <DiarioCrisi   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='terapie'   && <TerapiePage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='toilet'    && <ToiletPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='condividi' && <CondividiPage  onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='report'    && <ReportPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='magazzino' && <MagazzinoPage  onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='altro'     && null}
+              {inArrivo.includes(page) && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
+
+              {/* Navbar interna — solo nelle pagine non-Home */}
+              {page !== 'home' && (
+                <NavbarInterna page={page} onNavigate={handleNavigate}/>
+              )}
+            </>
           )}
         </>
       )}
