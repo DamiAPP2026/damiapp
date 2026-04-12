@@ -12,10 +12,14 @@ import MagazzinoPage from './MagazzinoPage'
 import DoctorView from './DoctorView'
 import DisturbPage from './DisturbPage'
 import UtilityPage from './UtilityPage'
+import RubricaPage from './RubricaPage'
+import PagamentiPage from './PagamentiPage'
+import DocumentiPage from './DocumentiPage'
+import CosaPortarePage from './CosaPortarePage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
-const VERSION   = '05.00.24'
+const VERSION   = '05.00.25'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 
@@ -399,11 +403,12 @@ export default function App() {
               {page==='magazzino' && <MagazzinoPage  onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
               {page==='disturbi'  && <DisturbPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
               {page==='utility'   && <UtilityPage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='cosa_portare' && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
-              {page==='doc_medici'   && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
-              {page==='rubrica'      && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
-              {page==='pagamenti'    && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
-              {inArrivo.includes(page) && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
+              {page==='rubrica'      && <RubricaPage     onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='pagamenti'    && <PagamentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='cosa_portare' && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='doc_medici'   && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
+              {page==='doc_personali'&& <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
+              {page==='admin' && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
 
               {page !== 'home' && (
                 <NavbarInterna page={page} onNavigate={handleNavigate}/>

@@ -25,16 +25,6 @@ const VOCI = [
     page: 'cosa_portare',
   },
   {
-    key: 'doc_personali',
-    Icon: FileText,
-    label: 'Documenti personali',
-    sub: 'Tessera sanitaria, documenti identità',
-    grad: 'linear-gradient(135deg,#7B5EA7,#2e84e9)',
-    color: '#7B5EA7',
-    bg: '#F5F3FF',
-    page: 'doc_personali',
-  },
-  {
     key: 'doc_medici',
     Icon: FileText,
     label: 'Documenti medici',
@@ -43,6 +33,16 @@ const VOCI = [
     color: '#2e84e9',
     bg: '#EEF3FD',
     page: 'doc_medici',
+  },
+  {
+    key: 'doc_personali',
+    Icon: FileText,
+    label: 'Documenti personali',
+    sub: 'Tessera sanitaria, documenti identità',
+    grad: 'linear-gradient(135deg,#7B5EA7,#2e84e9)',
+    color: '#7B5EA7',
+    bg: '#F5F3FF',
+    page: 'doc_personali',
   },
   {
     key: 'pagamenti',
@@ -93,8 +93,8 @@ export default function UtilityPage({ onBack, isDemo, onNavigate }) {
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px'}}>
             {[
               {label:'Sezioni',val:'6'},
-              {label:'Disponibili',val:'2'},
-              {label:'In arrivo',val:'4'},
+              {label:'Disponibili',val:'5'},
+              {label:'In arrivo',val:'1'},
             ].map(({label,val},i)=>(
               <div key={i} style={{background:'rgba(255,255,255,0.12)',borderRadius:'12px',padding:'8px',textAlign:'center'}}>
                 <div style={{fontSize:f(20),fontWeight:'900',color:'#fff'}}>{val}</div>
@@ -111,8 +111,8 @@ export default function UtilityPage({ onBack, isDemo, onNavigate }) {
           </div>
 
           {VOCI.map(({key, Icon, label, sub, grad, color, bg, page}) => {
-            // Condividi e Rubrica sono implementate; le altre in arrivo
-            const disponibile = key === 'condividi' || key === 'rubrica' || key === 'cosa_portare'
+            // Tutte disponibili tranne doc_personali
+            const disponibile = key !== 'doc_personali'
             return (
               <div
                 key={key}
