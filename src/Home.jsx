@@ -3,7 +3,7 @@ import {
   ChevronRight, AlertTriangle, Clock, Bell, Pill,
   Droplets, BookOpen, BarChart2, Package, Phone,
   Link, Settings, Home, ShoppingBag, FileText,
-  CreditCard, X, Check, Pencil, ChevronUp
+  CreditCard, X, Check, Pencil, ChevronUp, Activity, Layers
 } from 'lucide-react'
 import { db } from './firebase'
 import { ref, onValue } from 'firebase/database'
@@ -39,14 +39,15 @@ const FRASI = [
 ]
 
 const ALL_QUICK_ACTIONS = [
-  {key:'crisi',     Icon:AlertTriangle, label:'Registra crisi',   sub:'Timer immediato',   color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'crisi'},
-  {key:'diario',    Icon:BookOpen,      label:'Diario crisi',      sub:'Vedi registro',     color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#7B5EA7)', page:'diario'},
-  {key:'terapie',   Icon:Pill,          label:'Terapie',           sub:'Farmaci oggi',      color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#2e84e9)', page:'terapie'},
-  {key:'toilet',    Icon:Droplets,      label:'Toilet Training',   sub:'Log sessione',      color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'toilet'},
-  {key:'magazzino', Icon:Package,       label:'Magazzino',         sub:'Scorte medicinali', color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#193f9e)', page:'magazzino'},
-  {key:'report',    Icon:BarChart2,     label:'Report',            sub:'Statistiche',       color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'report'},
-  {key:'condividi', Icon:Link,          label:'Condividi',         sub:'Token medico',      color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', page:'condividi'},
-  {key:'rubrica',   Icon:Phone,         label:'Rubrica',           sub:'Contatti',          color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'rubrica'},
+  {key:'crisi',     Icon:AlertTriangle, label:'Registra crisi',      sub:'Timer immediato',       color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'crisi'},
+  {key:'diario',    Icon:BookOpen,      label:'Diario crisi',         sub:'Vedi registro',         color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#7B5EA7)', page:'diario'},
+  {key:'terapie',   Icon:Pill,          label:'Terapie',              sub:'Farmaci oggi',          color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#2e84e9)', page:'terapie'},
+  {key:'toilet',    Icon:Droplets,      label:'Toilet Training',      sub:'Log sessione',          color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'toilet'},
+  {key:'magazzino', Icon:Package,       label:'Magazzino',            sub:'Scorte medicinali',     color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#193f9e)', page:'magazzino'},
+  {key:'report',    Icon:BarChart2,     label:'Report',               sub:'Statistiche',           color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'report'},
+  {key:'condividi', Icon:Link,          label:'Condividi',            sub:'Token medico',          color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', page:'condividi'},
+  {key:'disturbi',  Icon:Activity,      label:'Disturbi movimento',   sub:'Registra episodio',     color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'disturbi'},
+  {key:'rubrica',   Icon:Phone,         label:'Rubrica',              sub:'Contatti',              color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'rubrica'},
 ]
 
 const DEFAULT_QUICK = ['crisi', 'terapie', 'toilet']
@@ -60,12 +61,13 @@ const NAV_BOTTOM = [
   {Icon:Settings, label:'Altro',     page:'altro'},
 ]
 
+// NAV_EXTRA: max 6 voci — Disturbi del Movimento al posto di Documenti
 const NAV_EXTRA = [
   {Icon:BarChart2,   label:'Report',    page:'report'},
   {Icon:Package,     label:'Magazzino', page:'magazzino'},
-  {Icon:Phone,       label:'Rubrica',   page:'rubrica'},
+  {Icon:Activity,    label:'Disturbi',  page:'disturbi'},
   {Icon:ShoppingBag, label:'Portare',   page:'cosa_portare'},
-  {Icon:FileText,    label:'Documenti', page:'doc_medici'},
+  {Icon:Layers,      label:'Utility',   page:'utility'},
   {Icon:CreditCard,  label:'Pagamenti', page:'pagamenti'},
 ]
 
@@ -92,13 +94,11 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
 
   const frase = FRASI[(new Date().getDate() + new Date().getMonth()) % FRASI.length]
 
-  // Clock tick
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  // Dati Firebase o Demo
   useEffect(() => {
     if (isDemo) {
       const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
@@ -143,14 +143,12 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
     onNavigate && onNavigate(page)
   }
 
-  // Calcoli tempo
   const giorni  = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
   const mesi    = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
   const dataStr = `${giorni[time.getDay()]} ${time.getDate()} ${mesi[time.getMonth()]} ${time.getFullYear()}`
   const timeStr = time.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
   const oraMin  = time.getHours()*60 + time.getMinutes()
 
-  // Calcoli crisi
   const ultimaCrisi      = [...crisi].sort((a,b)=>b.timestamp-a.timestamp)[0]
   const giorniSenzaCrisi = ultimaCrisi ? Math.floor((Date.now()-ultimaCrisi.timestamp)/86400000) : null
   const cGiorni = giorniSenzaCrisi===null ? '#bec1cc'
@@ -158,19 +156,16 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
     : giorniSenzaCrisi>=7  ? '#FF8C42'
     : '#F7295A'
 
-  // Calcoli terapie
   const prossimaTerapia = [...terapie]
     .map(t => { const [h,m]=(t.orario||'00:00').split(':').map(Number); return {...t,min:h*60+m} })
     .filter(t => t.min > oraMin)
     .sort((a,b) => a.min-b.min)[0]
 
-  // Calcoli scadenze magazzino
   const scadenzeAlert = magazzino.filter(m => {
     if (!m.scadenza) return false
     return Math.ceil((new Date(m.scadenza)-Date.now())/86400000) <= 30
   })
 
-  // Calcoli toilet oggi
   const bagnoOggi = toiletData.filter(s => matchOggi(s.data) && s.bisogno && s.bisogno!=='nessuno').length
   const incOggi   = toiletData.filter(s => matchOggi(s.data) && (s.incidentePippi||s.incidenteCacca)).length
   const toilet7gg = toiletData.filter(s => (s.timestamp||0)>=Date.now()-7*86400000 && s.bisogno && s.bisogno!=='nessuno').length
@@ -182,7 +177,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
   const pbContent = showExtra ? NAV_H+EXTRA_H+4 : NAV_H+4
 
-  // Stile item navbar — ottimizzato touch, senza highlight
   const ni = {
     flex:1, display:'flex', flexDirection:'column', alignItems:'center',
     gap:'3px', cursor:'pointer', touchAction:'manipulation',
@@ -192,7 +186,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
   return (
     <div style={{fontFamily:"-apple-system,'Segoe UI',sans-serif", minHeight:'100vh', background:'#f3f4f7', paddingBottom:`${pbContent}px`}}>
 
-      {/* ── OVERLAY — chiude barra extra ── */}
       {showExtra && (
         <div
           onClick={onToggleExtra}
@@ -200,7 +193,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         />
       )}
 
-      {/* ── BARRA EXTRA — animazione basso→alto ── */}
+      {/* BARRA EXTRA */}
       <div style={{
         position:'fixed',
         bottom: showExtra ? NAV_H : -(EXTRA_H+2),
@@ -225,7 +218,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         ))}
       </div>
 
-      {/* ── NAVBAR PRINCIPALE ── */}
+      {/* NAVBAR PRINCIPALE */}
       <div style={{
         position:'fixed',
         bottom:0, left:'50%', transform:'translateX(-50%)',
@@ -266,7 +259,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         })}
       </div>
 
-      {/* ── MODAL PERSONALIZZA PRIORITÀ ── */}
+      {/* MODAL PERSONALIZZA */}
       {showQEdit && (
         <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.50)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto'}}>
@@ -327,7 +320,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             {frase}
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-            {/* Bottone crisi */}
             <button onClick={()=>go('crisi')} style={{position:'relative',height:'50px',borderRadius:'50px',border:'none',overflow:'hidden',cursor:'pointer',boxShadow:'0 6px 20px rgba(25,63,158,0.35)',touchAction:'manipulation'}}>
               <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#193f9e,#2e84e9)'}}/>
               <div style={{position:'absolute',left:0,bottom:0,width:'40px',height:'40px',background:'linear-gradient(135deg,#FF5B8D,#FF9F3F)',borderRadius:'0 50% 0 50px',opacity:0.75}}/>
@@ -337,7 +329,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
                 <span style={{color:'#fff',fontSize:f(12),fontWeight:'800'}}>Avvia timer crisi</span>
               </div>
             </button>
-            {/* Bottone SOS */}
             <button onClick={()=>go('sos')} style={{height:'50px',borderRadius:'50px',border:'2.5px solid #e53935',background:'#feffff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',boxShadow:'0 4px 14px rgba(229,57,53,0.18)',touchAction:'manipulation'}}>
               <Phone size={15} color="#e53935"/>
               <span style={{fontSize:f(13),fontWeight:'900',color:'#e53935'}}>SOCCORSO</span>
@@ -346,7 +337,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         </div>
       </div>
 
-      {/* MINI CARDS — 3 colonne */}
+      {/* MINI CARDS */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'8px 12px'}}>
         {[
           {
@@ -414,7 +405,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Dashboard</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
 
-          {/* Crisi 7 giorni → diario */}
+          {/* Crisi 7 giorni */}
           <div onClick={()=>go('diario')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
               <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Crisi 7 giorni</span>
@@ -422,7 +413,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
                 {crisi.filter(c=>Date.now()-c.timestamp<7*86400000).length}
               </span>
             </div>
-            {/* Grafico barre 7gg */}
             <div style={{display:'flex',alignItems:'flex-end',gap:'3px',height:'34px'}}>
               {[6,5,4,3,2,1,0].map(i => {
                 const s=new Date(); s.setDate(s.getDate()-i); s.setHours(0,0,0,0)
@@ -447,7 +437,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             </div>
           </div>
 
-          {/* Terapie oggi → terapie */}
+          {/* Terapie oggi */}
           <div onClick={()=>go('terapie')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
               <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Terapie oggi</span>
@@ -472,7 +462,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             </div>
           </div>
 
-          {/* Toilet oggi → toilet */}
+          {/* Toilet oggi */}
           <div onClick={()=>go('toilet')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
               <span style={{fontSize:f(11),fontWeight:'800',color:'#02153f'}}>Toilet oggi</span>

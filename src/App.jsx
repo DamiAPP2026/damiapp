@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Home, BookOpen, Pill, Droplets, Link, Settings } from 'lucide-react'
+import { Home, BookOpen, Pill, Droplets, Link, Settings, Layers } from 'lucide-react'
 import Home2 from './Home'
 import CrisiPage from './CrisiPage'
 import DiarioCrisi from './DiarioCrisi'
@@ -10,10 +10,12 @@ import CondividiPage from './CondividiPage'
 import ReportPage from './ReportPage'
 import MagazzinoPage from './MagazzinoPage'
 import DoctorView from './DoctorView'
+import DisturbPage from './DisturbPage'
+import UtilityPage from './UtilityPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
-const VERSION   = '05.00.23'
+const VERSION   = '05.00.24'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 
@@ -54,7 +56,7 @@ export function getFrase() {
   return FRASI[(new Date().getDate() + new Date().getMonth()) % FRASI.length]
 }
 
-// ── CSS GLOBALE — centralizza app a 480px su desktop ──────────
+// ── CSS GLOBALE ──────────────────────────────────────────────
 const GLOBAL_CSS = `
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #e8eaf0; }
@@ -187,14 +189,12 @@ function Login({ onLogin }) {
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f3f4f7',fontFamily:"-apple-system,'Segoe UI',sans-serif",padding:'20px'}}>
       <div style={{background:'#feffff',borderRadius:'28px',overflow:'hidden',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.20),0 8px 20px rgba(2,21,63,0.10)'}}>
-
         <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'36px 24px 30px',textAlign:'center',position:'relative'}}>
           <div style={{position:'absolute',top:'10px',right:'14px',fontSize:f(10),color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>v{VERSION}</div>
           <img src="/DamiLogo.png" alt="logo" style={{width:'100px',height:'100px',borderRadius:'50%',objectFit:'cover',marginBottom:'16px',border:'3px solid rgba(255,255,255,0.25)',boxShadow:'0 12px 40px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.3)'}}/>
           <div style={{fontSize:f(28),fontWeight:'900',color:'#fff',letterSpacing:'-0.5px'}}>DamiAPP</div>
           <div style={{fontSize:f(12),color:'rgba(255,255,255,0.5)',marginTop:'4px'}}>Il tuo assistente quotidiano</div>
         </div>
-
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#f3f4f7',margin:'16px 16px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
           {['paziente','medico'].map(t=>(
             <button key={t} onClick={()=>{setTab(t);setError('');setPin('');setToken('')}}
@@ -203,7 +203,6 @@ function Login({ onLogin }) {
             </button>
           ))}
         </div>
-
         <div style={{padding:'20px 24px 28px'}}>
           {tab==='paziente' ? (
             <>
@@ -273,7 +272,7 @@ function PaginaInArrivo({ onBack }) {
   )
 }
 
-// ── NAVBAR per pagine interne (non Home) ──────────────────────
+// ── NAVBAR per pagine interne ─────────────────────────────────
 function NavbarInterna({ page, onNavigate }) {
   const items = [
     {Icon:Home,     label:'Home',      p:'home'},
@@ -281,7 +280,7 @@ function NavbarInterna({ page, onNavigate }) {
     {Icon:Pill,     label:'Terapie',   p:'terapie'},
     {Icon:Droplets, label:'Toilet',    p:'toilet'},
     {Icon:Link,     label:'Condividi', p:'condividi'},
-    {Icon:Settings, label:'Altro',     p:'home'},
+    {Icon:Layers,   label:'Utility',   p:'utility'},
   ]
   return (
     <div style={{
@@ -354,12 +353,12 @@ export default function App() {
     : isDemo ? (pendingNome||'Ospite')
     : (pendingNome||nomeUtente||'Damiano')
 
-  const noNav   = ['crisi','sos']
-  const inArrivo = ['cosa_portare','doc_personali','doc_medici','rubrica','pagamenti','admin']
+  const noNav    = ['crisi','sos']
+  // Pagine in arrivo (solo quelle non ancora implementate)
+  const inArrivo = ['doc_personali','admin']
 
   return (
     <>
-      {/* CSS GLOBALE — fix navbar desktop */}
       <style>{GLOBAL_CSS}</style>
 
       {!authenticated && <Login onLogin={handleLogin}/>}
@@ -377,8 +376,8 @@ export default function App() {
           {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
 
           {/* Pagine senza navbar */}
-          {page==='crisi' && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
-          {page==='sos'   && <SOSPage onBack={()=>setPage('home')}/>}
+          {page==='crisi'    && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
+          {page==='sos'      && <SOSPage onBack={()=>setPage('home')}/>}
 
           {/* Pagine con navbar */}
           {!noNav.includes(page) && (
@@ -398,10 +397,14 @@ export default function App() {
               {page==='condividi' && <CondividiPage  onBack={()=>setPage('home')} isDemo={isDemo}/>}
               {page==='report'    && <ReportPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
               {page==='magazzino' && <MagazzinoPage  onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='altro'     && null}
+              {page==='disturbi'  && <DisturbPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='utility'   && <UtilityPage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='cosa_portare' && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
+              {page==='doc_medici'   && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
+              {page==='rubrica'      && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
+              {page==='pagamenti'    && <PaginaInArrivo onBack={()=>handleNavigate('utility')}/>}
               {inArrivo.includes(page) && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
 
-              {/* Navbar interna — solo nelle pagine non-Home */}
               {page !== 'home' && (
                 <NavbarInterna page={page} onNavigate={handleNavigate}/>
               )}
