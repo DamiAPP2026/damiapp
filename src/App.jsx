@@ -12,6 +12,9 @@ import CondividiPage from './CondividiPage'
 import ReportPage from './ReportPage'
 import MagazzinoPage from './MagazzinoPage'
 import DoctorView from './DoctorView'
+import MagazzinoPage from './MagazzinoPage'
+import DoctorView from './DoctorView'
+import DisturbPage from './DisturbPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
@@ -345,6 +348,7 @@ export default function App() {
           {page==='condividi' && <CondividiPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
           {page==='report' && <ReportPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
           {page==='magazzino' && <MagazzinoPage onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+          {page==='disturbi' && <DisturbPage onBack={()=>setPage('home')} isDemo={isDemo}/>}
           {page==='altro' && null}
           {inArrivo.includes(page) && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
 

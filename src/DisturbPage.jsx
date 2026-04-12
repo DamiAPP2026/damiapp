@@ -1,0 +1,415 @@
+import { useState, useEffect, useRef } from 'react'
+import { ChevronLeft, Check, Play, Square, RotateCcw } from 'lucide-react'
+import { db } from './firebase'
+import { ref, push, onValue } from 'firebase/database'
+import { processFirebaseSnap, encrypt } from './crypto'
+
+const f = (base) => `${Math.round(base * 1.15)}px`
+const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
+const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
+
+const TIPI_DISTURBO = [
+  { key: 'tremore', label: 'Tremore', color: '#FF8C42' },
+  { key: 'distonia', label: 'Distonia', color: '#7B5EA7' },
+  { key: 'corea', label: 'Corea', color: '#2e84e9' },
+  { key: 'tic', label: 'Tic', color: '#00BFA6' },
+  { key: 'spasmo', label: 'Spasmo', color: '#F7295A' },
+  { key: 'altro', label: 'Altro', color: '#394058' },
+]
+
+const INTENSITA_LABELS = ['', 'Lieve', 'Lieve', 'Lieve', 'Moderata', 'Moderata', 'Moderata', 'Intensa', 'Intensa', 'Severa', 'Severa']
+
+const DEMO_LOG = [
+  { id:1, timestamp:Date.now()-3600000, data:'12/04/2026', ora:'08:15', tipo:'tremore', intensita:4, durataSecondi:125, note:'' },
+  { id:2, timestamp:Date.now()-86400000, data:'11/04/2026', ora:'14:30', tipo:'distonia', intensita:7, durataSecondi:340, note:'Dopo pasto' },
+  { id:3, timestamp:Date.now()-2*86400000, data:'10/04/2026', ora:'09:00', tipo:'spasmo', intensita:6, durataSecondi:45, note:'' },
+  { id:4, timestamp:Date.now()-3*86400000, data:'09/04/2026', ora:'20:10', tipo:'tremore', intensita:3, durataSecondi:200, note:'' },
+  { id:5, timestamp:Date.now()-5*86400000, data:'07/04/2026', ora:'11:45', tipo:'tic', intensita:2, durataSecondi:30, note:'' },
+]
+
+function fmt(s) {
+  const h = Math.floor(s/3600)
+  const m = Math.floor((s%3600)/60)
+  const sec = s%60
+  if (h>0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+  if (m>0) return `${m}m ${String(sec).padStart(2,'0')}s`
+  return `${sec}s`
+}
+
+function fmtShort(s) {
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60
+  if(h>0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+}
+
+// Calendario mensile
+function CalendarioMese({ log, mese, setMese }) {
+  const mesiNomi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
+  const primoGiorno = new Date(mese.getFullYear(), mese.getMonth(), 1).getDay()
+  const offset = primoGiorno===0 ? 6 : primoGiorno-1
+  const giorniMese = new Date(mese.getFullYear(), mese.getMonth()+1, 0).getDate()
+
+  const byDay = {}
+  log.forEach(e => {
+    const d = new Date(e.timestamp)
+    if (d.getMonth()===mese.getMonth() && d.getFullYear()===mese.getFullYear()) {
+      const day = d.getDate()
+      byDay[day] = (byDay[day]||0)+1
+    }
+  })
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+        <button onClick={()=>setMese(new Date(mese.getFullYear(),mese.getMonth()-1,1))} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',fontSize:'16px'}}>‹</button>
+        <span style={{fontSize:f(13),fontWeight:'800',color:'#02153f'}}>{mesiNomi[mese.getMonth()]} {mese.getFullYear()}</span>
+        <button onClick={()=>setMese(new Date(mese.getFullYear(),mese.getMonth()+1,1))} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',fontSize:'16px'}}>›</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'3px'}}>
+        {['L','M','M','G','V','S','D'].map((g,i)=>(
+          <div key={i} style={{textAlign:'center',fontSize:f(9),fontWeight:'700',color:'#bec1cc',padding:'3px 0'}}>{g}</div>
+        ))}
+        {[...Array(offset)].map((_,i)=><div key={`e${i}`}/>)}
+        {[...Array(giorniMese)].map((_,i)=>{
+          const d=i+1; const n=byDay[d]||0
+          let bg='#f3f4f7', color='#7c8088'
+          if(n===1){bg='#FFF5EE';color='#FF8C42'}
+          else if(n>=2&&n<=3){bg='#FF8C42';color='#fff'}
+          else if(n>3){bg='#F7295A';color='#fff'}
+          return (
+            <div key={d} style={{aspectRatio:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:bg,cursor:'default'}}>
+              <span style={{fontSize:f(10),fontWeight:'700',color}}>{d}</span>
+              {n>0&&<span style={{fontSize:'7px',color,marginTop:'1px'}}>×{n}</span>}
+            </div>
+          )
+        })}
+      </div>
+      <div style={{display:'flex',gap:'10px',marginTop:'10px',flexWrap:'wrap'}}>
+        {[{bg:'#f3f4f7',c:'#7c8088',l:'0'},{bg:'#FFF5EE',c:'#FF8C42',l:'1'},{bg:'#FF8C42',c:'#fff',l:'2-3'},{bg:'#F7295A',c:'#fff',l:'4+'}].map(({bg,c,l})=>(
+          <div key={l} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+            <div style={{width:'12px',height:'12px',borderRadius:'3px',background:bg,border:'1px solid #f0f1f4'}}/>
+            <span style={{fontSize:f(9),color:'#7c8088'}}>{l} episodi</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Grafico distribuzione oraria
+function GraficoOrario({ log }) {
+  const canvasRef = useRef(null)
+  const counts = Array(24).fill(0)
+  log.forEach(e => {
+    const h = parseInt((e.ora||'0').split(':')[0])
+    if(h>=0&&h<24) counts[h]++
+  })
+  const picco = counts.indexOf(Math.max(...counts))
+
+  useEffect(()=>{
+    if(!canvasRef.current) return
+    const ctx=canvasRef.current.getContext('2d')
+    const W=canvasRef.current.width, H=canvasRef.current.height
+    ctx.clearRect(0,0,W,H)
+    const maxV=Math.max(...counts,1)
+    const barW=(W-20)/24-1
+    const chartH=H-22
+    counts.forEach((n,i)=>{
+      const x=10+i*((W-20)/24)
+      const barH=(n/maxV)*chartH*0.9
+      const y=chartH-barH
+      const isPicco=i===picco&&n>0
+      ctx.fillStyle=isPicco?'#F7295A':n>0?'#FF8C42':'#f0f1f4'
+      ctx.beginPath();ctx.roundRect(x,y,barW,barH+2,[3,3,0,0]);ctx.fill()
+      if(i%6===0){ctx.fillStyle='#bec1cc';ctx.font='8px -apple-system';ctx.textAlign='center';ctx.fillText(`${i}h`,x+barW/2,H-5)}
+    })
+  },[log])
+
+  return (
+    <div>
+      {picco>=0&&counts[picco]>0&&(
+        <div style={{background:'#FEF0F4',borderRadius:'10px',padding:'6px 10px',marginBottom:'8px',fontSize:f(11),color:'#F7295A',fontWeight:'700'}}>
+          Picco: ore {picco}:00 ({counts[picco]} episodi)
+        </div>
+      )}
+      <canvas ref={canvasRef} width={420} height={90} style={{width:'100%',height:'auto'}}/>
+    </div>
+  )
+}
+
+export default function DisturbPage({ onBack, isDemo }) {
+  const oggi = new Date()
+  const [sezione, setSezione] = useState('form')
+  const [mese, setMese] = useState(new Date())
+  const [log, setLog] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Form
+  const [tipo, setTipo] = useState('')
+  const [data, setData] = useState(oggi.toISOString().split('T')[0])
+  const [ora, setOra] = useState(oggi.toTimeString().slice(0,5))
+  const [intensita, setIntensita] = useState(5)
+  const [note, setNote] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  // Timer durata
+  const [timerSec, setTimerSec] = useState(0)
+  const [running, setRunning] = useState(false)
+  const [durataManuale, setDurataManuale] = useState('')
+  const [usaTimer, setUsaTimer] = useState(true)
+  const timerRef = useRef(null)
+
+  useEffect(()=>{
+    if(isDemo){setLog(DEMO_LOG);setLoading(false);return}
+    const r=ref(db,'disturbi_movimento')
+    const u=onValue(r,snap=>{setLog(processFirebaseSnap(snap).sort((a,b)=>b.timestamp-a.timestamp));setLoading(false)})
+    return()=>u()
+  },[isDemo])
+
+  function startTimer(){if(running)return;setRunning(true);timerRef.current=setInterval(()=>setTimerSec(s=>s+1),1000)}
+  function stopTimer(){setRunning(false);clearInterval(timerRef.current)}
+  function resetTimer(){stopTimer();setTimerSec(0)}
+
+  function handleSave(){
+    if(!tipo){alert('Seleziona il tipo di disturbo');return}
+    let durataSecondi = usaTimer ? timerSec : 0
+    if(!usaTimer && durataManuale){
+      const parts = durataManuale.split(':').map(Number)
+      if(parts.length===3) durataSecondi=parts[0]*3600+parts[1]*60+parts[2]
+      else if(parts.length===2) durataSecondi=parts[0]*60+parts[1]
+      else durataSecondi=parseInt(durataManuale)||0
+    }
+    if(durataSecondi===0&&usaTimer){alert('Avvia il timer per registrare la durata');return}
+    stopTimer()
+    const d=new Date(data)
+    const dataFmt=`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+    const episodio={
+      id:Date.now(),timestamp:Date.now(),
+      data:dataFmt,ora,tipo,intensita,
+      durataSecondi,nota:note,
+    }
+    if(!isDemo) push(ref(db,'disturbi_movimento'),encrypt(episodio))
+    setSaved(true)
+    setTimeout(()=>{
+      setSaved(false);setTipo('');setIntensita(5);setNote('')
+      resetTimer();setDurataManuale('')
+      const n=new Date();setOra(n.toTimeString().slice(0,5))
+    },1500)
+  }
+
+  // Stats
+  const oggi7 = log.filter(e=>Date.now()-e.timestamp<7*86400000).length
+  const mediaIntensita = log.length>0?(log.reduce((s,e)=>s+(e.intensita||0),0)/log.length).toFixed(1):'—'
+  const mediaDurata = log.filter(e=>e.durataSecondi>0).length>0
+    ? Math.round(log.filter(e=>e.durataSecondi>0).reduce((s,e)=>s+e.durataSecondi,0)/log.filter(e=>e.durataSecondi>0).length)
+    : 0
+
+  const inStyle = {width:'100%',padding:'11px 12px',borderRadius:'12px',border:'1.5px solid #f0f1f4',fontSize:f(13),color:'#02153f',background:'#f3f4f7',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}
+  const lbStyle = {fontSize:f(11),fontWeight:'700',color:'#7c8088',textTransform:'uppercase',letterSpacing:'0.4px',marginBottom:'6px',display:'block'}
+
+  return (
+    <>
+      <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.dm-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:100px;width:100%;max-width:480px;margin:0 auto;}`}</style>
+      <div className="dm-wrap">
+
+        {/* HEADER */}
+        <div style={{background:'linear-gradient(135deg,#FF8C42,#F7295A)',padding:'14px 16px 20px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'14px'}}>
+            <button onClick={onBack} style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <ChevronLeft size={20} color="#fff"/>
+            </button>
+            <div>
+              <div style={{fontSize:f(18),fontWeight:'900',color:'#fff'}}>🫨 Disturbi del movimento</div>
+              <div style={{fontSize:f(11),color:'rgba(255,255,255,0.75)'}}>{isDemo?'🎭 Dati demo':'Registra episodio'}</div>
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px'}}>
+            {[
+              {label:'Tot. episodi',val:log.length,color:'#fff'},
+              {label:'Ultimi 7gg',val:oggi7,color:'#fff'},
+              {label:'Media int.',val:mediaIntensita,color:'#fff'},
+            ].map(({label,val,color},i)=>(
+              <div key={i} style={{background:'rgba(255,255,255,0.15)',borderRadius:'12px',padding:'8px',textAlign:'center'}}>
+                <div style={{fontSize:f(20),fontWeight:'900',color}}>{val}</div>
+                <div style={{fontSize:f(10),color:'rgba(255,255,255,0.75)',marginTop:'2px'}}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* TABS */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',background:'#f3f4f7',margin:'12px 12px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
+          {[{k:'form',l:'➕ Nuovo'},{k:'calendario',l:'📅 Calendario'},{k:'statistiche',l:'📊 Stats'}].map(({k,l})=>(
+            <button key={k} onClick={()=>setSezione(k)} style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:sezione===k?'#feffff':'transparent',color:sezione===k?'#FF8C42':'#7c8088',boxShadow:sezione===k?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        <div style={{padding:'12px'}}>
+
+          {/* FORM */}
+          {sezione==='form' && (
+            <>
+              {/* Tipo disturbo */}
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🫨 Tipo di disturbo</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'7px'}}>
+                  {TIPI_DISTURBO.map(t=>(
+                    <div key={t.key} onClick={()=>setTipo(t.key)} style={{padding:'10px 8px',borderRadius:'12px',cursor:'pointer',textAlign:'center',border:`2px solid ${tipo===t.key?t.color:'#f0f1f4'}`,background:tipo===t.key?`${t.color}14`:'#feffff',transition:'all 0.15s'}}>
+                      <div style={{fontSize:f(12),fontWeight:'800',color:tipo===t.key?t.color:'#02153f'}}>{t.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Data, ora, intensità */}
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📅 Quando</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px'}}>
+                  <div><label style={lbStyle}>Data</label><input type="date" value={data} onChange={e=>setData(e.target.value)} style={inStyle} min="2020-01-01" max="2040-12-31"/></div>
+                  <div><label style={lbStyle}>Ora</label><input type="time" value={ora} onChange={e=>setOra(e.target.value)} style={inStyle}/></div>
+                </div>
+                <label style={lbStyle}>Intensità: {intensita}/10 — {INTENSITA_LABELS[intensita]}</label>
+                <input type="range" min="1" max="10" value={intensita} onChange={e=>setIntensita(Number(e.target.value))} style={{width:'100%',accentColor:'#FF8C42',marginBottom:'6px'}}/>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <span style={{fontSize:f(9),color:'#00BFA6',fontWeight:'600'}}>Lieve</span>
+                  <span style={{fontSize:f(9),color:'#FF8C42',fontWeight:'600'}}>Moderata</span>
+                  <span style={{fontSize:f(9),color:'#F7295A',fontWeight:'600'}}>Severa</span>
+                </div>
+              </div>
+
+              {/* Durata */}
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>⏱ Durata</div>
+                <div style={{display:'flex',gap:'6px',marginBottom:'14px'}}>
+                  {[{k:true,l:'Timer'},{k:false,l:'Manuale'}].map(({k,l})=>(
+                    <button key={String(k)} onClick={()=>setUsaTimer(k)} style={{flex:1,padding:'8px',borderRadius:'12px',border:`2px solid ${usaTimer===k?'#FF8C42':'#f0f1f4'}`,background:usaTimer===k?'#FFF5EE':'#feffff',color:usaTimer===k?'#FF8C42':'#7c8088',fontWeight:'700',fontSize:f(12),cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s'}}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+
+                {usaTimer ? (
+                  <>
+                    <div style={{fontSize:f(44),fontWeight:'900',textAlign:'center',color:'#02153f',letterSpacing:'-2px',fontVariantNumeric:'tabular-nums',marginBottom:'12px'}}>
+                      {fmtShort(timerSec)}
+                    </div>
+                    <div style={{display:'flex',justifyContent:'center',gap:'12px'}}>
+                      <button onClick={startTimer} disabled={running} style={{width:'48px',height:'48px',borderRadius:'50%',border:'none',cursor:'pointer',background:running?'#f3f4f7':'linear-gradient(135deg,#FF8C42,#F7295A)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:running?'none':'0 4px 14px rgba(255,140,66,0.4)'}}>
+                        <Play size={20} color={running?'#bec1cc':'#fff'} fill={running?'#bec1cc':'#fff'}/>
+                      </button>
+                      <button onClick={stopTimer} style={{width:'48px',height:'48px',borderRadius:'50%',border:'none',cursor:'pointer',background:'linear-gradient(135deg,#7c8088,#394058)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <Square size={18} color="#fff" fill="#fff"/>
+                      </button>
+                      <button onClick={resetTimer} style={{width:'48px',height:'48px',borderRadius:'50%',border:'none',cursor:'pointer',background:'#f3f4f7',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <RotateCcw size={18} color="#7c8088"/>
+                      </button>
+                    </div>
+                    {running&&<div style={{textAlign:'center',marginTop:'8px',fontSize:f(11),color:'#FF8C42',fontWeight:'700'}}>🔴 Registrazione in corso...</div>}
+                  </>
+                ) : (
+                  <>
+                    <label style={lbStyle}>Inserisci durata (mm:ss oppure hh:mm:ss)</label>
+                    <input value={durataManuale} onChange={e=>setDurataManuale(e.target.value)} placeholder="Es: 02:30 oppure 01:02:30" style={inStyle}/>
+                  </>
+                )}
+              </div>
+
+              {/* Note */}
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <label style={lbStyle}>📝 Note (opzionale)</label>
+                <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Es: dopo pasto, in posizione seduta..." rows={2} style={{...inStyle,resize:'none',lineHeight:'1.5'}}/>
+              </div>
+
+              <button onClick={handleSave} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:saved?'linear-gradient(135deg,#00BFA6,#2e84e9)':'linear-gradient(135deg,#FF8C42,#F7295A)',boxShadow:'0 6px 20px rgba(255,140,66,0.4)',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',transition:'all 0.3s',marginBottom:'8px'}}>
+                {saved?<><Check size={18} color="#fff"/> Salvato!</>:<>🫨 Salva episodio</>}
+              </button>
+              {isDemo&&<div style={{textAlign:'center',fontSize:f(11),color:'#8B6914',fontWeight:'600'}}>🎭 Modalità demo — non salvato</div>}
+            </>
+          )}
+
+          {/* CALENDARIO */}
+          {sezione==='calendario' && (
+            <>
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📅 Calendario episodi</div>
+                <CalendarioMese log={log} mese={mese} setMese={setMese}/>
+              </div>
+
+              {/* Lista del mese corrente */}
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>
+                  📋 Episodi del mese ({log.filter(e=>{const d=new Date(e.timestamp);return d.getMonth()===mese.getMonth()&&d.getFullYear()===mese.getFullYear()}).length})
+                </div>
+                {log.filter(e=>{const d=new Date(e.timestamp);return d.getMonth()===mese.getMonth()&&d.getFullYear()===mese.getFullYear()}).length===0
+                  ? <div style={{textAlign:'center',padding:'16px',color:'#bec1cc',fontSize:f(12)}}>Nessun episodio questo mese</div>
+                  : log.filter(e=>{const d=new Date(e.timestamp);return d.getMonth()===mese.getMonth()&&d.getFullYear()===mese.getFullYear()}).map((e,i)=>{
+                    const tipo=TIPI_DISTURBO.find(t=>t.key===e.tipo)||{label:e.tipo,color:'#7c8088'}
+                    return (
+                      <div key={e.id||i} style={{padding:'10px',borderRadius:'12px',marginBottom:'7px',background:'#f3f4f7',borderLeft:`3px solid ${tipo.color}`}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
+                          <span style={{fontSize:f(13),fontWeight:'800',color:tipo.color}}>{tipo.label}</span>
+                          <span style={{fontSize:f(10),color:'#bec1cc'}}>{e.data} {e.ora}</span>
+                        </div>
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                          {e.durataSecondi>0&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:'#f3f4f7',color:'#394058'}}>⏱ {fmt(e.durataSecondi)}</span>}
+                          {e.intensita&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:e.intensita<=3?'#E8FBF8':e.intensita<=6?'#FFF5EE':'#FEF0F4',color:e.intensita<=3?'#00BFA6':e.intensita<=6?'#FF8C42':'#F7295A'}}>Int. {e.intensita}/10</span>}
+                        </div>
+                        {e.nota&&<div style={{fontSize:f(10),color:'#7c8088',marginTop:'4px',fontStyle:'italic'}}>📝 {e.nota}</div>}
+                      </div>
+                    )
+                  })
+                }
+              </div>
+            </>
+          )}
+
+          {/* STATISTICHE */}
+          {sezione==='statistiche' && (
+            <>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'7px',marginBottom:'10px'}}>
+                {[
+                  {label:'Totale',val:log.length,color:'#FF8C42'},
+                  {label:'Media intensità',val:mediaIntensita,color:'#F7295A'},
+                  {label:'Durata media',val:mediaDurata>0?fmt(mediaDurata):'—',color:'#7B5EA7'},
+                ].map(({label,val,color},i)=>(
+                  <div key={i} style={{background:'#feffff',borderRadius:'14px',padding:'10px 8px',boxShadow:shSm,textAlign:'center'}}>
+                    <div style={{fontSize:i===2?f(13):f(22),fontWeight:'900',color,marginBottom:'2px'}}>{val}</div>
+                    <div style={{fontSize:f(9),color:'#7c8088',fontWeight:'700',textTransform:'uppercase'}}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🕐 Distribuzione oraria</div>
+                {log.length===0?<div style={{textAlign:'center',padding:'16px',color:'#bec1cc',fontSize:f(12)}}>Nessun dato</div>:<GraficoOrario log={log}/>}
+              </div>
+
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🫨 Per tipo</div>
+                {TIPI_DISTURBO.map(t=>{
+                  const n=log.filter(e=>e.tipo===t.key).length
+                  const pct=log.length>0?Math.round((n/log.length)*100):0
+                  if(n===0) return null
+                  return (
+                    <div key={t.key} style={{marginBottom:'8px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'3px'}}>
+                        <span style={{fontSize:f(12),fontWeight:'700',color:'#394058'}}>{t.label}</span>
+                        <span style={{fontSize:f(11),color:'#7c8088'}}>{n}x · {pct}%</span>
+                      </div>
+                      <div style={{height:'6px',borderRadius:'3px',background:'#f3f4f7',overflow:'hidden'}}>
+                        <div style={{height:'100%',borderRadius:'3px',width:`${pct}%`,background:t.color}}/>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+        </div>
+      </div>
+    </>
+  )
+}
