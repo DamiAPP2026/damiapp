@@ -2,21 +2,46 @@ import { useState, useEffect } from 'react'
 import {
   ChevronRight, AlertTriangle, Clock, Bell, Pill,
   Droplets, BookOpen, BarChart2, Package, Phone,
-  Link, Settings, Home, ShoppingBag, FileText,
+  Link, Home, FileText, Brain,
   CreditCard, X, Check, Pencil, ChevronUp, Activity, Layers,
-  MessageCircle
+  MessageCircle, MoreHorizontal
 } from 'lucide-react'
 import { db } from './firebase'
 import { ref, onValue } from 'firebase/database'
 import { processFirebaseSnap } from './crypto'
 
-
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh   = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
-const NAV_H   = 58
-const EXTRA_H = 52
 
+// ─── COSTANTI NAVBAR ─────────────────────────────────────────
+const NAV_H   = 58   // navbar principale
+const EXTRA_H = 52   // barra secondaria
+
+// Navbar principale — 6 voci esatte richieste
+const NAV_BOTTOM = [
+  { Icon: Home,          label: 'Home',     page: 'home'      },
+  { Icon: BookOpen,      label: 'Diario',   page: 'diario'    },
+  { Icon: Brain,         label: 'Disturbi', page: 'disturbi'  },
+  { Icon: Droplets,      label: 'Toilet',   page: 'toilet'    },
+  { Icon: MessageCircle, label: 'Messaggi', page: 'messaggi', isBadge: true },
+  { Icon: MoreHorizontal,label: 'Altro',    page: '__extra__' },
+]
+
+// Barra secondaria — 5 voci
+const NAV_EXTRA = [
+  { Icon: FileText,  label: 'Documenti', page: 'docmedici'    },
+  { Icon: Package,   label: 'Magazzino', page: 'magazzino'    },
+  { Icon: Pill,      label: 'Terapie',   page: 'terapie'      },
+  { Icon: BarChart2, label: 'Report',    page: 'report'       },
+  { Icon: Layers,    label: 'Utility',   page: 'utility'      },
+]
+
+// Pagine considerate "extra" per il badge Altro
+const EXTRA_PAGES = new Set([
+  'docmedici','docpersonali','magazzino','terapie','report','utility',
+  'rubrica','pagamenti','cosaportare','condividi',
+])
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -41,44 +66,20 @@ const FRASI = [
   "Ogni crisi superata è una prova della tua forza.",
 ]
 
-
 const ALL_QUICK_ACTIONS = [
-  {key:'crisi',     Icon:AlertTriangle,  label:'Registra crisi',      sub:'Timer immediato',       color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'crisi'},
-  {key:'diario',    Icon:BookOpen,       label:'Diario crisi',         sub:'Vedi registro',         color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#7B5EA7)', page:'diario'},
-  {key:'terapie',   Icon:Pill,           label:'Terapie',              sub:'Farmaci oggi',          color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#2e84e9)', page:'terapie'},
-  {key:'toilet',    Icon:Droplets,       label:'Toilet Training',      sub:'Log sessione',          color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'toilet'},
-  {key:'magazzino', Icon:Package,        label:'Magazzino',            sub:'Scorte medicinali',     color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#193f9e)', page:'magazzino'},
-  {key:'report',    Icon:BarChart2,      label:'Report',               sub:'Statistiche',           color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'report'},
-  {key:'condividi', Icon:Link,           label:'Condividi',            sub:'Token medico',          color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', page:'condividi'},
-  {key:'disturbi',  Icon:Activity,       label:'Disturbi movimento',   sub:'Registra episodio',     color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'disturbi'},
-  {key:'rubrica',   Icon:Phone,          label:'Rubrica',              sub:'Contatti',              color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'rubrica'},
-  {key:'messaggi',  Icon:MessageCircle,  label:'Messaggi Medico',      sub:'Chat con il medico',    color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'messaggi'},
+  { key:'crisi',    Icon:AlertTriangle, label:'Registra crisi',    sub:'Timer immediato',    color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'crisi'    },
+  { key:'diario',   Icon:BookOpen,      label:'Diario crisi',      sub:'Vedi registro',      color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#7B5EA7)', page:'diario'   },
+  { key:'terapie',  Icon:Pill,          label:'Terapie',           sub:'Farmaci oggi',       color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#2e84e9)', page:'terapie'  },
+  { key:'toilet',   Icon:Droplets,      label:'Toilet Training',   sub:'Log sessione',       color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'toilet'   },
+  { key:'magazzino',Icon:Package,       label:'Magazzino',         sub:'Scorte medicinali',  color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#193f9e)', page:'magazzino'},
+  { key:'report',   Icon:BarChart2,     label:'Report',            sub:'Statistiche',        color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'report'   },
+  { key:'condividi',Icon:Link,          label:'Condividi',         sub:'Token medico',       color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', page:'condividi'},
+  { key:'disturbi', Icon:Activity,      label:'Disturbi movimento',sub:'Registra episodio',  color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'disturbi' },
+  { key:'rubrica',  Icon:Phone,         label:'Rubrica',           sub:'Contatti',           color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'rubrica'  },
+  { key:'messaggi', Icon:MessageCircle, label:'Messaggi Medico',   sub:'Chat con il medico', color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'messaggi' },
 ]
-
 
 const DEFAULT_QUICK = ['crisi', 'terapie', 'toilet']
-
-
-const NAV_BOTTOM = [
-  {Icon:Home,          label:'Home',      page:'home'},
-  {Icon:BookOpen,      label:'Diario',    page:'diario'},
-  {Icon:Pill,          label:'Terapie',   page:'terapie'},
-  {Icon:Droplets,      label:'Toilet',    page:'toilet'},
-  {Icon:MessageCircle, label:'Messaggi',  page:'messaggi', isBadge:true},
-  {Icon:Settings,      label:'Altro',     page:'altro'},
-]
-
-
-// NAV_EXTRA: max 6 voci
-const NAV_EXTRA = [
-  {Icon:BarChart2,   label:'Report',    page:'report'},
-  {Icon:Package,     label:'Magazzino', page:'magazzino'},
-  {Icon:Activity,    label:'Disturbi',  page:'disturbi'},
-  {Icon:ShoppingBag, label:'Portare',   page:'cosa_portare'},
-  {Icon:Layers,      label:'Utility',   page:'utility'},
-  {Icon:CreditCard,  label:'Pagamenti', page:'pagamenti'},
-]
-
 
 function matchOggi(dataField) {
   if (!dataField) return false
@@ -89,53 +90,55 @@ function matchOggi(dataField) {
   return raw === oggiRaw || String(dataField) === oggi
 }
 
-
-export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, onToggleExtra, msgNonLetti = 0 }) {
+export default function HomeScreen({
+  nomeUtente, isDemo, onNavigate,
+  showExtra, onToggleExtra,
+  msgNonLetti = 0,
+  activePage: activePageProp = 'home',
+}) {
   const [time,         setTime]   = useState(new Date())
   const [crisi,        setCrisi]  = useState([])
   const [terapie,      setTer]    = useState([])
   const [magazzino,    setMag]    = useState([])
   const [toiletData,   setToilet] = useState([])
   const [showQEdit,    setQEdit]  = useState(false)
+  const [activePage,   setAP]     = useState(activePageProp)
   const [quickActions, setQA]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('damiapp_quick_actions')) || DEFAULT_QUICK }
     catch { return DEFAULT_QUICK }
   })
 
-
   const frase = FRASI[(new Date().getDate() + new Date().getMonth()) % FRASI.length]
-
 
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
 
-
   useEffect(() => {
     if (isDemo) {
       const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
       const oggi = fmt(new Date())
-      const ieri = fmt(new Date(Date.now()-86400000))
+      const ieri  = fmt(new Date(Date.now()-86400000))
       setCrisi([
-        {id:1, type:'Crisi tonico-cloniche', timestamp:Date.now()-3*86400000,  duration:'00:02:34', intensita:7},
-        {id:2, type:'Crisi di assenza',       timestamp:Date.now()-10*86400000, duration:'00:00:18', intensita:4},
-        {id:3, type:'Crisi miocloniche',      timestamp:Date.now()-18*86400000, duration:'00:00:45', intensita:5},
+        { id:1, type:'Crisi tonico-cloniche', timestamp:Date.now()-3*86400000,  duration:'00:02:34', intensita:7 },
+        { id:2, type:'Crisi di assenza',       timestamp:Date.now()-10*86400000, duration:'00:00:18', intensita:4 },
+        { id:3, type:'Crisi miocloniche',      timestamp:Date.now()-18*86400000, duration:'00:00:45', intensita:5 },
       ])
       setTer([
-        {id:1, nome:'Keppra 500mg', orario:'08:00', quantita:'1 cp'},
-        {id:2, nome:'Depakine',     orario:'13:00', quantita:'5ml'},
-        {id:3, nome:'Keppra 750mg', orario:'20:00', quantita:'1 cp'},
+        { id:1, nome:'Keppra 500mg', orario:'08:00', quantita:'1 cp' },
+        { id:2, nome:'Depakine',     orario:'13:00', quantita:'5ml'  },
+        { id:3, nome:'Keppra 750mg', orario:'20:00', quantita:'1 cp' },
       ])
       setMag([
-        {id:1, nome:'Keppra 500mg', scadenza:'2026-05-15', scatole:2},
-        {id:2, nome:'Depakine',     scadenza:'2026-04-20', scatole:1},
+        { id:1, nome:'Keppra 500mg', scadenza:'2026-05-15', scatole:2 },
+        { id:2, nome:'Depakine',     scadenza:'2026-04-20', scatole:1 },
       ])
       setToilet([
-        {id:1, data:oggi, ora:'08:30', bisogno:'pippi',    modalita:'caa-auto',    incidentePippi:false, incidenteCacca:false, timestamp:Date.now()-3600000},
-        {id:2, data:oggi, ora:'13:15', bisogno:'cacca',    modalita:'adulto',      incidentePippi:false, incidenteCacca:false, timestamp:Date.now()-7200000},
-        {id:3, data:oggi, ora:'15:00', bisogno:'nessuno',  modalita:'',            incidentePippi:true,  incidenteCacca:false, timestamp:Date.now()-3000000},
-        {id:4, data:ieri, ora:'09:00', bisogno:'entrambi', modalita:'caa-guidata', incidentePippi:false, incidenteCacca:false, timestamp:Date.now()-86400000},
+        { id:1, data:oggi, ora:'08:30', bisogno:'pippi',    modalita:'caa-auto',    incidentePippi:false, incidenteCacca:false, timestamp:Date.now()-3600000  },
+        { id:2, data:oggi, ora:'13:15', bisogno:'cacca',    modalita:'adulto',      incidentePippi:false, incidenteCacca:false, timestamp:Date.now()-7200000  },
+        { id:3, data:oggi, ora:'15:00', bisogno:'nessuno',  modalita:'',            incidentePippi:true,  incidenteCacca:false, timestamp:Date.now()-3000000  },
+        { id:4, data:ieri, ora:'09:00', bisogno:'entrambi', modalita:'caa-guidata', incidentePippi:false, incidenteCacca:false, timestamp:Date.now()-86400000 },
       ])
       return
     }
@@ -146,18 +149,25 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
     return () => { u1(); u2(); u3(); u4() }
   }, [isDemo])
 
-
   function saveQA(keys) {
     setQA(keys)
     localStorage.setItem('damiapp_quick_actions', JSON.stringify(keys))
   }
 
-
   function go(page) {
-    if (showExtra && onToggleExtra) onToggleExtra()
-    onNavigate && onNavigate(page)
+    if (page === '__extra__') { onToggleExtra?.(); return }
+    setAP(page)
+    if (EXTRA_PAGES.has(page) && !showExtra) { /* lascia extra aperta se già aperta */ }
+    else if (!EXTRA_PAGES.has(page) && showExtra) onToggleExtra?.()
+    onNavigate?.(page)
   }
 
+  // stabilisce se la voce navbar principale è attiva
+  function isNavActive(page) {
+    if (page === '__extra__') return showExtra || EXTRA_PAGES.has(activePage)
+    if (page === 'home')      return activePage === 'home'
+    return activePage === page
+  }
 
   const giorni  = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
   const mesi    = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
@@ -165,52 +175,47 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
   const timeStr = time.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
   const oraMin  = time.getHours()*60 + time.getMinutes()
 
-
   const ultimaCrisi      = [...crisi].sort((a,b)=>b.timestamp-a.timestamp)[0]
   const giorniSenzaCrisi = ultimaCrisi ? Math.floor((Date.now()-ultimaCrisi.timestamp)/86400000) : null
   const cGiorni = giorniSenzaCrisi===null ? '#bec1cc'
     : giorniSenzaCrisi>=30 ? '#00BFA6'
-    : giorniSenzaCrisi>=7  ? '#FF8C42'
-    : '#F7295A'
-
+    : giorniSenzaCrisi>=7  ? '#FF8C42' : '#F7295A'
 
   const prossimaTerapia = [...terapie]
     .map(t => { const [h,m]=(t.orario||'00:00').split(':').map(Number); return {...t,min:h*60+m} })
     .filter(t => t.min > oraMin)
     .sort((a,b) => a.min-b.min)[0]
 
-
   const scadenzeAlert = magazzino.filter(m => {
     if (!m.scadenza) return false
     return Math.ceil((new Date(m.scadenza)-Date.now())/86400000) <= 30
   })
 
-
-  const bagnoOggi = toiletData.filter(s => matchOggi(s.data) && s.bisogno && s.bisogno!=='nessuno').length
-  const incOggi   = toiletData.filter(s => matchOggi(s.data) && (s.incidentePippi||s.incidenteCacca)).length
-  const toilet7gg = toiletData.filter(s => (s.timestamp||0)>=Date.now()-7*86400000 && s.bisogno && s.bisogno!=='nessuno').length
-  const fasceMat  = toiletData.filter(s => { const h=parseInt((s.ora||'0').split(':')[0]); return matchOggi(s.data)&&h>=6&&h<12 }).length
-  const fascePom  = toiletData.filter(s => { const h=parseInt((s.ora||'0').split(':')[0]); return matchOggi(s.data)&&h>=12&&h<18 }).length
-  const fasceSer  = toiletData.filter(s => { const h=parseInt((s.ora||'0').split(':')[0]); return matchOggi(s.data)&&h>=18 }).length
-  const fasceMax  = Math.max(fasceMat, fascePom, fasceSer, 1)
-
+  const bagnoOggi = toiletData.filter(s=>matchOggi(s.data)&&s.bisogno&&s.bisogno!=='nessuno').length
+  const incOggi   = toiletData.filter(s=>matchOggi(s.data)&&(s.incidentePippi||s.incidenteCacca)).length
+  const toilet7gg = toiletData.filter(s=>(s.timestamp||0)>=Date.now()-7*86400000&&s.bisogno&&s.bisogno!=='nessuno').length
+  const fasceMat  = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=6&&h<12}).length
+  const fascePom  = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=12&&h<18}).length
+  const fasceSer  = toiletData.filter(s=>{const h=parseInt((s.ora||'0').split(':')[0]);return matchOggi(s.data)&&h>=18}).length
+  const fasceMax  = Math.max(fasceMat,fascePom,fasceSer,1)
 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
-  const pbContent = showExtra ? NAV_H+EXTRA_H+4 : NAV_H+4
 
+  // Padding bottom contenuto: lascia spazio a navbar + eventuale barra extra
+  const pbContent = showExtra ? NAV_H + EXTRA_H + 4 : NAV_H + 4
 
+  // stile voce navbar (div cliccabile)
   const ni = {
     flex:1, display:'flex', flexDirection:'column', alignItems:'center',
     gap:'3px', cursor:'pointer', touchAction:'manipulation',
-    WebkitTapHighlightColor:'transparent', userSelect:'none', padding:'3px 2px',
-    position:'relative'
+    WebkitTapHighlightColor:'transparent', userSelect:'none',
+    padding:'3px 2px', position:'relative', border:'none', background:'transparent',
   }
-
 
   return (
     <div style={{fontFamily:"-apple-system,'Segoe UI',sans-serif", minHeight:'100vh', background:'#f3f4f7', paddingBottom:`${pbContent}px`}}>
 
-
+      {/* ── OVERLAY chiude extra al tap fuori ────────────────── */}
       {showExtra && (
         <div
           onClick={onToggleExtra}
@@ -218,11 +223,10 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         />
       )}
 
-
-      {/* BARRA EXTRA */}
+      {/* ════════ BARRA EXTRA (secondaria) ═══════════════════ */}
       <div style={{
-        position:'fixed',
-        bottom: showExtra ? NAV_H : -(EXTRA_H+2),
+        position: 'fixed',
+        bottom: showExtra ? NAV_H : -(EXTRA_H + 2),
         left:'50%', transform:'translateX(-50%)',
         width:'100%', maxWidth:'480px',
         height:`${EXTRA_H}px`,
@@ -233,22 +237,38 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         zIndex:1100,
         transition:'bottom 0.30s cubic-bezier(.4,0,.2,1)',
         willChange:'bottom',
+        // nascosta ma presente nel DOM per l'animazione
+        opacity: showExtra ? 1 : 0,
+        pointerEvents: showExtra ? 'auto' : 'none',
       }}>
-        {NAV_EXTRA.map(({Icon,label,page}) => (
-          <div key={page} style={ni} onClick={()=>go(page)}>
-            <div style={{width:'30px',height:'22px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px'}}>
-              <Icon size={16} color="#bec1cc"/>
-            </div>
-            <span style={{fontSize:'10px',fontWeight:'500',color:'#7c8088'}}>{label}</span>
-          </div>
-        ))}
+        {NAV_EXTRA.map(({ Icon, label, page }) => {
+          const active = activePage === page
+          return (
+            <button key={page} onClick={() => go(page)} style={{
+              ...ni,
+              height:'100%',
+            }}>
+              <div style={{
+                width:'32px', height:'26px', display:'flex',
+                alignItems:'center', justifyContent:'center',
+                borderRadius:'8px',
+                background: active ? '#EEF3FD' : 'transparent',
+              }}>
+                <Icon size={16} color={active ? '#193f9e' : '#394058'} strokeWidth={active ? 2.5 : 2}/>
+              </div>
+              <span style={{
+                fontSize:'10px', fontWeight: active ? '800' : '600',
+                color: active ? '#193f9e' : '#394058', lineHeight:1,
+              }}>{label}</span>
+            </button>
+          )
+        })}
       </div>
 
-
-      {/* NAVBAR PRINCIPALE */}
-      <div style={{
-        position:'fixed',
-        bottom:0, left:'50%', transform:'translateX(-50%)',
+      {/* ════════ NAVBAR PRINCIPALE ══════════════════════════ */}
+      <nav style={{
+        position: 'fixed',
+        bottom: 0, left:'50%', transform:'translateX(-50%)',
         width:'100%', maxWidth:'480px',
         height:`${NAV_H}px`,
         background:'#feffff',
@@ -256,35 +276,45 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         display:'flex', alignItems:'center',
         boxShadow:'0 -4px 16px rgba(2,21,63,0.09)',
         zIndex:1200,
+        paddingBottom:'env(safe-area-inset-bottom)',
       }}>
-        {NAV_BOTTOM.map(({Icon,label,page,isBadge}) => {
-          const isAltro  = page==='altro'
-          const active   = page==='home' || (isAltro && showExtra)
+        {NAV_BOTTOM.map(({ Icon, label, page, isBadge }) => {
+          const isExtra  = page === '__extra__'
+          const active   = isNavActive(page)
           return (
-            <div key={page} style={ni} onClick={()=>isAltro ? onToggleExtra&&onToggleExtra() : go(page)}>
+            <button key={page} onClick={() => go(page)} style={{ ...ni, height:'100%' }}>
+              {/* indicatore top */}
+              {active && (
+                <div style={{
+                  position:'absolute', top:0, left:'50%',
+                  transform:'translateX(-50%)',
+                  width:'28px', height:'3px',
+                  background:'#193f9e',
+                  borderRadius:'0 0 4px 4px',
+                }}/>
+              )}
               <div style={{
-                width:'34px', height:'24px',
+                width:'34px', height:'26px',
                 display:'flex', alignItems:'center', justifyContent:'center',
                 borderRadius:'10px',
                 background: active ? '#EEF3FD' : 'transparent',
                 transition:'background 0.2s',
-                position:'relative'
+                position:'relative',
               }}>
-                {isAltro
-                  ? <ChevronUp
+                {isExtra
+                  ? <MoreHorizontal
                       size={17}
-                      color={showExtra?'#193f9e':'#bec1cc'}
-                      style={{transform:showExtra?'rotate(0)':'rotate(180deg)',transition:'transform 0.30s ease'}}
+                      color={active ? '#193f9e' : '#bec1cc'}
                     />
-                  : <Icon size={17} color={active?'#193f9e':'#bec1cc'}/>
+                  : <Icon size={17} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
                 }
-                {/* Badge messaggi non letti */}
+                {/* badge messaggi */}
                 {isBadge && msgNonLetti > 0 && (
                   <span style={{
                     position:'absolute', top:'-4px', right:'-4px',
                     minWidth:'15px', height:'15px', borderRadius:'50%',
-                    background:'#F7295A', display:'flex', alignItems:'center', justifyContent:'center',
-                    border:'2px solid #feffff', padding:'0 2px'
+                    background:'#F7295A', display:'flex', alignItems:'center',
+                    justifyContent:'center', border:'2px solid #feffff', padding:'0 2px',
                   }}>
                     <span style={{fontSize:'8px',fontWeight:'900',color:'#fff',lineHeight:1}}>
                       {msgNonLetti > 9 ? '9+' : msgNonLetti}
@@ -292,16 +322,19 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
                   </span>
                 )}
               </div>
-              <span style={{fontSize:f(9),fontWeight:active?'800':'500',color:active?'#193f9e':'#bec1cc',transition:'color 0.2s'}}>
-                {isAltro ? (showExtra?'Chiudi':'Altro') : label}
+              <span style={{
+                fontSize:f(9), fontWeight: active ? '800' : '500',
+                color: active ? '#193f9e' : '#bec1cc',
+                transition:'color 0.2s', lineHeight:1,
+              }}>
+                {isExtra ? (showExtra ? 'Chiudi' : 'Altro') : label}
               </span>
-            </div>
+            </button>
           )
         })}
-      </div>
+      </nav>
 
-
-      {/* MODAL PERSONALIZZA */}
+      {/* ════════ MODAL PERSONALIZZA QUICK ACTIONS ═══════════ */}
       {showQEdit && (
         <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.50)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto'}}>
@@ -336,9 +369,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         </div>
       )}
 
-
-      {/* ════════════════ CONTENUTO ════════════════ */}
-
+      {/* ════════════════ CONTENUTO HOME ═══════════════════════ */}
 
       {/* HERO CARD */}
       <div style={{padding:'12px 12px 0'}}>
@@ -367,30 +398,23 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
           {/* BANNER MESSAGGI NON LETTI */}
           {msgNonLetti > 0 && (
             <div
-              onClick={()=>go('messaggi')}
+              onClick={() => go('messaggi')}
               style={{
                 display:'flex', alignItems:'center', gap:'10px',
                 background:'linear-gradient(135deg,#7B5EA7,#2e84e9)',
                 borderRadius:'14px', padding:'10px 14px', marginBottom:'12px',
                 cursor:'pointer', touchAction:'manipulation',
                 boxShadow:'0 4px 16px rgba(123,94,167,0.35)',
-                animation:'pulse-msg 2s ease-in-out infinite'
               }}>
-              <style>{`@keyframes pulse-msg{0%,100%{opacity:1}50%{opacity:0.85}}`}</style>
               <div style={{position:'relative',flexShrink:0}}>
                 <MessageCircle size={22} color="#fff"/>
-                <span style={{
-                  position:'absolute',top:'-5px',right:'-5px',
-                  width:'16px',height:'16px',borderRadius:'50%',
-                  background:'#F7295A',border:'2px solid #fff',
-                  display:'flex',alignItems:'center',justifyContent:'center'
-                }}>
+                <span style={{position:'absolute',top:'-5px',right:'-5px',width:'16px',height:'16px',borderRadius:'50%',background:'#F7295A',border:'2px solid rgba(123,94,167,0.3)',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   <span style={{fontSize:'8px',fontWeight:'900',color:'#fff'}}>{msgNonLetti > 9 ? '9+' : msgNonLetti}</span>
                 </span>
               </div>
               <div style={{flex:1}}>
                 <div style={{fontSize:f(12),fontWeight:'800',color:'#fff'}}>
-                  {msgNonLetti === 1 ? '1 nuovo messaggio' : `${msgNonLetti} nuovi messaggi`} dal medico
+                  {msgNonLetti===1 ? '1 nuovo messaggio' : `${msgNonLetti} nuovi messaggi`} dal medico
                 </div>
                 <div style={{fontSize:f(10),color:'rgba(255,255,255,0.75)',marginTop:'1px'}}>Tocca per leggere</div>
               </div>
@@ -416,32 +440,12 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         </div>
       </div>
 
-
       {/* MINI CARDS */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'8px 12px'}}>
         {[
-          {
-            label:'Senza crisi',
-            val: giorniSenzaCrisi!==null ? `${giorniSenzaCrisi}g` : '—',
-            hint: ultimaCrisi ? `ul. ${new Date(ultimaCrisi.timestamp).toLocaleDateString('it-IT').slice(0,5)}` : 'Nessuna',
-            color: cGiorni, Icon: AlertTriangle,
-            bar: `linear-gradient(90deg,${cGiorni},${cGiorni}88)`
-          },
-          {
-            label:'Prossima ter.',
-            val: prossimaTerapia ? prossimaTerapia.orario : '—',
-            hint: prossimaTerapia ? prossimaTerapia.nome : 'Finite per oggi',
-            color:'#00BFA6', Icon: Clock,
-            bar:'linear-gradient(90deg,#00BFA6,#2e84e9)'
-          },
-          {
-            label:'Scadenze',
-            val: scadenzeAlert.length,
-            hint: scadenzeAlert.length>0 ? 'entro 30g' : 'tutto ok',
-            color: scadenzeAlert.length>0 ? '#FF8C42' : '#00BFA6',
-            Icon: Bell,
-            bar: scadenzeAlert.length>0 ? 'linear-gradient(90deg,#FFD93D,#FF8C42)' : '#f0f1f4'
-          },
+          { label:'Senza crisi',  val:giorniSenzaCrisi!==null?`${giorniSenzaCrisi}g`:'—', hint:ultimaCrisi?`ul. ${new Date(ultimaCrisi.timestamp).toLocaleDateString('it-IT').slice(0,5)}`:'Nessuna', color:cGiorni, Icon:AlertTriangle, bar:`linear-gradient(90deg,${cGiorni},${cGiorni}88)` },
+          { label:'Prossima ter.',val:prossimaTerapia?prossimaTerapia.orario:'—',           hint:prossimaTerapia?prossimaTerapia.nome:'Finite per oggi',     color:'#00BFA6', Icon:Clock,          bar:'linear-gradient(90deg,#00BFA6,#2e84e9)' },
+          { label:'Scadenze',     val:scadenzeAlert.length,                                 hint:scadenzeAlert.length>0?'entro 30g':'tutto ok',              color:scadenzeAlert.length>0?'#FF8C42':'#00BFA6', Icon:Bell, bar:scadenzeAlert.length>0?'linear-gradient(90deg,#FFD93D,#FF8C42)':'#f0f1f4' },
         ].map(({label,val,hint,color,Icon,bar},i) => (
           <div key={i} style={{background:'#feffff',borderRadius:'14px',overflow:'hidden',boxShadow:shSm}}>
             <div style={{padding:'9px 8px 7px'}}>
@@ -456,7 +460,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
           </div>
         ))}
       </div>
-
 
       {/* PRIORITÀ RAPIDE */}
       <div style={{padding:'0 12px',marginBottom:'10px'}}>
@@ -481,12 +484,10 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
         ))}
       </div>
 
-
       {/* DASHBOARD 2×2 */}
       <div style={{padding:'0 12px',marginBottom:'12px'}}>
         <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Dashboard</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
-
 
           {/* Crisi 7 giorni */}
           <div onClick={()=>go('diario')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
@@ -501,11 +502,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
                 const s=new Date(); s.setDate(s.getDate()-i); s.setHours(0,0,0,0)
                 const e=new Date(s); e.setHours(23,59,59,999)
                 const n=crisi.filter(c=>c.timestamp>=s.getTime()&&c.timestamp<=e.getTime()).length
-                const all=[6,5,4,3,2,1,0].map(j=>{
-                  const ss=new Date(); ss.setDate(ss.getDate()-j); ss.setHours(0,0,0,0)
-                  const ee=new Date(ss); ee.setHours(23,59,59,999)
-                  return crisi.filter(c=>c.timestamp>=ss.getTime()&&c.timestamp<=ee.getTime()).length
-                })
+                const all=[6,5,4,3,2,1,0].map(j=>{const ss=new Date();ss.setDate(ss.getDate()-j);ss.setHours(0,0,0,0);const ee=new Date(ss);ee.setHours(23,59,59,999);return crisi.filter(c=>c.timestamp>=ss.getTime()&&c.timestamp<=ee.getTime()).length})
                 const mx=Math.max(...all,1)
                 return <div key={i} style={{flex:1,height:`${n>0?(n/mx)*100:8}%`,borderRadius:'3px 3px 0 0',background:n>0?'#F7295A':'#f0f1f4',minHeight:'3px'}}/>
               })}
@@ -520,7 +517,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             </div>
           </div>
 
-
           {/* Terapie oggi */}
           <div onClick={()=>go('terapie')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
@@ -531,7 +527,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
               ? <div style={{fontSize:f(10),color:'#bec1cc',textAlign:'center',padding:'8px'}}>Nessuna terapia</div>
               : [...terapie].sort((a,b)=>(a.orario||'').localeCompare(b.orario||'')).slice(0,3).map((t,i,arr) => {
                   const [h,m]=(t.orario||'00:00').split(':').map(Number)
-                  const passata = h*60+m < oraMin
+                  const passata=h*60+m<oraMin
                   return (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:'6px',padding:'3px 0',borderBottom:i<arr.length-1?'1px solid #f0f1f4':'none'}}>
                       <div style={{width:'6px',height:'6px',borderRadius:'50%',background:passata?'#bec1cc':'#00BFA6',flexShrink:0}}/>
@@ -546,7 +542,6 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             </div>
           </div>
 
-
           {/* Toilet oggi */}
           <div onClick={()=>go('toilet')} style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm,cursor:'pointer',touchAction:'manipulation'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
@@ -555,9 +550,9 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             </div>
             <div style={{display:'flex',gap:'5px',marginBottom:'8px'}}>
               {[
-                {val:bagnoOggi, label:'In bagno',  bg:'#F5F3FF',                          color:'#7B5EA7'},
-                {val:incOggi,   label:'Incidenti', bg:incOggi>0?'#FEF0F4':'#E8FBF8',      color:incOggi>0?'#F7295A':'#00BFA6'},
-                {val:toilet7gg, label:'7 giorni',  bg:'#f3f4f7',                          color:'#394058'},
+                {val:bagnoOggi,label:'In bagno', bg:'#F5F3FF',                    color:'#7B5EA7'},
+                {val:incOggi,  label:'Incidenti',bg:incOggi>0?'#FEF0F4':'#E8FBF8',color:incOggi>0?'#F7295A':'#00BFA6'},
+                {val:toilet7gg,label:'7 giorni', bg:'#f3f4f7',                    color:'#394058'},
               ].map(({val,label,bg,color},i) => (
                 <div key={i} style={{flex:1,background:bg,borderRadius:'8px',padding:'5px',textAlign:'center'}}>
                   <div style={{fontSize:f(17),fontWeight:'900',color}}>{val}</div>
@@ -566,7 +561,7 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
               ))}
             </div>
             {[
-              {l:'Mattina',   c:'#2e84e9', v:fasceMat},
+              {l:'Mattina',   c:'#2e84e9',v:fasceMat},
               {l:'Pomerigg.', c:'#FF8C42', v:fascePom},
               {l:'Sera',      c:'#F7295A', v:fasceSer},
             ].map(({l,c,v}) => (
@@ -580,14 +575,13 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             ))}
           </div>
 
-
           {/* Totali */}
           <div style={{background:'#feffff',borderRadius:'16px',padding:'12px',boxShadow:shSm}}>
             <div style={{fontSize:f(11),fontWeight:'800',color:'#02153f',marginBottom:'8px'}}>Totali</div>
             {[
-              {label:'Crisi registrate', val:crisi.length,    color:'#F7295A', page:'diario'},
-              {label:'Terapie attive',   val:terapie.length,  color:'#00BFA6', page:'terapie'},
-              {label:'Medicinali',       val:magazzino.length, color:'#FF8C42', page:'magazzino'},
+              {label:'Crisi registrate',val:crisi.length,   color:'#F7295A',page:'diario'   },
+              {label:'Terapie attive',  val:terapie.length, color:'#00BFA6',page:'terapie'  },
+              {label:'Medicinali',      val:magazzino.length,color:'#FF8C42',page:'magazzino'},
             ].map(({label,val,color,page},i) => (
               <div key={i} onClick={()=>go(page)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:i<2?'1px solid #f0f1f4':'none',cursor:'pointer',touchAction:'manipulation'}}>
                 <span style={{fontSize:f(10),color:'#7c8088'}}>{label}</span>
@@ -599,10 +593,8 @@ export default function HomeScreen({ nomeUtente, isDemo, onNavigate, showExtra, 
             ))}
           </div>
 
-
         </div>
       </div>
-
 
     </div>
   )
