@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { LogOut, AlertTriangle, Pill, Phone, FileText } from 'lucide-react'
+import { LogOut, AlertTriangle, Pill, Phone, FileText, MessageCircle, Send, CheckCheck, Check, Clock } from 'lucide-react'
 import { db } from './firebase'
-import { ref, get } from 'firebase/database'
+import { ref, get, push, onValue, serverTimestamp, update } from 'firebase/database'
 import { decrypt } from './crypto'
 import ToiletCharts from './ToiletCharts'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
-const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
+const sh   = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
 
 const TIPO_COLORI = {
@@ -24,26 +24,224 @@ const PERIODI = [
   {key:'year',label:'1A'},
 ]
 
+const TABS = [
+  { key:'dati',      label:'Dati Paziente', Icon:FileText },
+  { key:'messaggi',  label:'Messaggi',      Icon:MessageCircle },
+]
+
+// ─── SEZIONE CHAT MEDICO ────────────────────────────────────────
+function ChatMedico({ tokenData }) {
+  const [messaggi, setMessaggi] = useState([])
+  const [testo, setTesto]       = useState('')
+  const [inviando, setInviando] = useState(false)
+  const bottomRef = useRef(null)
+  const nomeMedico = `Dr. ${tokenData.medicoName || 'Medico'}`
+
+  useEffect(() => {
+    const msgRef = ref(db, 'messages')
+    const unsub = onValue(msgRef, snap => {
+      const val = snap.val()
+      if (!val) { setMessaggi([]); return }
+      const lista = Object.entries(val)
+        .map(([id, m]) => ({ id, ...m }))
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+      setMessaggi(lista)
+      // Marca come letti i messaggi della famiglia
+      lista.filter(m => m.da === 'famiglia' && !m.letto)
+           .forEach(m => update(ref(db, `messages/${m.id}`), { letto: true }))
+    })
+    return () => unsub()
+  }, [])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messaggi])
+
+  async function invia() {
+    const txt = testo.trim()
+    if (!txt || inviando) return
+    setInviando(true)
+    try {
+      await push(ref(db, 'messages'), {
+        testo: txt,
+        da: 'medico',
+        mittente: nomeMedico,
+        timestamp: serverTimestamp(),
+        letto: false,
+      })
+      setTesto('')
+    } catch(err) { console.error(err) }
+    setInviando(false)
+  }
+
+  function formatOra(ts) {
+    if (!ts) return ''
+    const d = new Date(ts)
+    const oggi = new Date()
+    const ieri  = new Date(oggi); ieri.setDate(ieri.getDate()-1)
+    const hm = d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
+    if (d.toDateString()===oggi.toDateString()) return hm
+    if (d.toDateString()===ieri.toDateString()) return `Ieri ${hm}`
+    return `${d.getDate()}/${d.getMonth()+1} ${hm}`
+  }
+
+  function formatGiorno(ts) {
+    if (!ts) return ''
+    const d = new Date(ts)
+    const oggi = new Date()
+    const ieri  = new Date(oggi); ieri.setDate(ieri.getDate()-1)
+    if (d.toDateString()===oggi.toDateString()) return 'Oggi'
+    if (d.toDateString()===ieri.toDateString()) return 'Ieri'
+    return d.toLocaleDateString('it-IT',{day:'numeric',month:'long'})
+  }
+
+  const gruppi = []
+  messaggi.forEach((m,i) => {
+    const giorno = formatGiorno(m.timestamp)
+    if (i===0 || giorno!==formatGiorno(messaggi[i-1].timestamp))
+      gruppi.push({tipo:'separatore', giorno})
+    gruppi.push({tipo:'msg', ...m})
+  })
+
+  const nonLettiF = messaggi.filter(m=>m.da==='famiglia'&&!m.letto).length
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 130px)'}}>
+
+      {/* Info banner */}
+      <div style={{
+        margin:'12px 12px 0',
+        padding:'8px 14px',
+        background:'linear-gradient(135deg,#EEF3FD,#E8FBF8)',
+        borderRadius:'12px',
+        display:'flex',alignItems:'center',gap:'8px',
+        border:'1px solid #d8e8f8', flexShrink:0
+      }}>
+        <MessageCircle size={14} color="#193f9e"/>
+        <span style={{fontSize:f(11),color:'#193f9e',fontWeight:'700'}}>
+          Chat con la famiglia — stai scrivendo come <strong>{nomeMedico}</strong>
+        </span>
+        {nonLettiF>0 && (
+          <span style={{
+            marginLeft:'auto', background:'#F7295A', color:'#fff',
+            borderRadius:'20px', padding:'2px 8px',
+            fontSize:f(9), fontWeight:'800'
+          }}>{nonLettiF} nuovi</span>
+        )}
+      </div>
+
+      {/* Lista messaggi */}
+      <div style={{flex:1,overflowY:'auto',padding:'10px 12px 0',display:'flex',flexDirection:'column',gap:'4px'}}>
+        {gruppi.length===0 && (
+          <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 20px',textAlign:'center'}}>
+            <div style={{width:'56px',height:'56px',borderRadius:'50%',background:'#EEF3FD',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'14px'}}>
+              <MessageCircle size={24} color="#2e84e9"/>
+            </div>
+            <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',marginBottom:'6px'}}>Nessun messaggio</div>
+            <div style={{fontSize:f(11),color:'#7c8088',lineHeight:'1.6',maxWidth:'230px'}}>
+              Scrivi il primo messaggio alla famiglia del paziente.
+            </div>
+          </div>
+        )}
+
+        {gruppi.map((item,i) => {
+          if (item.tipo==='separatore') return (
+            <div key={`sep-${i}`} style={{textAlign:'center',margin:'8px 0 4px'}}>
+              <span style={{background:'#e8eaf0',borderRadius:'20px',padding:'3px 12px',fontSize:f(9),color:'#7c8088',fontWeight:'600'}}>{item.giorno}</span>
+            </div>
+          )
+          const isMio = item.da==='medico'
+          return (
+            <div key={item.id} style={{display:'flex',justifyContent:isMio?'flex-end':'flex-start',marginBottom:'2px'}}>
+              <div style={{
+                maxWidth:'78%',
+                background:isMio?'linear-gradient(135deg,#08184c,#193f9e)':'#feffff',
+                borderRadius:isMio?'18px 18px 4px 18px':'18px 18px 18px 4px',
+                padding:'10px 13px',
+                boxShadow:isMio?'0 4px 14px rgba(8,24,76,0.30)':'0 2px 10px rgba(2,21,63,0.08)',
+              }}>
+                {!isMio && (
+                  <div style={{fontSize:f(9),fontWeight:'800',color:'#F7295A',marginBottom:'3px'}}>
+                    {item.mittente||'Famiglia'}
+                  </div>
+                )}
+                <div style={{fontSize:f(13),lineHeight:'1.5',color:isMio?'#fff':'#02153f',wordBreak:'break-word'}}>
+                  {item.testo}
+                </div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'4px',marginTop:'4px'}}>
+                  <span style={{fontSize:f(8),color:isMio?'rgba(255,255,255,0.6)':'#bec1cc'}}>{formatOra(item.timestamp)}</span>
+                  {isMio && (item.letto
+                    ? <CheckCheck size={11} color="rgba(255,255,255,0.8)"/>
+                    : <Check size={11} color="rgba(255,255,255,0.5)"/>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} style={{height:'8px'}}/>
+      </div>
+
+      {/* Input */}
+      <div style={{padding:'10px 12px 16px',background:'#feffff',borderTop:'1px solid #f0f1f4',boxShadow:'0 -4px 16px rgba(2,21,63,0.06)',flexShrink:0}}>
+        <div style={{display:'flex',gap:'8px',alignItems:'flex-end'}}>
+          <textarea
+            value={testo}
+            onChange={e=>setTesto(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();invia()}}}
+            placeholder="Scrivi un messaggio alla famiglia…"
+            rows={1}
+            style={{flex:1,padding:'11px 14px',borderRadius:'22px',border:'2px solid #e8eaf0',fontSize:f(13),fontFamily:'inherit',resize:'none',outline:'none',background:'#f3f4f7',color:'#02153f',lineHeight:'1.4',maxHeight:'100px',overflowY:'auto',transition:'border-color 0.2s',boxSizing:'border-box'}}
+            onFocus={e=>e.target.style.borderColor='#193f9e'}
+            onBlur={e=>e.target.style.borderColor='#e8eaf0'}
+          />
+          <button
+            onClick={invia}
+            disabled={!testo.trim()||inviando}
+            style={{width:'44px',height:'44px',borderRadius:'50%',border:'none',background:testo.trim()&&!inviando?'linear-gradient(135deg,#08184c,#193f9e)':'#e8eaf0',display:'flex',alignItems:'center',justifyContent:'center',cursor:testo.trim()&&!inviando?'pointer':'default',flexShrink:0,transition:'all 0.2s',boxShadow:testo.trim()&&!inviando?'0 4px 14px rgba(8,24,76,0.35)':'none'}}
+          >
+            {inviando ? <Clock size={18} color="#bec1cc"/> : <Send size={18} color={testo.trim()?'#fff':'#bec1cc'}/>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── COMPONENTE PRINCIPALE ──────────────────────────────────────
 export default function DoctorView({ tokenData, onLogout }) {
-  const [data, setData] = useState(null)
+  const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
   const [periodo, setPeriodo] = useState('month')
+  const [tab,     setTab]     = useState('dati')
+  const [msgNonLetti, setMsgNonLetti] = useState(0)
   const canvasRef = useRef(null)
 
   const perms = tokenData.permissions || {}
 
   useEffect(() => { loadData() }, [])
 
+  // Conta messaggi famiglia non letti (badge tab)
+  useEffect(() => {
+    const unsub = onValue(ref(db,'messages'), snap => {
+      const val = snap.val()
+      if (!val) { setMsgNonLetti(0); return }
+      const n = Object.values(val).filter(m=>m.da==='famiglia'&&!m.letto).length
+      setMsgNonLetti(n)
+    })
+    return () => unsub()
+  }, [])
+
   async function loadData() {
     try {
       const promises = []
       promises.push(get(ref(db,'crises')))
-      promises.push(perms.shareTerapie ? get(ref(db,'terapies')) : Promise.resolve(null))
-      promises.push(perms.shareDocuments ? get(ref(db,'documents')) : Promise.resolve(null))
-      promises.push(perms.shareContacts ? get(ref(db,'contacts')) : Promise.resolve(null))
-      promises.push(perms.shareToilet ? get(ref(db,'toilet_training')) : Promise.resolve(null))
+      promises.push(perms.shareTerapie   ? get(ref(db,'terapies'))        : Promise.resolve(null))
+      promises.push(perms.shareDocuments ? get(ref(db,'documents'))       : Promise.resolve(null))
+      promises.push(perms.shareContacts  ? get(ref(db,'contacts'))        : Promise.resolve(null))
+      promises.push(perms.shareToilet    ? get(ref(db,'toilet_training')) : Promise.resolve(null))
 
-      const [crisiSnap, terapieSnap, docsSnap, contattiSnap, toiletSnap] = await Promise.all(promises)
+      const [crisiSnap,terapieSnap,docsSnap,contattiSnap,toiletSnap] = await Promise.all(promises)
 
       function parseSnap(snap) {
         if (!snap) return []
@@ -56,15 +254,13 @@ export default function DoctorView({ tokenData, onLogout }) {
       }
 
       setData({
-        crisi: parseSnap(crisiSnap).sort((a,b)=>b.timestamp-a.timestamp),
-        terapie: parseSnap(terapieSnap).sort((a,b)=>(a.orario||'').localeCompare(b.orario||'')),
+        crisi:     parseSnap(crisiSnap).sort((a,b)=>b.timestamp-a.timestamp),
+        terapie:   parseSnap(terapieSnap).sort((a,b)=>(a.orario||'').localeCompare(b.orario||'')),
         documenti: parseSnap(docsSnap),
-        contatti: parseSnap(contattiSnap),
-        toilet: parseSnap(toiletSnap).sort((a,b)=>b.timestamp-a.timestamp),
+        contatti:  parseSnap(contattiSnap),
+        toilet:    parseSnap(toiletSnap).sort((a,b)=>b.timestamp-a.timestamp),
       })
-    } catch(err) {
-      console.error(err)
-    }
+    } catch(err) { console.error(err) }
     setLoading(false)
   }
 
@@ -72,8 +268,7 @@ export default function DoctorView({ tokenData, onLogout }) {
     if (!data?.crisi) return []
     if (periodo==='all') return data.crisi
     const days = {week:7,month:30,'3months':90,'6months':180,year:365}[periodo]
-    const from = Date.now()-days*86400000
-    return data.crisi.filter(c=>c.timestamp>=from)
+    return data.crisi.filter(c=>c.timestamp>=Date.now()-days*86400000)
   }
 
   const crisiPeriodo = getCrisiPeriodo()
@@ -81,15 +276,13 @@ export default function DoctorView({ tokenData, onLogout }) {
   crisiPeriodo.forEach(c=>{ tipiCount[c.type]=(tipiCount[c.type]||0)+1 })
   const mediaInt = crisiPeriodo.length>0
     ? (crisiPeriodo.reduce((s,c)=>s+(c.intensita||0),0)/crisiPeriodo.length).toFixed(1) : '—'
-  const conPerdita = crisiPeriodo.filter(c=>c.perdCoscienza).length
 
   useEffect(() => {
-    if (!canvasRef.current || !data) return
+    if (!canvasRef.current||!data||tab!=='dati') return
     const ctx = canvasRef.current.getContext('2d')
-    const W = canvasRef.current.width
-    const H = canvasRef.current.height
+    const W=canvasRef.current.width, H=canvasRef.current.height
     ctx.clearRect(0,0,W,H)
-    const weeks = []
+    const weeks=[]
     for(let i=7;i>=0;i--){
       const start=new Date();start.setDate(start.getDate()-i*7-6);start.setHours(0,0,0,0)
       const end=new Date();end.setDate(end.getDate()-i*7);end.setHours(23,59,59,999)
@@ -97,12 +290,10 @@ export default function DoctorView({ tokenData, onLogout }) {
       weeks.push({label:`S${8-i}`,count})
     }
     const max=Math.max(...weeks.map(w=>w.count),1)
-    const barW=(W-40)/weeks.length-4
-    const chartH=H-30
+    const barW=(W-40)/weeks.length-4, chartH=H-30
     weeks.forEach((w,i)=>{
       const x=20+i*((W-40)/weeks.length)
-      const barH=(w.count/max)*chartH*0.85
-      const y=chartH-barH
+      const barH=(w.count/max)*chartH*0.85, y=chartH-barH
       const grad=ctx.createLinearGradient(0,y,0,chartH)
       grad.addColorStop(0,'#2e84e9');grad.addColorStop(1,'#193f9e')
       ctx.fillStyle=w.count>0?grad:'#f0f1f4'
@@ -111,7 +302,7 @@ export default function DoctorView({ tokenData, onLogout }) {
       ctx.fillText(w.label,x+barW/2,H-6)
       if(w.count>0){ctx.fillStyle='#02153f';ctx.font='bold 10px -apple-system';ctx.fillText(w.count,x+barW/2,y-4)}
     })
-  },[data,periodo])
+  },[data,periodo,tab])
 
   if (loading) return (
     <div style={{minHeight:'100vh',background:'#f3f4f7',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
@@ -128,7 +319,7 @@ export default function DoctorView({ tokenData, onLogout }) {
       <div className="doc-wrap">
 
         {/* HEADER */}
-        <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'16px 16px 20px'}}>
+        <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'16px 16px 0'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
             <div>
               <div style={{fontSize:f(18),fontWeight:'900',color:'#fff'}}>👨‍⚕️ Vista Medico</div>
@@ -141,167 +332,204 @@ export default function DoctorView({ tokenData, onLogout }) {
               Esci
             </button>
           </div>
-          <div style={{background:'rgba(255,255,255,0.12)',borderRadius:'12px',padding:'8px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
+          <div style={{background:'rgba(255,255,255,0.12)',borderRadius:'12px',padding:'8px 12px',display:'flex',alignItems:'center',gap:'8px',marginBottom:'12px'}}>
             <FileText size={14} color="rgba(255,255,255,0.8)"/>
             <span style={{fontSize:f(11),color:'rgba(255,255,255,0.8)',fontWeight:'600'}}>
               Accesso in sola lettura · Scade: {tokenData.expiresAt?new Date(tokenData.expiresAt).toLocaleDateString('it-IT'):'N/D'}
             </span>
           </div>
-        </div>
 
-        <div style={{padding:'12px'}}>
-
-          {/* BADGE PERMESSI */}
-          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
-            {[
-              {label:'Crisi',color:'#F7295A',bg:'#FEF0F4',show:true},
-              {label:'Terapie',color:'#00BFA6',bg:'#E8FBF8',show:perms.shareTerapie},
-              {label:'Toilet',color:'#7B5EA7',bg:'#F5F3FF',show:perms.shareToilet},
-              {label:'Documenti',color:'#193f9e',bg:'#EEF3FD',show:perms.shareDocuments},
-              {label:'Contatti',color:'#FF8C42',bg:'#FFF5EE',show:perms.shareContacts},
-            ].filter(p=>p.show).map((p,i)=>(
-              <span key={i} style={{fontSize:f(11),fontWeight:'700',padding:'4px 10px',borderRadius:'20px',background:p.bg,color:p.color}}>
-                ✓ {p.label}
-              </span>
-            ))}
-          </div>
-
-          {/* STATS RAPIDE */}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'7px',marginBottom:'10px'}}>
-            {[
-              {label:'Crisi totali',val:data?.crisi?.length||0,color:'#F7295A'},
-              {label:'Nel periodo',val:crisiPeriodo.length,color:'#FF8C42'},
-              {label:'Media intens.',val:mediaInt,color:'#7B5EA7'},
-            ].map(({label,val,color},i)=>(
-              <div key={i} style={{background:'#feffff',borderRadius:'14px',padding:'10px 8px',boxShadow:shSm,textAlign:'center'}}>
-                <div style={{fontSize:f(22),fontWeight:'900',color,marginBottom:'2px'}}>{val}</div>
-                <div style={{fontSize:f(9),color:'#7c8088',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.3px'}}>{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* SELEZIONE PERIODO */}
-          <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
-            <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'10px'}}>📊 Andamento crisi</div>
-            <div style={{display:'flex',gap:'5px',marginBottom:'12px',overflowX:'auto'}}>
-              {PERIODI.map(p=>(
-                <button key={p.key} onClick={()=>setPeriodo(p.key)} style={{padding:'5px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),whiteSpace:'nowrap',fontFamily:'inherit',background:periodo===p.key?'#193f9e':'#f3f4f7',color:periodo===p.key?'#fff':'#7c8088',transition:'all 0.2s'}}>
-                  {p.label}
+          {/* TAB BAR */}
+          <div style={{display:'flex',gap:'4px',padding:'0 0 0'}}>
+            {TABS.map(({key,label,Icon})=>{
+              const active = tab===key
+              const badge  = key==='messaggi' && msgNonLetti>0
+              return (
+                <button key={key} onClick={()=>setTab(key)} style={{
+                  flex:1, display:'flex', alignItems:'center', justifyContent:'center',
+                  gap:'6px', padding:'10px 8px 12px',
+                  border:'none', cursor:'pointer', fontFamily:'inherit',
+                  fontWeight:'800', fontSize:f(12),
+                  background: active?'#f3f4f7':'transparent',
+                  color: active?'#193f9e':'rgba(255,255,255,0.65)',
+                  borderRadius: active?'12px 12px 0 0':'12px 12px 0 0',
+                  transition:'all 0.2s', position:'relative'
+                }}>
+                  <Icon size={15}/>
+                  {label}
+                  {badge && (
+                    <span style={{
+                      position:'absolute',top:'6px',right:'10px',
+                      width:'16px',height:'16px',borderRadius:'50%',
+                      background:'#F7295A',display:'flex',alignItems:'center',
+                      justifyContent:'center',border:'2px solid #193f9e'
+                    }}>
+                      <span style={{fontSize:'8px',fontWeight:'900',color:'#fff'}}>{msgNonLetti>9?'9+':msgNonLetti}</span>
+                    </span>
+                  )}
                 </button>
-              ))}
-            </div>
-            {(data?.crisi?.length||0)===0
-              ? <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Nessuna crisi registrata</div>
-              : <canvas ref={canvasRef} width={420} height={110} style={{width:'100%',height:'auto'}}/>
-            }
+              )
+            })}
           </div>
-
-          {/* DISTRIBUZIONE TIPI */}
-          {Object.keys(tipiCount).length>0&&(
-            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
-              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🎯 Distribuzione per tipo</div>
-              {Object.entries(tipiCount).sort((a,b)=>b[1]-a[1]).map(([tipo,count])=>{
-                const color=TIPO_COLORI[tipo]||'#7c8088'
-                const pct=Math.round((count/crisiPeriodo.length)*100)
-                return (
-                  <div key={tipo} style={{marginBottom:'8px'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                        <div style={{width:'8px',height:'8px',borderRadius:'50%',background:color}}/>
-                        <span style={{fontSize:f(12),fontWeight:'700',color:'#394058'}}>{tipo}</span>
-                      </div>
-                      <span style={{fontSize:f(11),color:'#7c8088'}}>{count}x · {pct}%</span>
-                    </div>
-                    <div style={{height:'6px',borderRadius:'3px',background:'#f3f4f7',overflow:'hidden'}}>
-                      <div style={{height:'100%',borderRadius:'3px',width:`${pct}%`,background:color}}/>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* LISTA ULTIME CRISI */}
-          {(data?.crisi?.length||0)>0&&(
-            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
-              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📋 Ultime crisi</div>
-              {(data?.crisi||[]).slice(0,10).map((c,i)=>{
-                const color=TIPO_COLORI[c.type]||'#7c8088'
-                return (
-                  <div key={i} style={{padding:'10px',borderRadius:'12px',marginBottom:'7px',background:'#f3f4f7',border:`1.5px solid ${color}22`}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>
-                      <div style={{width:'8px',height:'8px',borderRadius:'50%',background:color,flexShrink:0}}/>
-                      <span style={{fontSize:f(13),fontWeight:'800',color,flex:1}}>{c.type}</span>
-                      <span style={{fontSize:f(10),fontWeight:'700',color:'#fff',background:color,padding:'2px 7px',borderRadius:'20px'}}>{c.duration}</span>
-                    </div>
-                    <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'3px'}}>📅 {c.date}</div>
-                    {c.areas?.length>0&&<div style={{fontSize:f(11),color:'#394058',marginBottom:'2px'}}>🎯 {c.areas.join(', ')}</div>}
-                    {c.trigger&&c.trigger!=='Nessuno noto'&&<div style={{fontSize:f(11),color:'#394058',marginBottom:'2px'}}>⚡ {c.trigger}</div>}
-                    <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginTop:'5px'}}>
-                      {c.intensita&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:c.intensita<=3?'#E8FBF8':c.intensita<=6?'#FFF9E6':'#FEF0F4',color:c.intensita<=3?'#00BFA6':c.intensita<=6?'#FF8C42':'#F7295A'}}>Int. {c.intensita}/10</span>}
-                      {c.perdCoscienza&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'#FEF0F4',color:'#F7295A'}}>Perdita coscienza</span>}
-                      {c.postCrisi&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'#F5F3FF',color:'#7B5EA7'}}>{c.postCrisi}</span>}
-                    </div>
-                    {c.note&&<div style={{fontSize:f(11),color:'#7c8088',marginTop:'5px',fontStyle:'italic',borderTop:'1px solid #f0f1f4',paddingTop:'5px'}}>📝 {c.note}</div>}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* TERAPIE — sola lettura */}
-          {perms.shareTerapie&&(data?.terapie?.length||0)>0&&(
-            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
-              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>💊 Terapie programmate</div>
-              {(data?.terapie||[]).map((t,i)=>(
-                <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:i<(data.terapie.length-1)?'1px solid #f0f1f4':'none'}}>
-                  <Pill size={16} color="#00BFA6"/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:f(13),fontWeight:'700',color:'#02153f'}}>{t.nome}</div>
-                    <div style={{fontSize:f(11),color:'#7c8088'}}>{t.quantita}{t.note?` · ${t.note}`:''}</div>
-                  </div>
-                  <span style={{fontSize:f(12),fontWeight:'700',color:'#193f9e'}}>{t.orario}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* TOILET TRAINING — sola lettura con grafici */}
-          {perms.shareToilet&&(data?.toilet?.length||0)>0&&(
-            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
-              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>
-                🚽 Toilet Training
-              </div>
-              <ToiletCharts dati={data?.toilet||[]} titolo={false}/>
-            </div>
-          )}
-
-          {/* CONTATTI — sola lettura */}
-          {perms.shareContacts&&(data?.contatti?.length||0)>0&&(
-            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
-              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📞 Contatti</div>
-              {(data?.contatti||[]).map((c,i)=>(
-                <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:i<(data.contatti.length-1)?'1px solid #f0f1f4':'none'}}>
-                  <Phone size={16} color="#FF8C42"/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:f(13),fontWeight:'700',color:'#02153f'}}>{c.nome}</div>
-                    <div style={{fontSize:f(11),color:'#7c8088'}}>{c.ruolo||''}</div>
-                  </div>
-                  <span style={{fontSize:f(12),color:'#7c8088'}}>{c.telefono}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* NESSUN DATO */}
-          {(data?.crisi?.length||0)===0&&(
-            <div style={{background:'#feffff',borderRadius:'18px',padding:'32px',textAlign:'center',boxShadow:sh}}>
-              <div style={{fontSize:'32px',marginBottom:'12px'}}>📋</div>
-              <div style={{fontSize:f(14),color:'#7c8088'}}>Nessun dato disponibile</div>
-            </div>
-          )}
-
         </div>
+
+        {/* ── TAB MESSAGGI ── */}
+        {tab==='messaggi' && <ChatMedico tokenData={tokenData}/>}
+
+        {/* ── TAB DATI ── */}
+        {tab==='dati' && (
+          <div style={{padding:'12px'}}>
+
+            {/* BADGE PERMESSI */}
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
+              {[
+                {label:'Crisi',color:'#F7295A',bg:'#FEF0F4',show:true},
+                {label:'Terapie',color:'#00BFA6',bg:'#E8FBF8',show:perms.shareTerapie},
+                {label:'Toilet',color:'#7B5EA7',bg:'#F5F3FF',show:perms.shareToilet},
+                {label:'Documenti',color:'#193f9e',bg:'#EEF3FD',show:perms.shareDocuments},
+                {label:'Contatti',color:'#FF8C42',bg:'#FFF5EE',show:perms.shareContacts},
+              ].filter(p=>p.show).map((p,i)=>(
+                <span key={i} style={{fontSize:f(11),fontWeight:'700',padding:'4px 10px',borderRadius:'20px',background:p.bg,color:p.color}}>
+                  ✓ {p.label}
+                </span>
+              ))}
+            </div>
+
+            {/* STATS */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'7px',marginBottom:'10px'}}>
+              {[
+                {label:'Crisi totali',val:data?.crisi?.length||0,color:'#F7295A'},
+                {label:'Nel periodo',val:crisiPeriodo.length,color:'#FF8C42'},
+                {label:'Media intens.',val:mediaInt,color:'#7B5EA7'},
+              ].map(({label,val,color},i)=>(
+                <div key={i} style={{background:'#feffff',borderRadius:'14px',padding:'10px 8px',boxShadow:shSm,textAlign:'center'}}>
+                  <div style={{fontSize:f(22),fontWeight:'900',color,marginBottom:'2px'}}>{val}</div>
+                  <div style={{fontSize:f(9),color:'#7c8088',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.3px'}}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* GRAFICO */}
+            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'10px'}}>📊 Andamento crisi</div>
+              <div style={{display:'flex',gap:'5px',marginBottom:'12px',overflowX:'auto'}}>
+                {PERIODI.map(p=>(
+                  <button key={p.key} onClick={()=>setPeriodo(p.key)} style={{padding:'5px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),whiteSpace:'nowrap',fontFamily:'inherit',background:periodo===p.key?'#193f9e':'#f3f4f7',color:periodo===p.key?'#fff':'#7c8088',transition:'all 0.2s'}}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {(data?.crisi?.length||0)===0
+                ? <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Nessuna crisi registrata</div>
+                : <canvas ref={canvasRef} width={420} height={110} style={{width:'100%',height:'auto'}}/>
+              }
+            </div>
+
+            {/* DISTRIBUZIONE */}
+            {Object.keys(tipiCount).length>0&&(
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🎯 Distribuzione per tipo</div>
+                {Object.entries(tipiCount).sort((a,b)=>b[1]-a[1]).map(([tipo,count])=>{
+                  const color=TIPO_COLORI[tipo]||'#7c8088'
+                  const pct=Math.round((count/crisiPeriodo.length)*100)
+                  return (
+                    <div key={tipo} style={{marginBottom:'8px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                          <div style={{width:'8px',height:'8px',borderRadius:'50%',background:color}}/>
+                          <span style={{fontSize:f(12),fontWeight:'700',color:'#394058'}}>{tipo}</span>
+                        </div>
+                        <span style={{fontSize:f(11),color:'#7c8088'}}>{count}x · {pct}%</span>
+                      </div>
+                      <div style={{height:'6px',borderRadius:'3px',background:'#f3f4f7',overflow:'hidden'}}>
+                        <div style={{height:'100%',borderRadius:'3px',width:`${pct}%`,background:color}}/>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* ULTIME CRISI */}
+            {(data?.crisi?.length||0)>0&&(
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📋 Ultime crisi</div>
+                {(data?.crisi||[]).slice(0,10).map((c,i)=>{
+                  const color=TIPO_COLORI[c.type]||'#7c8088'
+                  return (
+                    <div key={i} style={{padding:'10px',borderRadius:'12px',marginBottom:'7px',background:'#f3f4f7',border:`1.5px solid ${color}22`}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>
+                        <div style={{width:'8px',height:'8px',borderRadius:'50%',background:color,flexShrink:0}}/>
+                        <span style={{fontSize:f(13),fontWeight:'800',color,flex:1}}>{c.type}</span>
+                        <span style={{fontSize:f(10),fontWeight:'700',color:'#fff',background:color,padding:'2px 7px',borderRadius:'20px'}}>{c.duration}</span>
+                      </div>
+                      <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'3px'}}>📅 {c.date}</div>
+                      {c.areas?.length>0&&<div style={{fontSize:f(11),color:'#394058',marginBottom:'2px'}}>🎯 {c.areas.join(', ')}</div>}
+                      {c.trigger&&c.trigger!=='Nessuno noto'&&<div style={{fontSize:f(11),color:'#394058',marginBottom:'2px'}}>⚡ {c.trigger}</div>}
+                      <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginTop:'5px'}}>
+                        {c.intensita&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:c.intensita<=3?'#E8FBF8':c.intensita<=6?'#FFF9E6':'#FEF0F4',color:c.intensita<=3?'#00BFA6':c.intensita<=6?'#FF8C42':'#F7295A'}}>Int. {c.intensita}/10</span>}
+                        {c.perdCoscienza&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'#FEF0F4',color:'#F7295A'}}>Perdita coscienza</span>}
+                        {c.postCrisi&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'#F5F3FF',color:'#7B5EA7'}}>{c.postCrisi}</span>}
+                      </div>
+                      {c.note&&<div style={{fontSize:f(11),color:'#7c8088',marginTop:'5px',fontStyle:'italic',borderTop:'1px solid #f0f1f4',paddingTop:'5px'}}>📝 {c.note}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* TERAPIE */}
+            {perms.shareTerapie&&(data?.terapie?.length||0)>0&&(
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>💊 Terapie programmate</div>
+                {(data?.terapie||[]).map((t,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:i<(data.terapie.length-1)?'1px solid #f0f1f4':'none'}}>
+                    <Pill size={16} color="#00BFA6"/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:f(13),fontWeight:'700',color:'#02153f'}}>{t.nome}</div>
+                      <div style={{fontSize:f(11),color:'#7c8088'}}>{t.quantita}{t.note?` · ${t.note}`:''}</div>
+                    </div>
+                    <span style={{fontSize:f(12),fontWeight:'700',color:'#193f9e'}}>{t.orario}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TOILET */}
+            {perms.shareToilet&&(data?.toilet?.length||0)>0&&(
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🚽 Toilet Training</div>
+                <ToiletCharts dati={data?.toilet||[]} titolo={false}/>
+              </div>
+            )}
+
+            {/* CONTATTI */}
+            {perms.shareContacts&&(data?.contatti?.length||0)>0&&(
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📞 Contatti</div>
+                {(data?.contatti||[]).map((c,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:i<(data.contatti.length-1)?'1px solid #f0f1f4':'none'}}>
+                    <Phone size={16} color="#FF8C42"/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:f(13),fontWeight:'700',color:'#02153f'}}>{c.nome}</div>
+                      <div style={{fontSize:f(11),color:'#7c8088'}}>{c.ruolo||''}</div>
+                    </div>
+                    <span style={{fontSize:f(12),color:'#7c8088'}}>{c.telefono}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(data?.crisi?.length||0)===0&&(
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'32px',textAlign:'center',boxShadow:sh}}>
+                <div style={{fontSize:'32px',marginBottom:'12px'}}>📋</div>
+                <div style={{fontSize:f(14),color:'#7c8088'}}>Nessun dato disponibile</div>
+              </div>
+            )}
+
+          </div>
+        )}
+
       </div>
     </>
   )
