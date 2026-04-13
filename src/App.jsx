@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Home, BookOpen, Pill, Droplets, Link, Settings, Layers } from 'lucide-react'
+import { db } from './firebase'
+import { ref, onValue } from 'firebase/database'
+import { decrypt } from './crypto'
 import Home2 from './Home'
 import CrisiPage from './CrisiPage'
 import DiarioCrisi from './DiarioCrisi'
@@ -16,12 +19,16 @@ import RubricaPage from './RubricaPage'
 import PagamentiPage from './PagamentiPage'
 import DocumentiPage from './DocumentiPage'
 import CosaPortarePage from './CosaPortarePage'
+import MessaggiPage from './MessaggiPage'
+
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
-const VERSION   = '05.00.25'
+const VERSION   = '05.01.00'
+
 
 const f = (base) => `${Math.round(base * 1.15)}px`
+
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -56,9 +63,11 @@ const FRASI = [
   "La cura quotidiana è il gesto d'amore più grande.",
 ]
 
+
 export function getFrase() {
   return FRASI[(new Date().getDate() + new Date().getMonth()) % FRASI.length]
 }
+
 
 // ── CSS GLOBALE ──────────────────────────────────────────────
 const GLOBAL_CSS = `
@@ -74,6 +83,7 @@ const GLOBAL_CSS = `
     box-shadow: 0 0 60px rgba(2,21,63,0.12);
   }
 `
+
 
 function Disclaimer({ nome, onAccept }) {
   return (
@@ -100,6 +110,7 @@ function Disclaimer({ nome, onAccept }) {
     </div>
   )
 }
+
 
 function OnboardingModal({ onDone, isDemo }) {
   const [nome, setNome] = useState('')
@@ -138,6 +149,7 @@ function OnboardingModal({ onDone, isDemo }) {
   )
 }
 
+
 function Login({ onLogin }) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
@@ -146,10 +158,12 @@ function Login({ onLogin }) {
   const [ricordaPin, setRicordaPin] = useState(false)
   const [checkingToken, setCheckingToken] = useState(false)
 
+
   useEffect(() => {
     const saved = localStorage.getItem('damiapp_saved_pin')
     if (saved) { setPin(saved); setRicordaPin(true) }
   }, [])
+
 
   function handlePinLogin() {
     if (pin === PIN_REALE || pin === PIN_DEMO) {
@@ -161,6 +175,7 @@ function Login({ onLogin }) {
       setPin('')
     }
   }
+
 
   async function handleTokenLogin() {
     if (!token.trim()) { setError('Inserisci il token'); return }
@@ -189,6 +204,7 @@ function Login({ onLogin }) {
     }
     setCheckingToken(false)
   }
+
 
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f3f4f7',fontFamily:"-apple-system,'Segoe UI',sans-serif",padding:'20px'}}>
@@ -261,6 +277,7 @@ function Login({ onLogin }) {
   )
 }
 
+
 function PaginaInArrivo({ onBack }) {
   return (
     <div style={{minHeight:'100vh',background:'#f3f4f7',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif",paddingBottom:'80px'}}>
@@ -276,14 +293,15 @@ function PaginaInArrivo({ onBack }) {
   )
 }
 
+
 // ── NAVBAR per pagine interne ─────────────────────────────────
-function NavbarInterna({ page, onNavigate }) {
+function NavbarInterna({ page, onNavigate, msgNonLetti = 0 }) {
   const items = [
     {Icon:Home,     label:'Home',      p:'home'},
     {Icon:BookOpen, label:'Diario',    p:'diario'},
     {Icon:Pill,     label:'Terapie',   p:'terapie'},
     {Icon:Droplets, label:'Toilet',    p:'toilet'},
-    {Icon:Link,     label:'Condividi', p:'condividi'},
+    {Icon:Link,     label:'Medico',    p:'condividi', badge: msgNonLetti},
     {Icon:Layers,   label:'Utility',   p:'utility'},
   ]
   return (
@@ -294,12 +312,26 @@ function NavbarInterna({ page, onNavigate }) {
       display:'flex', padding:'7px 0 14px',
       boxShadow:'0 -4px 16px rgba(2,21,63,0.08)', zIndex:100
     }}>
-      {items.map(({Icon,label,p})=>{
+      {items.map(({Icon,label,p,badge})=>{
         const act = page===p
         return (
-          <div key={label} onClick={()=>onNavigate(p)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',touchAction:'manipulation'}}>
+          <div key={label} onClick={()=>onNavigate(p)}
+            style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',touchAction:'manipulation',position:'relative'}}>
             <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
               <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
+              {/* Badge messaggi non letti */}
+              {badge > 0 && (
+                <span style={{
+                  position:'absolute', top:'0px', right:'calc(50% - 20px)',
+                  width:'15px', height:'15px', borderRadius:'50%',
+                  background:'#F7295A', display:'flex', alignItems:'center', justifyContent:'center',
+                  border:'2px solid #feffff', zIndex:2
+                }}>
+                  <span style={{fontSize:'8px',fontWeight:'900',color:'#fff',lineHeight:1}}>
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                </span>
+              )}
             </div>
             <span style={{fontSize:`${Math.round(9*1.15)}px`,fontWeight:act?'800':'500',color:act?'#193f9e':'#bec1cc'}}>{label}</span>
           </div>
@@ -308,6 +340,7 @@ function NavbarInterna({ page, onNavigate }) {
     </div>
   )
 }
+
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false)
@@ -321,46 +354,73 @@ export default function App() {
   const [pendingNome, setPendingNome] = useState('')
   const [timerSecCrisi, setTimerSecCrisi] = useState(0)
   const [showExtra, setShowExtra] = useState(false)
-// ── PWA Install Prompt ──
-const [installPrompt, setInstallPrompt]     = useState(null)
-const [showInstallBanner, setInstallBanner] = useState(false)
+  // ── NUOVO: messaggi non letti dal medico ──
+  const [msgNonLetti, setMsgNonLetti] = useState(0)
 
-useEffect(() => {
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
-  const isInStandaloneMode = window.navigator.standalone === true
-  const hasDismissed = localStorage.getItem('damiapp_install_dismissed')
+  // ── PWA Install Prompt ──
+  const [installPrompt, setInstallPrompt]     = useState(null)
+  const [showInstallBanner, setInstallBanner] = useState(false)
 
-  if (isIOS && !isInStandaloneMode && !hasDismissed) {
-    const t = setTimeout(() => setInstallBanner('ios'), 3000)
-    return () => clearTimeout(t)
-  }
+  useEffect(() => {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isInStandaloneMode = window.navigator.standalone === true
+    const hasDismissed = localStorage.getItem('damiapp_install_dismissed')
+    if (isIOS && !isInStandaloneMode && !hasDismissed) {
+      const t = setTimeout(() => setInstallBanner('ios'), 3000)
+      return () => clearTimeout(t)
+    }
+    function handleBeforeInstall(e) {
+      e.preventDefault()
+      setInstallPrompt(e)
+      if (!hasDismissed) {
+        setTimeout(() => setInstallBanner('android'), 4000)
+      }
+    }
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall)
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
+  }, [])
 
-  function handleBeforeInstall(e) {
-    e.preventDefault()
-    setInstallPrompt(e)
-    if (!hasDismissed) {
-      setTimeout(() => setInstallBanner('android'), 4000)
+  async function handleInstall() {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') {
+      setInstallBanner(false)
+      setInstallPrompt(null)
     }
   }
 
-  window.addEventListener('beforeinstallprompt', handleBeforeInstall)
-  return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
-}, [])
-
-async function handleInstall() {
-  if (!installPrompt) return
-  installPrompt.prompt()
-  const { outcome } = await installPrompt.userChoice
-  if (outcome === 'accepted') {
+  function dismissInstall() {
     setInstallBanner(false)
-    setInstallPrompt(null)
+    localStorage.setItem('damiapp_install_dismissed', '1')
   }
-}
 
-function dismissInstall() {
-  setInstallBanner(false)
-  localStorage.setItem('damiapp_install_dismissed', '1')
-}
+  // ── Conteggio messaggi non letti (da medico) — attivo solo da autenticato non demo ──
+  useEffect(() => {
+    if (!authenticated || isDemo || isMedico) return
+    const unsub = onValue(ref(db, 'sharetokens'), snapTokens => {
+      const rawTokens = snapTokens.val()
+      if (!rawTokens) { setMsgNonLetti(0); return }
+      const tokenKeys = Object.entries(rawTokens)
+        .map(([k, enc]) => { const d = decrypt(enc); return d ? k : null })
+        .filter(Boolean)
+      if (tokenKeys.length === 0) { setMsgNonLetti(0); return }
+      let totale = 0
+      let pending = tokenKeys.length
+      tokenKeys.forEach(tk => {
+        onValue(ref(db, `messages/${tk}`), snapMsgs => {
+          const raw = snapMsgs.val()
+          if (raw) {
+            const msgs = Object.values(raw).map(enc => decrypt(enc)).filter(Boolean)
+            totale += msgs.filter(m => m.da === 'medico' && !m.letto).length
+          }
+          pending--
+          if (pending === 0) setMsgNonLetti(totale)
+        }, { onlyOnce: true })
+      })
+    })
+    return () => unsub()
+  }, [authenticated, isDemo, isMedico])
 
   function handleLogin(demo, tokenData) {
     setIsDemo(demo)
@@ -398,8 +458,6 @@ function dismissInstall() {
     : (pendingNome||nomeUtente||'Damiano')
 
   const noNav    = ['crisi','sos']
-  // Pagine in arrivo (solo quelle non ancora implementate)
-  const inArrivo = ['doc_personali','admin']
 
   return (
     <>
@@ -420,8 +478,8 @@ function dismissInstall() {
           {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
 
           {/* Pagine senza navbar */}
-          {page==='crisi'    && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
-          {page==='sos'      && <SOSPage onBack={()=>setPage('home')}/>}
+          {page==='crisi' && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
+          {page==='sos'   && <SOSPage onBack={()=>setPage('home')}/>}
 
           {/* Pagine con navbar */}
           {!noNav.includes(page) && (
@@ -433,57 +491,60 @@ function dismissInstall() {
                   onNavigate={handleNavigate}
                   showExtra={showExtra}
                   onToggleExtra={()=>setShowExtra(p=>!p)}
+                  msgNonLetti={msgNonLetti}
                 />
               )}
-              {page==='diario'    && <DiarioCrisi   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='terapie'   && <TerapiePage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='toilet'    && <ToiletPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='condividi' && <CondividiPage  onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='report'    && <ReportPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='magazzino' && <MagazzinoPage  onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='disturbi'  && <DisturbPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='utility'   && <UtilityPage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='rubrica'      && <RubricaPage     onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='pagamenti'    && <PagamentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='diario'       && <DiarioCrisi   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='terapie'      && <TerapiePage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='toilet'       && <ToiletPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='condividi'    && <CondividiPage  onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='messaggi'     && <MessaggiPage   onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='report'       && <ReportPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='magazzino'    && <MagazzinoPage  onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='disturbi'     && <DisturbPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='utility'      && <UtilityPage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='rubrica'      && <RubricaPage    onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='pagamenti'    && <PagamentiPage  onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
               {page==='cosa_portare' && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='doc_medici'   && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
-              {page==='doc_personali'&& <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
-              {page==='admin' && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
+              {page==='doc_medici'   && <DocumentiPage  onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
+              {page==='doc_personali'&& <DocumentiPage  onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
+              {page==='admin'        && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
 
               {page !== 'home' && (
-                <NavbarInterna page={page} onNavigate={handleNavigate}/>
+                <NavbarInterna page={page} onNavigate={handleNavigate} msgNonLetti={msgNonLetti}/>
               )}
+
               {/* BANNER INSTALLAZIONE PWA */}
-      {showInstallBanner && (
-        <div style={{
-          position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
-          width:'calc(100% - 24px)', maxWidth:'456px',
-          background:'#08184c', borderRadius:'20px', padding:'14px 16px',
-          boxShadow:'0 8px 32px rgba(2,21,63,0.45)', zIndex:3000,
-          display:'flex', alignItems:'center', gap:'12px',
-          fontFamily:"-apple-system,'Segoe UI',sans-serif",
-        }}>
-          <img src="/DamiLogo.png" alt="logo"
-            style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'cover',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:'14px',fontWeight:'900',color:'#fff',marginBottom:'2px'}}>Installa DamiAPP</div>
-            {showInstallBanner==='ios'
-              ? <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)',lineHeight:'1.4'}}>Tocca <strong style={{color:'#fff'}}>⎋ Condividi</strong> poi <strong style={{color:'#fff'}}>"Aggiungi a Home"</strong></div>
-              : <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)'}}>Accesso rapido dalla schermata Home</div>
-            }
-          </div>
-          <div style={{display:'flex',gap:'6px',flexShrink:0}}>
-            {showInstallBanner==='android' && (
-              <button onClick={handleInstall} style={{padding:'8px 14px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:'12px',color:'#08184c',background:'#fff',fontFamily:'inherit'}}>
-                Installa
-              </button>
-            )}
-            <button onClick={dismissInstall} style={{width:'30px',height:'30px',borderRadius:'50%',border:'none',cursor:'pointer',background:'rgba(255,255,255,0.15)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+              {showInstallBanner && (
+                <div style={{
+                  position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
+                  width:'calc(100% - 24px)', maxWidth:'456px',
+                  background:'#08184c', borderRadius:'20px', padding:'14px 16px',
+                  boxShadow:'0 8px 32px rgba(2,21,63,0.45)', zIndex:3000,
+                  display:'flex', alignItems:'center', gap:'12px',
+                  fontFamily:"-apple-system,'Segoe UI',sans-serif",
+                }}>
+                  <img src="/DamiLogo.png" alt="logo"
+                    style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'cover',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'14px',fontWeight:'900',color:'#fff',marginBottom:'2px'}}>Installa DamiAPP</div>
+                    {showInstallBanner==='ios'
+                      ? <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)',lineHeight:'1.4'}}>Tocca <strong style={{color:'#fff'}}>⎋ Condividi</strong> poi <strong style={{color:'#fff'}}>"Aggiungi a Home"</strong></div>
+                      : <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)'}}>Accesso rapido dalla schermata Home</div>
+                    }
+                  </div>
+                  <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+                    {showInstallBanner==='android' && (
+                      <button onClick={handleInstall} style={{padding:'8px 14px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:'12px',color:'#08184c',background:'#fff',fontFamily:'inherit'}}>
+                        Installa
+                      </button>
+                    )}
+                    <button onClick={dismissInstall} style={{width:'30px',height:'30px',borderRadius:'50%',border:'none',cursor:'pointer',background:'rgba(255,255,255,0.15)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>
+                      ×
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </>
