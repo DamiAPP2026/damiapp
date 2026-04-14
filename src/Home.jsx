@@ -237,7 +237,6 @@ export default function HomeScreen({
         zIndex:1100,
         transition:'bottom 0.30s cubic-bezier(.4,0,.2,1)',
         willChange:'bottom',
-        // nascosta ma presente nel DOM per l'animazione
         opacity: showExtra ? 1 : 0,
         pointerEvents: showExtra ? 'auto' : 'none',
       }}>
@@ -248,17 +247,29 @@ export default function HomeScreen({
               ...ni,
               height:'100%',
             }}>
+              {/* stesso indicatore top della navbar principale */}
+              {active && (
+                <div style={{
+                  position:'absolute', top:0, left:'50%',
+                  transform:'translateX(-50%)',
+                  width:'28px', height:'3px',
+                  background:'#193f9e',
+                  borderRadius:'0 0 4px 4px',
+                }}/>
+              )}
               <div style={{
-                width:'32px', height:'26px', display:'flex',
-                alignItems:'center', justifyContent:'center',
-                borderRadius:'8px',
+                width:'34px', height:'26px',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                borderRadius:'10px',
                 background: active ? '#EEF3FD' : 'transparent',
+                transition:'background 0.2s',
               }}>
-                <Icon size={16} color={active ? '#193f9e' : '#394058'} strokeWidth={active ? 2.5 : 2}/>
+                <Icon size={17} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
               </div>
               <span style={{
-                fontSize:'10px', fontWeight: active ? '800' : '600',
-                color: active ? '#193f9e' : '#394058', lineHeight:1,
+                fontSize:f(9), fontWeight: active ? '800' : '500',
+                color: active ? '#193f9e' : '#bec1cc',
+                transition:'color 0.2s', lineHeight:1,
               }}>{label}</span>
             </button>
           )
