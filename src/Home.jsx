@@ -313,9 +313,10 @@ export default function HomeScreen({
                 position:'relative',
               }}>
                 {isExtra
-                  ? <MoreHorizontal
+                  ? <ChevronUp
                       size={17}
-                      color={active ? '#193f9e' : '#bec1cc'}
+                      color={showExtra ? '#193f9e' : '#bec1cc'}
+                      style={{transform:showExtra?'rotate(0deg)':'rotate(180deg)',transition:'transform 0.30s cubic-bezier(.4,0,.2,1)'}}
                     />
                   : <Icon size={17} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
                 }
@@ -338,7 +339,7 @@ export default function HomeScreen({
                 color: active ? '#193f9e' : '#bec1cc',
                 transition:'color 0.2s', lineHeight:1,
               }}>
-                {isExtra ? (showExtra ? 'Chiudi' : 'Altro') : label}
+                {label}
               </span>
             </button>
           )
