@@ -1,326 +1,395 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Plus, Save, PenSquare, Trash2, ShowerHead, Sparkles, Waves, Activity, CircleDot, X, ChevronRight, TimerReset, Filter, ListChecks, Baby, Toilet, ArrowDownWideNarrow } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronLeft, Check, Save, Plus, PenSquare, X, Filter } from 'lucide-react'
+import { db } from './firebase'
+import { ref, push, onValue, remove, update } from 'firebase/database'
+import { processFirebaseSnap, encrypt } from './crypto'
 import ToiletCharts from './ToiletCharts'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const cardSh = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
 
-const MODALITA = ['CAA guidata', 'CAA autonoma', 'Manuale', 'Assistita']
-const BISOGNI = ['Pipì', 'Cacca', 'Entrambi', 'Nessuno']
-
-const DEMO = [
-  { id: 1, data: '14042026', ora: '0830', bisogno: 'Pipì', modalita: 'CAA guidata', incidentePippi: false, oraPippi: '', incidenteCacca: false, oraCacca: '', note: 'Mattina tranquilla', timestamp: Date.now() - 86400000 * 2 },
-  { id: 2, data: '14042026', ora: '1230', bisogno: 'Entrambi', modalita: 'CAA autonoma', incidentePippi: true, oraPippi: '1237', incidenteCacca: false, oraCacca: '', note: 'Piccolo incidente pipì', timestamp: Date.now() - 86400000 },
-  { id: 3, data: '13042026', ora: '1815', bisogno: 'Cacca', modalita: 'Manuale', incidentePippi: false, oraPippi: '', incidenteCacca: true, oraCacca: '1820', note: 'Serale', timestamp: Date.now() - 3600000 * 8 },
+const MODALITA = [
+  { key: 'adulto',      label: '👆 Comando adulto', sub: "L'adulto ha deciso il momento" },
+  { key: 'caa-guidata', label: '🤝 CAA guidata',    sub: 'Comunicazione Aumentativa guidata' },
+  { key: 'caa-auto',    label: '⭐ CAA autonoma',   sub: 'Ha comunicato da solo' },
 ]
 
-function oggiStr(d = new Date()) {
-  return `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${d.getFullYear()}`
-}
+const BISOGNI = [
+  { key: 'pippi',    label: '💧 Pipì' },
+  { key: 'cacca',    label: '💩 Cacca' },
+  { key: 'entrambi', label: '🔄 Entrambi' },
+]
 
-function toISOdata(data) {
-  if (!data) return ''
-  if (data.includes('-')) return data
-  const dd = data.slice(0, 2)
-  const mm = data.slice(2, 4)
-  const yyyy = data.slice(4)
-  return `${yyyy}-${mm}-${dd}`
-}
+const DEMO_LOG = [
+  { id:1, timestamp:Date.now()-3600000,   data:'12/04/2026', ora:'08:30', bisogno:'pippi',    modalita:'caa-auto',    incidentePippi:false, incidenteCacca:false },
+  { id:2, timestamp:Date.now()-7200000,   data:'12/04/2026', ora:'13:15', bisogno:'entrambi', modalita:'adulto',      incidentePippi:false, incidenteCacca:false },
+  { id:3, timestamp:Date.now()-86400000,  data:'11/04/2026', ora:'09:00', bisogno:'cacca',    modalita:'caa-guidata', incidentePippi:false, incidenteCacca:false },
+  { id:4, timestamp:Date.now()-90000000,  data:'11/04/2026', ora:'15:30', bisogno:'pippi',    modalita:'caa-auto',    incidentePippi:true,  oraPippi:'15:10', incidenteCacca:false },
+  { id:5, timestamp:Date.now()-180000000, data:'10/04/2026', ora:'11:00', bisogno:'nessuno',  modalita:'',            incidentePippi:true,  oraPippi:'10:50', incidenteCacca:true, oraCacca:'10:55' },
+]
 
-function toITAdata(data) {
-  if (!data) return ''
-  if (!data.includes('-')) return data
-  const [yyyy, mm, dd] = data.split('-')
-  return `${dd}${mm}${yyyy}`
-}
-
-function fmtDateLabel(ddmmyyyy) {
-  if (!ddmmyyyy || ddmmyyyy.length !== 8) return ddmmyyyy || ''
-  return `${ddmmyyyy.slice(0, 2)}/${ddmmyyyy.slice(2, 4)}/${ddmmyyyy.slice(4)}`
-}
-
-function todayTime() {
+function matchOggi(dataField) {
+  if (!dataField) return false
   const d = new Date()
-  return `${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
+  const oggi = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+  const raw = String(dataField).replace(/[\/\-\s]/g,'')
+  const oggiRaw = oggi.replace(/[\/\-\s]/g,'')
+  return raw === oggiRaw || String(dataField) === oggi
 }
 
-function parseMin(t) {
-  if (!t || t.length < 4) return 0
-  return Number(t.slice(0, 2)) * 60 + Number(t.slice(2, 4))
-}
-
-function weekLabel(offset) {
+function nowDate() {
   const d = new Date()
-  d.setDate(d.getDate() - offset)
-  return oggiStr(d)
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
 }
 
-export default function ToiletPage({ onBack, isDemo, onNavigate }) {
-  const [tab, setTab] = useState('sessioni')
-  const [items, setItems] = useState(DEMO)
-  const [editing, setEditing] = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
-  const [month, setMonth] = useState(new Date())
-  const [filterNeed, setFilterNeed] = useState('tutti')
-  const [filterMode, setFilterMode] = useState('tutti')
-  const [form, setForm] = useState({ data: oggiStr(), ora: todayTime(), bisogno: 'Nessuno', modalita: 'CAA guidata', incidentePippi: false, oraPippi: '', incidenteCacca: false, oraCacca: '', note: '' })
-  const chartRef = useRef(null)
+function nowTime() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+}
 
-  useEffect(() => {
-    if (!editing) return
-    setForm({
-      data: editing.data || oggiStr(),
-      ora: editing.ora || todayTime(),
-      bisogno: editing.bisogno || 'Nessuno',
-      modalita: editing.modalita || 'CAA guidata',
-      incidentePippi: !!editing.incidentePippi,
-      oraPippi: editing.oraPippi || '',
-      incidenteCacca: !!editing.incidenteCacca,
-      oraCacca: editing.oraCacca || '',
-      note: editing.note || '',
-    })
-    setShowForm(true)
-  }, [editing])
-
-  const filtered = useMemo(() => {
-    return items.filter((x) => {
-      const okNeed = filterNeed === 'tutti' || x.bisogno === filterNeed
-      const okMode = filterMode === 'tutti' || x.modalita === filterMode
-      return okNeed && okMode
-    }).sort((a, b) => (b.data + b.ora).localeCompare(a.data + a.ora))
-  }, [items, filterNeed, filterMode])
-
-  const stats = useMemo(() => {
-    const total = items.length
-    const pipi = items.filter((x) => x.bisogno === 'Pipì' || x.bisogno === 'Entrambi').length
-    const cacca = items.filter((x) => x.bisogno === 'Cacca' || x.bisogno === 'Entrambi').length
-    const inc = items.filter((x) => x.incidentePippi || x.incidenteCacca).length
-    return { total, pipi, cacca, inc }
-  }, [items])
-
-  const monthLabel = month.toLocaleString('it-IT', { month: 'long', year: 'numeric' })
-  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
-  const firstDow = new Date(month.getFullYear(), month.getMonth(), 1).getDay()
-  const grid = Array.from({ length: firstDow === 0 ? 6 : firstDow - 1 }).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1))
-  const byDay = items.reduce((acc, x) => {
-    if (x.data.slice(2, 4) === String(month.getMonth() + 1).padStart(2, '0') && x.data.slice(4) === String(month.getFullYear())) {
-      const d = Number(x.data.slice(0, 2))
-      acc[d] = (acc[d] || 0) + 1
-    }
-    return acc
-  }, {})
-
-  const saveItem = () => {
-    const data = { ...form, id: editing?.id || Date.now(), timestamp: Date.now() }
-    setItems((prev) => editing ? prev.map((x) => (x.id === editing.id ? { ...data } : x)) : [data, ...prev])
-    setEditing(null)
-    setShowForm(false)
-    setForm({ data: oggiStr(), ora: todayTime(), bisogno: 'Nessuno', modalita: 'CAA guidata', incidentePippi: false, oraPippi: '', incidenteCacca: false, oraCacca: '', note: '' })
+function emptyForm() {
+  return {
+    data: nowDate(), ora: nowTime(),
+    bisogno: '', modalita: '',
+    incidentePippi: false, oraPippi: '',
+    incidenteCacca: false, oraCacca: '',
+    note: '',
   }
+}
 
-  const setField = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+const inputStyle = {
+  width:'100%', padding:'11px 12px', borderRadius:'12px',
+  border:'1.5px solid #f0f1f4', fontSize:'15px', color:'#02153f',
+  background:'#f3f4f7', fontFamily:'inherit', outline:'none', boxSizing:'border-box',
+}
+const labelStyle = {
+  fontSize:'13px', fontWeight:'700', color:'#7c8088',
+  textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'6px', display:'block',
+}
 
+function FormFields({ formData, setFormData, onSubmit, submitLabel, isSaved }) {
   return (
-    <div style={{minHeight:'100vh',background:'#f3f4f7',fontFamily:"-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",paddingBottom:110}}>
-      <div style={{background:'linear-gradient(135deg,#7B5EA7,#4A6CF7)',padding:'14px 16px 18px',boxShadow:sh}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
-          <button onClick={onBack} style={{width:38,height:38,borderRadius:999,border:'none',background:'rgba(255,255,255,0.16)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>
-            <ArrowLeft size={20} />
-          </button>
-          <div style={{flex:1}}>
-            <div style={{fontSize:f(20),fontWeight:900,color:'#fff'}}>Toilet Training</div>
-            <div style={{fontSize:f(11),color:'rgba(255,255,255,0.7)'}}>{isDemo ? 'Modalità demo' : 'Sessioni, incidenti e grafici'}</div>
+    <>
+      <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+        <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📅 Data e ora</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+          <div>
+            <label style={labelStyle}>Data</label>
+            <input type="text" value={formData.data} onChange={e=>setFormData({...formData,data:e.target.value})} placeholder="gg/mm/aaaa" style={inputStyle}/>
           </div>
-          <button onClick={() => setShowForm(true)} style={{width:38,height:38,borderRadius:999,border:'none',background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',color:'#7B5EA7'}}>
-            <Plus size={20} />
-          </button>
-        </div>
-
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-          {[
-            { label: 'Sessioni', value: stats.total },
-            { label: 'Pipì', value: stats.pipi },
-            { label: 'Cacca', value: stats.cacca },
-            { label: 'Incidenti', value: stats.inc },
-          ].map((s) => (
-            <div key={s.label} style={{background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.16)',borderRadius:14,padding:'10px 8px',textAlign:'center'}}>
-              <div style={{fontSize:f(18),fontWeight:900,color:'#fff'}}>{s.value}</div>
-              <div style={{fontSize:f(10),color:'rgba(255,255,255,0.7)'}}>{s.label}</div>
-            </div>
-          ))}
+          <div>
+            <label style={labelStyle}>Ora</label>
+            <input type="time" value={formData.ora} onChange={e=>setFormData({...formData,ora:e.target.value})} style={inputStyle}/>
+          </div>
         </div>
       </div>
 
-      <div style={{padding:12}}>
-        <div style={{display:'flex',gap:8,background:'#fff',borderRadius:16,padding:6,boxShadow:cardSh,marginBottom:12}}>
-          {[
-            ['sessioni', 'Lista'],
-            ['calendario', 'Calendario'],
-            ['stat', 'Statistiche'],
-          ].map(([k, label]) => (
-            <button key={k} onClick={() => setTab(k)} style={{flex:1,border:'none',borderRadius:12,padding:'10px 8px',background:tab===k?'#EEF3FD':'transparent',color:tab===k?'#193f9e':'#394058',fontWeight:800,fontSize:f(12)}}>{label}</button>
-          ))}
-        </div>
-
-        {tab === 'sessioni' && (
-          <>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-              <div style={{fontSize:f(12),fontWeight:700,color:'#7c8088'}}>Tocca una sessione per modificarla</div>
-              <button onClick={() => setShowFilters((v) => !v)} style={{display:'flex',alignItems:'center',gap:6,border:'none',background:'#fff',borderRadius:999,padding:'9px 12px',boxShadow:cardSh,color:'#193f9e',fontWeight:800,fontSize:f(12)}}><Filter size={14} /> Filtri</button>
+      <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+        <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'4px'}}>⚠️ Incidente addosso</div>
+        <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Indipendente dal bagno</div>
+        {[
+          { val:formData.incidentePippi, key:'incidentePippi', icon:'💧', title:'Pipì addosso', oraKey:'oraPippi', oraVal:formData.oraPippi, labelOra:'Ora incidente pipì' },
+          { val:formData.incidenteCacca, key:'incidenteCacca', icon:'💩', title:'Cacca addosso', oraKey:'oraCacca', oraVal:formData.oraCacca, labelOra:'Ora incidente cacca' },
+        ].map(({val,key,icon,title,oraKey,oraVal,labelOra},i) => (
+          <div key={i}>
+            <div onClick={()=>setFormData({...formData,[key]:!val})} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px',borderRadius:'14px',cursor:'pointer',background:val?'#FEF0F4':'#f3f4f7',border:`2px solid ${val?'#F7295A33':'transparent'}`,marginBottom:'8px',transition:'all 0.15s'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <span style={{fontSize:'22px'}}>{icon}</span>
+                <div style={{fontSize:f(13),fontWeight:'700',color:val?'#F7295A':'#394058'}}>{title}</div>
+              </div>
+              <div style={{width:'48px',height:'26px',borderRadius:'13px',background:val?'#F7295A':'#dde0ed',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+                <div style={{width:'20px',height:'20px',borderRadius:'50%',background:'#fff',position:'absolute',top:'3px',left:val?'25px':'3px',transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}/>
+              </div>
             </div>
-            {showFilters && (
-              <div style={{background:'#fff',borderRadius:18,padding:12,boxShadow:cardSh,marginBottom:12}}>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                  <select value={filterNeed} onChange={(e) => setFilterNeed(e.target.value)} style={{border:'1px solid rgba(2,21,63,0.12)',borderRadius:12,padding:12,background:'#f8fafc'}}>
-                    <option value="tutti">Tutti i bisogni</option>
-                    {BISOGNI.map((b) => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                  <select value={filterMode} onChange={(e) => setFilterMode(e.target.value)} style={{border:'1px solid rgba(2,21,63,0.12)',borderRadius:12,padding:12,background:'#f8fafc'}}>
-                    <option value="tutti">Tutte le modalità</option>
-                    {MODALITA.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
+            {val && (
+              <div style={{padding:'0 4px 10px'}}>
+                <label style={labelStyle}>{labelOra}</label>
+                <input type="time" value={oraVal} onChange={e=>setFormData({...formData,[oraKey]:e.target.value})} style={inputStyle}/>
               </div>
             )}
+          </div>
+        ))}
+      </div>
 
-            {filtered.map((x) => (
-              <div key={x.id} style={{background:'#fff',borderRadius:18,padding:14,boxShadow:cardSh,marginBottom:10}}>
-                <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start'}}>
-                  <div style={{flex:1}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:6}}>
-                      <div style={{fontSize:f(14),fontWeight:900,color:'#02153f'}}>{fmtDateLabel(x.data)} • {x.ora.slice(0,2)}:{x.ora.slice(2,4)}</div>
-                      <span style={{fontSize:f(10),padding:'3px 8px',borderRadius:999,background:'#EEF3FD',color:'#193f9e',fontWeight:800}}>{x.bisogno}</span>
-                      <span style={{fontSize:f(10),padding:'3px 8px',borderRadius:999,background:'#f3f4f7',color:'#394058',fontWeight:800}}>{x.modalita}</span>
-                    </div>
-                    <div style={{fontSize:f(11),color:'#7c8088',lineHeight:1.5}}>
-                      {x.note || 'Nessuna nota'}
-                    </div>
-                    <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-                      {x.incidentePippi && <span style={{fontSize:f(10),padding:'4px 8px',borderRadius:999,background:'#FEF0F4',color:'#F7295A',fontWeight:800}}>Incidente pipì {x.oraPippi ? `• ${x.oraPippi.slice(0,2)}:${x.oraPippi.slice(2,4)}` : ''}</span>}
-                      {x.incidenteCacca && <span style={{fontSize:f(10),padding:'4px 8px',borderRadius:999,background:'#FFF5EE',color:'#FF8C42',fontWeight:800}}>Incidente cacca {x.oraCacca ? `• ${x.oraCacca.slice(0,2)}:${x.oraCacca.slice(2,4)}` : ''}</span>}
-                    </div>
-                  </div>
-                  <button onClick={() => setEditing(x)} style={{width:38,height:38,borderRadius:12,border:'none',background:'#EEF3FD',color:'#193f9e',display:'flex',alignItems:'center',justifyContent:'center'}}><PenSquare size={18} /></button>
+      <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+        <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'4px'}}>🚽 Ha usato il bagno?</div>
+        <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Opzionale</div>
+        <label style={labelStyle}>Cosa ha fatto</label>
+        <div style={{display:'flex',gap:'7px',marginBottom:'14px'}}>
+          {BISOGNI.map(({key,label}) => (
+            <div key={key} onClick={()=>setFormData({...formData,bisogno:formData.bisogno===key?'':key,modalita:formData.bisogno===key?'':formData.modalita})} style={{flex:1,padding:'10px 6px',borderRadius:'12px',cursor:'pointer',textAlign:'center',fontSize:f(12),fontWeight:'700',border:`2px solid ${formData.bisogno===key?'#7B5EA7':'#f0f1f4'}`,background:formData.bisogno===key?'#F5F3FF':'#feffff',color:formData.bisogno===key?'#7B5EA7':'#7c8088',transition:'all 0.15s'}}>{label}</div>
+          ))}
+        </div>
+        {formData.bisogno && (
+          <>
+            <label style={labelStyle}>🧠 Come è andato</label>
+            {MODALITA.map(opt => (
+              <div key={opt.key} onClick={()=>setFormData({...formData,modalita:opt.key})} style={{display:'flex',alignItems:'center',gap:'12px',padding:'11px 12px',borderRadius:'12px',cursor:'pointer',marginBottom:'7px',border:`2px solid ${formData.modalita===opt.key?'#7B5EA7':'#f0f1f4'}`,background:formData.modalita===opt.key?'#F5F3FF':'#feffff',transition:'all 0.15s'}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:f(13),fontWeight:'700',color:formData.modalita===opt.key?'#7B5EA7':'#02153f'}}>{opt.label}</div>
+                  <div style={{fontSize:f(10),color:'#7c8088'}}>{opt.sub}</div>
                 </div>
+                {formData.modalita===opt.key && <Check size={16} color="#7B5EA7"/>}
               </div>
             ))}
           </>
         )}
-
-        {tab === 'calendario' && (
-          <div style={{background:'#fff',borderRadius:18,padding:14,boxShadow:cardSh}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <div>
-                <div style={{fontSize:f(16),fontWeight:900,color:'#02153f'}}>{monthLabel}</div>
-                <div style={{fontSize:f(11),color:'#7c8088'}}>Giorni con sessioni evidenziati</div>
-              </div>
-              <div style={{display:'flex',gap:8}}>
-                <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} style={{border:'none',background:'#f3f4f7',borderRadius:12,padding:'10px 12px'}}><ChevronRight size={16} style={{transform:'rotate(180deg)'}} /></button>
-                <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} style={{border:'none',background:'#f3f4f7',borderRadius:12,padding:'10px 12px'}}><ChevronRight size={16} /></button>
-              </div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:8,fontSize:f(10),color:'#7c8088',fontWeight:800,marginBottom:8,textAlign:'center'}}>
-              {['L','M','M','G','V','S','D'].map((d) => <div key={d}>{d}</div>)}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:8}}>
-              {grid.map((d, i) => (
-                <div key={i} style={{aspectRatio:'1/1',borderRadius:14,background:d ? (byDay[d] ? '#EEF3FD' : '#f8fafc') : 'transparent',border:d ? '1px solid rgba(2,21,63,0.08)' : 'none',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',color:d ? '#02153f' : 'transparent',fontWeight:800}}>
-                  {d || ''}
-                  {d && byDay[d] ? <span style={{position:'absolute',bottom:8,right:8,width:8,height:8,borderRadius:999,background:'#7B5EA7'}} /> : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === 'stat' && (
-          <>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
-              {[
-                { l: 'Ultime 7 giornate', v: items.filter((x) => parseInt(x.data, 10) >= parseInt(weekLabel(7), 10)).length, c: '#7B5EA7' },
-                { l: 'Incidenti', v: stats.inc, c: '#F7295A' },
-                { l: 'CAA autonoma', v: items.filter((x) => x.modalita === 'CAA autonoma').length, c: '#00BFA6' },
-                { l: 'CAA guidata', v: items.filter((x) => x.modalita === 'CAA guidata').length, c: '#193f9e' },
-              ].map((s) => (
-                <div key={s.l} style={{background:'#fff',borderRadius:18,padding:14,boxShadow:cardSh}}>
-                  <div style={{fontSize:f(11),color:'#7c8088',marginBottom:8}}>{s.l}</div>
-                  <div style={{fontSize:f(20),fontWeight:900,color:s.c}}>{s.v}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{background:'#fff',borderRadius:18,padding:14,boxShadow:cardSh,marginBottom:12}}>
-              <ToiletCharts dati={items} compact titolo={false} />
-            </div>
-          </>
-        )}
+        <label style={{...labelStyle,marginTop:'10px'}}>📝 Note</label>
+        <textarea value={formData.note} onChange={e=>setFormData({...formData,note:e.target.value})} rows={2} placeholder="Annotazioni opzionali..." style={{...inputStyle,resize:'vertical'}}/>
       </div>
 
-      {showForm && (
-        <div onClick={() => { setShowForm(false); setEditing(null) }} style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.45)',display:'flex',alignItems:'flex-end',zIndex:40}}>
-          <div onClick={(e) => e.stopPropagation()} style={{width:'100%',maxWidth:480,margin:'0 auto',background:'#fff',borderTopLeftRadius:22,borderTopRightRadius:22,padding:14,boxShadow:sh,maxHeight:'88vh',overflowY:'auto'}}>
-            <div style={{width:42,height:5,borderRadius:999,background:'#d9dfeb',margin:'0 auto 14px'}} />
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <div style={{fontSize:f(16),fontWeight:900,color:'#02153f'}}>{editing ? 'Modifica sessione' : 'Nuova sessione'}</div>
-              <button onClick={() => { setShowForm(false); setEditing(null) }} style={{border:'none',background:'#f3f4f7',width:36,height:36,borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center'}}><X size={18} /></button>
-            </div>
+      <button type="button" onClick={onSubmit} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:isSaved?'linear-gradient(135deg,#00BFA6,#2e84e9)':'linear-gradient(135deg,#7B5EA7,#2e84e9)',boxShadow:'0 6px 20px rgba(123,94,167,0.35)',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',transition:'all 0.3s',marginBottom:'8px'}}>
+        {isSaved ? <><Check size={18} color="#fff"/> Salvato!</> : <><Save size={18} color="#fff"/> {submitLabel}</>}
+      </button>
+    </>
+  )
+}
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-              <label style={{display:'grid',gap:6,fontSize:f(11),fontWeight:800,color:'#394058'}}>Data
-                <input value={form.data} onChange={(e) => setField('data', e.target.value)} placeholder="ddmmyyyy" style={{padding:12,borderRadius:12,border:'1px solid rgba(2,21,63,0.12)'}} />
-              </label>
-              <label style={{display:'grid',gap:6,fontSize:f(11),fontWeight:800,color:'#394058'}}>Ora
-                <input value={form.ora} onChange={(e) => setField('ora', e.target.value)} placeholder="hhmm" style={{padding:12,borderRadius:12,border:'1px solid rgba(2,21,63,0.12)'}} />
-              </label>
-            </div>
+export default function ToiletPage({ onBack, isDemo }) {
+  const [tab, setTab] = useState('form')
+  const [log, setLog] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saved, setSaved] = useState(false)
+  const [filtro, setFiltro] = useState('settimana')
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterBisogno, setFilterBisogno] = useState('tutti')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editItem, setEditItem] = useState(null)
+  const [form, setForm] = useState(emptyForm())
+  const [editForm, setEditForm] = useState(emptyForm())
 
-            <div style={{marginTop:10,display:'grid',gap:10}}>
-              <div style={{fontSize:f(11),fontWeight:800,color:'#394058'}}>Bisogno</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
-                {BISOGNI.map((b) => (
-                  <button key={b} onClick={() => setField('bisogno', b)} style={{border:'1px solid rgba(2,21,63,0.12)',background:form.bisogno===b?'#EEF3FD':'#fff',color:form.bisogno===b?'#193f9e':'#02153f',borderRadius:12,padding:'11px 10px',fontWeight:800}}>{b}</button>
-                ))}
-              </div>
-            </div>
+  useEffect(() => {
+    if (isDemo) { setLog(DEMO_LOG); setLoading(false); return }
+    const ttRef = ref(db, 'toilet_training')
+    const unsub = onValue(ttRef, (snap) => {
+      const lista = processFirebaseSnap(snap).sort((a,b) => b.timestamp - a.timestamp)
+      setLog(lista)
+      setLoading(false)
+    })
+    return () => unsub()
+  }, [isDemo])
 
-            <div style={{marginTop:10,display:'grid',gap:10}}>
-              <div style={{fontSize:f(11),fontWeight:800,color:'#394058'}}>Modalità</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
-                {MODALITA.map((m) => (
-                  <button key={m} onClick={() => setField('modalita', m)} style={{border:'1px solid rgba(2,21,63,0.12)',background:form.modalita===m?'#EEF3FD':'#fff',color:form.modalita===m?'#193f9e':'#02153f',borderRadius:12,padding:'11px 10px',fontWeight:800}}>{m}</button>
-                ))}
-              </div>
-            </div>
+  function handleSave() {
+    const hasBagno = form.bisogno !== ''
+    const hasIncidente = form.incidentePippi || form.incidenteCacca
+    if (!hasBagno && !hasIncidente) {
+      alert("Seleziona cosa ha fatto in bagno oppure se c'è stato un incidente")
+      return
+    }
+    if (hasBagno && !form.modalita) { alert('Seleziona come è andato in bagno'); return }
+    const sessione = {
+      id: Date.now(), timestamp: Date.now(),
+      data: form.data, ora: form.ora,
+      bisogno: form.bisogno || 'nessuno', modalita: form.modalita,
+      incidentePippi: form.incidentePippi, oraPippi: form.incidentePippi ? form.oraPippi : '',
+      incidenteCacca: form.incidenteCacca, oraCacca: form.incidenteCacca ? form.oraCacca : '',
+      note: form.note,
+    }
+    if (!isDemo) push(ref(db, 'toilet_training'), encrypt(sessione))
+    else setLog(prev => [sessione, ...prev])
+    setSaved(true)
+    setTimeout(() => { setSaved(false); setForm(emptyForm()) }, 1500)
+  }
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10}}>
-              <label style={{display:'flex',alignItems:'center',gap:8,padding:12,borderRadius:12,border:'1px solid rgba(2,21,63,0.12)'}}>
-                <input type="checkbox" checked={form.incidentePippi} onChange={(e) => setField('incidentePippi', e.target.checked)} /> Incidente pipì
-              </label>
-              <label style={{display:'flex',alignItems:'center',gap:8,padding:12,borderRadius:12,border:'1px solid rgba(2,21,63,0.12)'}}>
-                <input type="checkbox" checked={form.incidenteCacca} onChange={(e) => setField('incidenteCacca', e.target.checked)} /> Incidente cacca
-              </label>
-            </div>
+  function openEdit(item) {
+    setEditItem(item)
+    setEditForm({
+      data: item.data || nowDate(), ora: item.ora || nowTime(),
+      bisogno: item.bisogno === 'nessuno' ? '' : (item.bisogno || ''),
+      modalita: item.modalita || '',
+      incidentePippi: !!item.incidentePippi, oraPippi: item.oraPippi || '',
+      incidenteCacca: !!item.incidenteCacca, oraCacca: item.oraCacca || '',
+      note: item.note || '',
+    })
+    setShowEditModal(true)
+  }
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10}}>
-              <label style={{display:'grid',gap:6,fontSize:f(11),fontWeight:800,color:'#394058'}}>Ora pipì
-                <input value={form.oraPippi} onChange={(e) => setField('oraPippi', e.target.value)} placeholder="hhmm" style={{padding:12,borderRadius:12,border:'1px solid rgba(2,21,63,0.12)'}} />
-              </label>
-              <label style={{display:'grid',gap:6,fontSize:f(11),fontWeight:800,color:'#394058'}}>Ora cacca
-                <input value={form.oraCacca} onChange={(e) => setField('oraCacca', e.target.value)} placeholder="hhmm" style={{padding:12,borderRadius:12,border:'1px solid rgba(2,21,63,0.12)'}} />
-              </label>
-            </div>
+  function handleUpdate() {
+    if (!editItem) return
+    const updated = {
+      ...editItem,
+      data: editForm.data, ora: editForm.ora,
+      bisogno: editForm.bisogno || 'nessuno', modalita: editForm.modalita,
+      incidentePippi: editForm.incidentePippi, oraPippi: editForm.incidentePippi ? editForm.oraPippi : '',
+      incidenteCacca: editForm.incidenteCacca, oraCacca: editForm.incidenteCacca ? editForm.oraCacca : '',
+      note: editForm.note,
+    }
+    if (!isDemo && editItem._firebaseKey) {
+      update(ref(db, `toilet_training/${editItem._firebaseKey}`), encrypt(updated))
+    } else {
+      setLog(prev => prev.map(x => x.id === editItem.id ? updated : x))
+    }
+    setShowEditModal(false); setEditItem(null)
+  }
 
-            <label style={{display:'grid',gap:6,fontSize:f(11),fontWeight:800,color:'#394058',marginTop:10}}>Note
-              <textarea value={form.note} onChange={(e) => setField('note', e.target.value)} rows={3} style={{padding:12,borderRadius:12,border:'1px solid rgba(2,21,63,0.12)',resize:'vertical'}} />
-            </label>
+  function handleDelete(item) {
+    if (!window.confirm('Eliminare questa sessione?')) return
+    if (!isDemo && item._firebaseKey) remove(ref(db, `toilet_training/${item._firebaseKey}`))
+    else setLog(prev => prev.filter(x => x.id !== item.id))
+    setShowEditModal(false); setEditItem(null)
+  }
 
-            <button onClick={saveItem} style={{marginTop:14,width:'100%',border:'none',borderRadius:14,padding:'13px 14px',background:'linear-gradient(135deg,#7B5EA7,#4A6CF7)',color:'#fff',fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-              <Save size={18} /> {editing ? 'Aggiorna sessione' : 'Salva sessione'}
+  function logFiltrato() {
+    let lista = log
+    if (filtro === 'oggi')      lista = lista.filter(s => matchOggi(s.data))
+    if (filtro === 'settimana') lista = lista.filter(s => (s.timestamp||0) >= Date.now()-7*86400000)
+    if (filtro === 'mese')      lista = lista.filter(s => (s.timestamp||0) >= Date.now()-30*86400000)
+    if (filterBisogno !== 'tutti') lista = lista.filter(s => s.bisogno === filterBisogno)
+    return lista
+  }
+
+  const logOggi = log.filter(s => matchOggi(s.data))
+  const bagnoOggi = logOggi.filter(s => s.bisogno && s.bisogno !== 'nessuno').length
+  const incidentiOggi = logOggi.filter(s => s.incidentePippi || s.incidenteCacca).length
+  const logVisibile = logFiltrato()
+
+  return (
+    <>
+      <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.tw{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:140px;width:100%;max-width:480px;margin:0 auto;}`}</style>
+      <div className="tw">
+
+        <div style={{background:'linear-gradient(135deg,#7B5EA7,#2e84e9)',padding:'14px 16px 20px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'14px'}}>
+            <button type="button" onClick={onBack} style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <ChevronLeft size={20} color="#fff"/>
             </button>
+            <div>
+              <div style={{fontSize:f(18),fontWeight:'900',color:'#fff'}}>🚽 Toilet Training</div>
+              <div style={{fontSize:f(11),color:'rgba(255,255,255,0.75)'}}>{isDemo?'🎭 Dati demo':'Registra sessione'}</div>
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'8px'}}>
+            {[
+              {label:'Bagno oggi',    val:bagnoOggi,      color:'#fff'},
+              {label:'Incidenti oggi',val:incidentiOggi,  color:incidentiOggi>0?'#FFD93D':'#fff'},
+              {label:'Tot. sessioni', val:log.length,     color:'#fff'},
+            ].map(({label,val,color},i) => (
+              <div key={i} style={{background:'rgba(255,255,255,0.15)',borderRadius:'12px',padding:'8px',textAlign:'center'}}>
+                <div style={{fontSize:f(20),fontWeight:'900',color}}>{val}</div>
+                <div style={{fontSize:f(10),color:'rgba(255,255,255,0.75)',marginTop:'2px'}}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',background:'#f3f4f7',margin:'12px 12px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
+          {[{k:'form',l:'➕ Nuova'},{k:'storico',l:'📋 Storico'},{k:'grafici',l:'📊 Grafici'}].map(({k,l}) => (
+            <button type="button" key={k} onClick={()=>setTab(k)} style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:tab===k?'#feffff':'transparent',color:tab===k?'#7B5EA7':'#7c8088',boxShadow:tab===k?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        <div style={{padding:'12px'}}>
+
+          {tab==='form' && (
+            <>
+              <FormFields formData={form} setFormData={setForm} onSubmit={handleSave} submitLabel="Salva sessione" isSaved={saved}/>
+              {isDemo && <div style={{textAlign:'center',fontSize:f(11),color:'#8B6914',fontWeight:'600'}}>🎭 Modalità demo — dati non salvati su Firebase</div>}
+            </>
+          )}
+
+          {tab==='storico' && (
+            <>
+              <div style={{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}}>
+                {[{k:'oggi',l:'Oggi'},{k:'settimana',l:'7 giorni'},{k:'mese',l:'30 giorni'},{k:'tutto',l:'Tutto'}].map(({k,l}) => (
+                  <button type="button" key={k} onClick={()=>setFiltro(k)} style={{padding:'6px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:filtro===k?'#7B5EA7':'#feffff',color:filtro===k?'#fff':'#7c8088',boxShadow:filtro===k?'0 3px 10px rgba(123,94,167,0.3)':'0 2px 6px rgba(0,0,0,0.06)',transition:'all 0.2s'}}>
+                    {l}
+                  </button>
+                ))}
+                <button type="button" onClick={()=>setShowFilters(v=>!v)} style={{padding:'6px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:'#feffff',color:'#7c8088',boxShadow:'0 2px 6px rgba(0,0,0,0.06)',display:'flex',alignItems:'center',gap:'4px'}}>
+                  <Filter size={12}/> Filtri
+                </button>
+              </div>
+
+              {showFilters && (
+                <div style={{background:'#feffff',borderRadius:'14px',padding:'12px',marginBottom:'10px',boxShadow:cardSh}}>
+                  <label style={labelStyle}>Tipo bisogno</label>
+                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                    {[{k:'tutti',l:'Tutti'}, ...BISOGNI.map(b=>({k:b.key,l:b.label}))].map(({k,l}) => (
+                      <button type="button" key={k} onClick={()=>setFilterBisogno(k)} style={{padding:'5px 10px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:filterBisogno===k?'#7B5EA7':'#f3f4f7',color:filterBisogno===k?'#fff':'#7c8088',transition:'all 0.2s'}}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📋 {logVisibile.length} sessioni</div>
+                {loading ? (
+                  <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Caricamento...</div>
+                ) : logVisibile.length===0 ? (
+                  <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Nessuna sessione in questo periodo</div>
+                ) : (
+                  logVisibile.map((s,i) => {
+                    const hasBagno = s.bisogno && s.bisogno !== 'nessuno'
+                    const hasInc = s.incidentePippi || s.incidenteCacca
+                    const borderColor = hasInc ? '#F7295A' : hasBagno ? '#7B5EA7' : '#bec1cc'
+                    return (
+                      <div key={s.id||i} style={{padding:'11px 12px',borderRadius:'12px',marginBottom:'8px',background:'#f3f4f7',borderLeft:`3px solid ${borderColor}`}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'5px'}}>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',flex:1}}>
+                            {hasBagno && <span style={{fontSize:f(12),fontWeight:'800',color:'#7B5EA7'}}>{s.bisogno==='pippi'?'💧 Pipì':s.bisogno==='cacca'?'💩 Cacca':'🔄 Entrambi'}</span>}
+                            {hasInc && <span style={{fontSize:f(11),fontWeight:'700',color:'#F7295A',background:'#FEF0F4',padding:'1px 8px',borderRadius:'20px'}}>⚠️ Incidente{s.incidentePippi&&s.incidenteCacca?' pipì+cacca':s.incidentePippi?' pipì':' cacca'}</span>}
+                            {!hasBagno && !hasInc && <span style={{fontSize:f(11),color:'#bec1cc'}}>Sessione vuota</span>}
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
+                            <span style={{fontSize:f(10),color:'#bec1cc'}}>{s.data} {s.ora}</span>
+                            <button type="button" onClick={()=>openEdit(s)} style={{width:'28px',height:'28px',borderRadius:'8px',border:'none',background:'#e8eaf0',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <PenSquare size={13} color="#7c8088"/>
+                            </button>
+                          </div>
+                        </div>
+                        {hasBagno && s.modalita && <div style={{fontSize:f(11),color:'#7c8088'}}>{s.modalita==='adulto'?'👆 Comando adulto':s.modalita==='caa-guidata'?'🤝 CAA guidata':'⭐ CAA autonoma'}</div>}
+                        {s.incidentePippi && s.oraPippi && <div style={{fontSize:f(10),color:'#F7295A',marginTop:'3px'}}>💧 Pipì addosso alle {s.oraPippi}</div>}
+                        {s.incidenteCacca && s.oraCacca && <div style={{fontSize:f(10),color:'#F7295A',marginTop:'2px'}}>💩 Cacca addosso alle {s.oraCacca}</div>}
+                        {s.note ? <div style={{fontSize:f(10),color:'#7c8088',marginTop:'3px',fontStyle:'italic'}}>{s.note}</div> : null}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </>
+          )}
+
+          {tab==='grafici' && (
+            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+              {log.length===0 ? (
+                <div style={{textAlign:'center',padding:'24px',color:'#bec1cc'}}>
+                  <div style={{fontSize:'32px',marginBottom:'8px'}}>📊</div>
+                  <div style={{fontSize:f(13)}}>Nessuna sessione registrata</div>
+                </div>
+              ) : (
+                <ToiletCharts dati={log} titolo={false}/>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* MODALE MODIFICA */}
+      {showEditModal && editItem && (
+        <div onClick={()=>{setShowEditModal(false);setEditItem(null)}} style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:200}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:'480px',background:'#f3f4f7',borderTopLeftRadius:'24px',borderTopRightRadius:'24px',padding:'14px',maxHeight:'88vh',overflowY:'auto'}}>
+            <div style={{width:'40px',height:'4px',borderRadius:'99px',background:'#dde0ed',margin:'0 auto 14px'}}/>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
+              <div style={{fontSize:f(15),fontWeight:'900',color:'#02153f'}}>✏️ Modifica sessione</div>
+              <div style={{display:'flex',gap:'8px'}}>
+                <button type="button" onClick={()=>handleDelete(editItem)} style={{padding:'8px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),background:'#FEF0F4',color:'#F7295A',fontFamily:'inherit'}}>
+                  🗑 Elimina
+                </button>
+                <button type="button" onClick={()=>{setShowEditModal(false);setEditItem(null)}} style={{width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'#f3f4f7',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <X size={16} color="#7c8088"/>
+                </button>
+              </div>
+            </div>
+            <FormFields formData={editForm} setFormData={setEditForm} onSubmit={handleUpdate} submitLabel="Aggiorna sessione" isSaved={false}/>
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

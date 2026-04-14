@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Home, BookOpen, Pill, Droplets, Link, Settings, Layers } from 'lucide-react'
 import { db } from './firebase'
-import { ref, onValue } from 'firebase/database'
+import { ref, onValue, get } from 'firebase/database'
 import { decrypt } from './crypto'
 import Home2 from './Home'
 import CrisiPage from './CrisiPage'
@@ -24,7 +24,7 @@ import MessaggiPage from './MessaggiPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
-const VERSION   = '05.01.00'
+const VERSION   = '05.01.02'
 
 
 const f = (base) => `${Math.round(base * 1.15)}px`
@@ -69,7 +69,6 @@ export function getFrase() {
 }
 
 
-// ── CSS GLOBALE ──────────────────────────────────────────────
 const GLOBAL_CSS = `
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #e8eaf0; }
@@ -102,7 +101,7 @@ function Disclaimer({ nome, onAccept }) {
           <p style={{marginBottom:'10px'}}><strong style={{color:'#02153f'}}>4. Modalità Demo</strong><br/>In modalità Demo tutti i dati sono fittizi.</p>
           <p style={{margin:0,color:'#bec1cc',fontSize:f(11)}}>v{VERSION} — Continuando accetti queste condizioni.</p>
         </div>
-        <button onClick={onAccept} style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 6px 20px rgba(8,24,76,0.35)',marginBottom:'10px'}}>
+        <button type="button" onClick={onAccept} style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 6px 20px rgba(8,24,76,0.35)',marginBottom:'10px'}}>
           ✅ Ho letto e accetto
         </button>
         <div style={{textAlign:'center',fontSize:f(11),color:'#bec1cc'}}>Non accettando non potrai utilizzare l'app</div>
@@ -118,7 +117,7 @@ function OnboardingModal({ onDone, isDemo }) {
     <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
       <div style={{background:'#feffff',borderRadius:'24px',padding:'32px 24px',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.25)'}}>
         <div style={{textAlign:'center',marginBottom:'24px'}}>
-          <img src="/DamiLogo.png" alt="logo" style={{width:'72px',height:'72px',borderRadius:'50%',objectFit:'cover',marginBottom:'14px',boxShadow:'0 4px 16px rgba(8,24,76,0.25)'}}/>
+          <img src="/DamiLogo.png" alt="logo" style={{width:'72px',height:'72px',borderRadius:'50%',objectFit:'contain',background:'#f3f4f7',marginBottom:'14px',boxShadow:'0 4px 16px rgba(8,24,76,0.25)'}} onError={e=>{e.target.style.display='none'}}/>
           <div style={{fontSize:f(20),fontWeight:'900',color:'#08184c',marginBottom:'6px'}}>
             {isDemo ? '👋 Benvenuto nella Demo!' : 'Benvenuto in DamiAPP'}
           </div>
@@ -139,7 +138,7 @@ function OnboardingModal({ onDone, isDemo }) {
           onFocus={e=>e.target.style.borderColor='#2e84e9'}
           onBlur={e=>e.target.style.borderColor='#e8eaf0'}
         />
-        <button
+        <button type="button"
           onClick={()=>nome.trim()&&onDone(nome.trim())}
           disabled={!nome.trim()}
           style={{width:'100%',padding:'15px',borderRadius:'50px',border:'none',background:nome.trim()?'linear-gradient(135deg,#08184c,#193f9e)':'#e8eaf0',color:nome.trim()?'#fff':'#bec1cc',fontSize:f(15),fontWeight:'800',cursor:nome.trim()?'pointer':'default',boxShadow:nome.trim()?'0 6px 20px rgba(8,24,76,0.35)':'none'}}
@@ -158,12 +157,10 @@ function Login({ onLogin }) {
   const [ricordaPin, setRicordaPin] = useState(false)
   const [checkingToken, setCheckingToken] = useState(false)
 
-
   useEffect(() => {
     const saved = localStorage.getItem('damiapp_saved_pin')
     if (saved) { setPin(saved); setRicordaPin(true) }
   }, [])
-
 
   function handlePinLogin() {
     if (pin === PIN_REALE || pin === PIN_DEMO) {
@@ -176,24 +173,21 @@ function Login({ onLogin }) {
     }
   }
 
-
+  // FIX: rimossi dynamic import — firebase, db e decrypt già importati staticamente
   async function handleTokenLogin() {
     if (!token.trim()) { setError('Inserisci il token'); return }
     setCheckingToken(true)
     setError('')
     try {
-      const { ref, get } = await import('firebase/database')
-      const { db } = await import('./firebase')
-      const { decrypt } = await import('./crypto')
-      const snap = await get(ref(db,'sharetokens'))
+      const snap = await get(ref(db, 'sharetokens'))
       const val = snap.val()
       if (!val) { setError('Token non valido o scaduto.'); setCheckingToken(false); return }
       let trovato = null
-      Object.entries(val).forEach(([key,encData]) => {
-        const t = typeof encData==='object' ? encData : decrypt(encData)
-        if (t && t.token===token.trim().toUpperCase() && t.active) {
+      Object.entries(val).forEach(([key, encData]) => {
+        const t = typeof encData === 'object' ? encData : decrypt(encData)
+        if (t && t.token === token.trim().toUpperCase() && t.active) {
           const scadenza = t.expiresAt ? new Date(t.expiresAt) : null
-          if (!scadenza || scadenza > new Date()) trovato = {...t, _firebaseKey:key}
+          if (!scadenza || scadenza > new Date()) trovato = { ...t, _firebaseKey: key }
         }
       })
       if (trovato) onLogin(false, trovato)
@@ -205,19 +199,18 @@ function Login({ onLogin }) {
     setCheckingToken(false)
   }
 
-
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f3f4f7',fontFamily:"-apple-system,'Segoe UI',sans-serif",padding:'20px'}}>
       <div style={{background:'#feffff',borderRadius:'28px',overflow:'hidden',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.20),0 8px 20px rgba(2,21,63,0.10)'}}>
         <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'36px 24px 30px',textAlign:'center',position:'relative'}}>
           <div style={{position:'absolute',top:'10px',right:'14px',fontSize:f(10),color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>v{VERSION}</div>
-          <img src="/DamiLogo.png" alt="logo" style={{width:'100px',height:'100px',borderRadius:'50%',objectFit:'cover',marginBottom:'16px',border:'3px solid rgba(255,255,255,0.25)',boxShadow:'0 12px 40px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.3)'}}/>
+          <img src="/DamiLogo.png" alt="logo" style={{width:'100px',height:'100px',borderRadius:'50%',objectFit:'contain',background:'#f3f4f7',marginBottom:'16px',border:'3px solid rgba(255,255,255,0.25)',boxShadow:'0 12px 40px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.3)'}} onError={e=>{e.target.style.display='none'}}/>
           <div style={{fontSize:f(28),fontWeight:'900',color:'#fff',letterSpacing:'-0.5px'}}>DamiAPP</div>
           <div style={{fontSize:f(12),color:'rgba(255,255,255,0.5)',marginTop:'4px'}}>Il tuo assistente quotidiano</div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#f3f4f7',margin:'16px 16px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
           {['paziente','medico'].map(t=>(
-            <button key={t} onClick={()=>{setTab(t);setError('');setPin('');setToken('')}}
+            <button type="button" key={t} onClick={()=>{setTab(t);setError('');setPin('');setToken('')}}
               style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(12),fontFamily:'inherit',background:tab===t?'#feffff':'transparent',color:tab===t?'#08184c':'#7c8088',boxShadow:tab===t?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
               {t==='paziente'?'👤 Paziente':'👨‍⚕️ Medico'}
             </button>
@@ -243,7 +236,7 @@ function Login({ onLogin }) {
                 <span style={{fontSize:f(12),color:'#7c8088',fontWeight:'600'}}>Ricorda PIN per accesso rapido</span>
               </div>
               {error && <div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
-              <button onClick={handlePinLogin} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 8px 24px rgba(8,24,76,0.35)'}}>
+              <button type="button" onClick={handlePinLogin} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 8px 24px rgba(8,24,76,0.35)'}}>
                 Accedi
               </button>
               <div style={{textAlign:'center',marginTop:'12px',fontSize:f(11),color:'#bec1cc'}}>💡 PIN demo disponibile per la presentazione</div>
@@ -261,7 +254,7 @@ function Login({ onLogin }) {
                 onBlur={e=>e.target.style.borderColor='#e8eaf0'}
               />
               {error && <div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
-              <button onClick={handleTokenLogin} disabled={checkingToken}
+              <button type="button" onClick={handleTokenLogin} disabled={checkingToken}
                 style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:checkingToken?'wait':'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:checkingToken?'#bec1cc':'linear-gradient(135deg,#00BFA6,#2e84e9)',boxShadow:checkingToken?'none':'0 8px 24px rgba(0,191,166,0.3)',opacity:checkingToken?0.7:1,transition:'all 0.2s'}}>
                 {checkingToken ? '⏳ Verifica in corso...' : 'Accedi come Medico'}
               </button>
@@ -285,7 +278,7 @@ function PaginaInArrivo({ onBack }) {
         <div style={{fontSize:'48px',marginBottom:'16px'}}>🚧</div>
         <div style={{fontSize:f(18),fontWeight:'900',color:'#02153f',marginBottom:'8px'}}>In arrivo</div>
         <div style={{fontSize:f(13),color:'#7c8088',marginBottom:'24px'}}>Questa sezione è in sviluppo</div>
-        <button onClick={onBack} style={{padding:'12px 24px',borderRadius:'50px',border:'none',background:'linear-gradient(135deg,#193f9e,#2e84e9)',color:'#fff',fontWeight:'700',fontSize:f(14),cursor:'pointer'}}>
+        <button type="button" onClick={onBack} style={{padding:'12px 24px',borderRadius:'50px',border:'none',background:'linear-gradient(135deg,#193f9e,#2e84e9)',color:'#fff',fontWeight:'700',fontSize:f(14),cursor:'pointer'}}>
           ← Torna indietro
         </button>
       </div>
@@ -294,24 +287,17 @@ function PaginaInArrivo({ onBack }) {
 }
 
 
-// ── NAVBAR per pagine interne ─────────────────────────────────
 function NavbarInterna({ page, onNavigate, msgNonLetti = 0 }) {
   const items = [
-    {Icon:Home,     label:'Home',      p:'home'},
-    {Icon:BookOpen, label:'Diario',    p:'diario'},
-    {Icon:Pill,     label:'Terapie',   p:'terapie'},
-    {Icon:Droplets, label:'Toilet',    p:'toilet'},
-    {Icon:Link,     label:'Medico',    p:'condividi', badge: msgNonLetti},
-    {Icon:Layers,   label:'Utility',   p:'utility'},
+    {Icon:Home,     label:'Home',    p:'home'},
+    {Icon:BookOpen, label:'Diario',  p:'diario'},
+    {Icon:Pill,     label:'Terapie', p:'terapie'},
+    {Icon:Droplets, label:'Toilet',  p:'toilet'},
+    {Icon:Link,     label:'Medico',  p:'condividi', badge: msgNonLetti},
+    {Icon:Layers,   label:'Utility', p:'utility'},
   ]
   return (
-    <div style={{
-      position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
-      width:'100%', maxWidth:'480px',
-      background:'#feffff', borderTop:'1px solid #f0f1f4',
-      display:'flex', padding:'7px 0 14px',
-      boxShadow:'0 -4px 16px rgba(2,21,63,0.08)', zIndex:100
-    }}>
+    <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'480px',background:'#feffff',borderTop:'1px solid #f0f1f4',display:'flex',padding:'7px 0 14px',boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',zIndex:100}}>
       {items.map(({Icon,label,p,badge})=>{
         const act = page===p
         return (
@@ -319,17 +305,9 @@ function NavbarInterna({ page, onNavigate, msgNonLetti = 0 }) {
             style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',touchAction:'manipulation',position:'relative'}}>
             <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
               <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
-              {/* Badge messaggi non letti */}
               {badge > 0 && (
-                <span style={{
-                  position:'absolute', top:'0px', right:'calc(50% - 20px)',
-                  width:'15px', height:'15px', borderRadius:'50%',
-                  background:'#F7295A', display:'flex', alignItems:'center', justifyContent:'center',
-                  border:'2px solid #feffff', zIndex:2
-                }}>
-                  <span style={{fontSize:'8px',fontWeight:'900',color:'#fff',lineHeight:1}}>
-                    {badge > 9 ? '9+' : badge}
-                  </span>
+                <span style={{position:'absolute',top:'0px',right:'calc(50% - 20px)',width:'15px',height:'15px',borderRadius:'50%',background:'#F7295A',display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid #feffff',zIndex:2}}>
+                  <span style={{fontSize:'8px',fontWeight:'900',color:'#fff',lineHeight:1}}>{badge > 9 ? '9+' : badge}</span>
                 </span>
               )}
             </div>
@@ -354,11 +332,8 @@ export default function App() {
   const [pendingNome, setPendingNome] = useState('')
   const [timerSecCrisi, setTimerSecCrisi] = useState(0)
   const [showExtra, setShowExtra] = useState(false)
-  // ── NUOVO: messaggi non letti dal medico ──
   const [msgNonLetti, setMsgNonLetti] = useState(0)
-
-  // ── PWA Install Prompt ──
-  const [installPrompt, setInstallPrompt]     = useState(null)
+  const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setInstallBanner] = useState(false)
 
   useEffect(() => {
@@ -372,9 +347,7 @@ export default function App() {
     function handleBeforeInstall(e) {
       e.preventDefault()
       setInstallPrompt(e)
-      if (!hasDismissed) {
-        setTimeout(() => setInstallBanner('android'), 4000)
-      }
+      if (!hasDismissed) setTimeout(() => setInstallBanner('android'), 4000)
     }
     window.addEventListener('beforeinstallprompt', handleBeforeInstall)
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
@@ -384,10 +357,7 @@ export default function App() {
     if (!installPrompt) return
     installPrompt.prompt()
     const { outcome } = await installPrompt.userChoice
-    if (outcome === 'accepted') {
-      setInstallBanner(false)
-      setInstallPrompt(null)
-    }
+    if (outcome === 'accepted') { setInstallBanner(false); setInstallPrompt(null) }
   }
 
   function dismissInstall() {
@@ -395,7 +365,7 @@ export default function App() {
     localStorage.setItem('damiapp_install_dismissed', '1')
   }
 
-  // ── Conteggio messaggi non letti (da medico) — attivo solo da autenticato non demo ──
+  // FIX: conteggio messaggi senza race condition — Promise.all
   useEffect(() => {
     if (!authenticated || isDemo || isMedico) return
     const unsub = onValue(ref(db, 'sharetokens'), snapTokens => {
@@ -405,19 +375,18 @@ export default function App() {
         .map(([k, enc]) => { const d = decrypt(enc); return d ? k : null })
         .filter(Boolean)
       if (tokenKeys.length === 0) { setMsgNonLetti(0); return }
-      let totale = 0
-      let pending = tokenKeys.length
-      tokenKeys.forEach(tk => {
-        onValue(ref(db, `messages/${tk}`), snapMsgs => {
-          const raw = snapMsgs.val()
-          if (raw) {
-            const msgs = Object.values(raw).map(enc => decrypt(enc)).filter(Boolean)
-            totale += msgs.filter(m => m.da === 'medico' && !m.letto).length
-          }
-          pending--
-          if (pending === 0) setMsgNonLetti(totale)
-        }, { onlyOnce: true })
-      })
+      Promise.all(
+        tokenKeys.map(tk =>
+          new Promise(resolve => {
+            onValue(ref(db, `messages/${tk}`), snap => {
+              const raw = snap.val()
+              if (!raw) { resolve(0); return }
+              const msgs = Object.values(raw).map(enc => decrypt(enc)).filter(Boolean)
+              resolve(msgs.filter(m => m.da === 'medico' && !m.letto).length)
+            }, { onlyOnce: true })
+          })
+        )
+      ).then(counts => setMsgNonLetti(counts.reduce((a, b) => a + b, 0)))
     })
     return () => unsub()
   }, [authenticated, isDemo, isMedico])
@@ -431,7 +400,7 @@ export default function App() {
     } else {
       setIsMedico(false)
       setTokenMedico(null)
-      if (demo||!nomeUtente) setShowOnboarding(true)
+      if (demo || !nomeUtente) setShowOnboarding(true)
     }
   }
 
@@ -457,7 +426,7 @@ export default function App() {
     : isDemo ? (pendingNome||'Ospite')
     : (pendingNome||nomeUtente||'Damiano')
 
-  const noNav    = ['crisi','sos']
+  const noNav = ['crisi','sos']
 
   return (
     <>
@@ -477,11 +446,9 @@ export default function App() {
           {showOnboarding && <OnboardingModal onDone={handleNome} isDemo={isDemo}/>}
           {showDisclaimer && <Disclaimer nome={nomeEffettivo} onAccept={handleAcceptDisclaimer}/>}
 
-          {/* Pagine senza navbar */}
           {page==='crisi' && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
           {page==='sos'   && <SOSPage onBack={()=>setPage('home')}/>}
 
-          {/* Pagine con navbar */}
           {!noNav.includes(page) && (
             <>
               {page==='home' && (
@@ -494,38 +461,29 @@ export default function App() {
                   msgNonLetti={msgNonLetti}
                 />
               )}
-              {page==='diario'       && <DiarioCrisi   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='terapie'      && <TerapiePage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='toilet'       && <ToiletPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='condividi'    && <CondividiPage  onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='messaggi'     && <MessaggiPage   onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='report'       && <ReportPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='magazzino'    && <MagazzinoPage  onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='disturbi'     && <DisturbPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='utility'      && <UtilityPage    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='rubrica'      && <RubricaPage    onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='pagamenti'    && <PagamentiPage  onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='cosa_portare' && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='doc_medici'   && <DocumentiPage  onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
-              {page==='doc_personali'&& <DocumentiPage  onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
-              {page==='admin'        && <PaginaInArrivo onBack={()=>handleNavigate('home')}/>}
+              {page==='diario'        && <DiarioCrisi    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='terapie'       && <TerapiePage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='toilet'        && <ToiletPage      onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='condividi'     && <CondividiPage   onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='messaggi'      && <MessaggiPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='report'        && <ReportPage      onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='magazzino'     && <MagazzinoPage   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='disturbi'      && <DisturbPage     onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='utility'       && <UtilityPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='rubrica'       && <RubricaPage     onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='pagamenti'     && <PagamentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='cosa_portare'  && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='doc_medici'    && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
+              {page==='doc_personali' && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
+              {page==='admin'         && <PaginaInArrivo  onBack={()=>handleNavigate('home')}/>}
 
               {page !== 'home' && (
                 <NavbarInterna page={page} onNavigate={handleNavigate} msgNonLetti={msgNonLetti}/>
               )}
 
-              {/* BANNER INSTALLAZIONE PWA */}
               {showInstallBanner && (
-                <div style={{
-                  position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
-                  width:'calc(100% - 24px)', maxWidth:'456px',
-                  background:'#08184c', borderRadius:'20px', padding:'14px 16px',
-                  boxShadow:'0 8px 32px rgba(2,21,63,0.45)', zIndex:3000,
-                  display:'flex', alignItems:'center', gap:'12px',
-                  fontFamily:"-apple-system,'Segoe UI',sans-serif",
-                }}>
-                  <img src="/DamiLogo.png" alt="logo"
-                    style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'cover',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}}/>
+                <div style={{position:'fixed',bottom:'80px',left:'50%',transform:'translateX(-50%)',width:'calc(100% - 24px)',maxWidth:'456px',background:'#08184c',borderRadius:'20px',padding:'14px 16px',boxShadow:'0 8px 32px rgba(2,21,63,0.45)',zIndex:3000,display:'flex',alignItems:'center',gap:'12px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+                  <img src="/DamiLogo.png" alt="logo" style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'contain',background:'#f3f4f7',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}} onError={e=>{e.target.style.display='none'}}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:'14px',fontWeight:'900',color:'#fff',marginBottom:'2px'}}>Installa DamiAPP</div>
                     {showInstallBanner==='ios'
@@ -535,11 +493,11 @@ export default function App() {
                   </div>
                   <div style={{display:'flex',gap:'6px',flexShrink:0}}>
                     {showInstallBanner==='android' && (
-                      <button onClick={handleInstall} style={{padding:'8px 14px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:'12px',color:'#08184c',background:'#fff',fontFamily:'inherit'}}>
+                      <button type="button" onClick={handleInstall} style={{padding:'8px 14px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:'12px',color:'#08184c',background:'#fff',fontFamily:'inherit'}}>
                         Installa
                       </button>
                     )}
-                    <button onClick={dismissInstall} style={{width:'30px',height:'30px',borderRadius:'50%',border:'none',cursor:'pointer',background:'rgba(255,255,255,0.15)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>
+                    <button type="button" onClick={dismissInstall} style={{width:'30px',height:'30px',borderRadius:'50%',border:'none',cursor:'pointer',background:'rgba(255,255,255,0.15)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>
                       ×
                     </button>
                   </div>
