@@ -72,14 +72,55 @@ export function getFrase() {
 const GLOBAL_CSS = `
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #e8eaf0; }
-  body { display: flex; justify-content: center; min-height: 100vh; }
+  body { display: flex; justify-content: center; min-height: 100dvh; }
   #root {
     width: 100%;
     max-width: 480px;
     background: #f3f4f7;
-    min-height: 100vh;
+    min-height: 100dvh;
     position: relative;
     box-shadow: 0 0 60px rgba(2,21,63,0.12);
+    overflow-x: hidden;
+  }
+
+  @keyframes damiLoginSlideUp {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes damiLogoPop {
+    0%   { opacity: 0; transform: scale(0.72); }
+    70%  { transform: scale(1.07); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes damiLogoPulse {
+    0%, 100% { box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0px rgba(255,255,255,0.12); }
+    50%       { box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3), 0 0 0 7px rgba(255,255,255,0.07); }
+  }
+  @keyframes damiSlideInRight {
+    from { opacity: 0; transform: translateX(48px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .dami-login-card {
+    animation: damiLoginSlideUp 0.45s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .dami-login-logo {
+    animation: damiLogoPop 0.5s cubic-bezier(0.22,1,0.36,1) 0.15s both,
+               damiLogoPulse 3s ease-in-out 1s infinite;
+  }
+  .dami-page-enter {
+    animation: damiSlideInRight 0.32s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .dami-btn-accedi {
+    transition: transform 0.15s cubic-bezier(0.22,1,0.36,1), box-shadow 0.15s;
+  }
+  .dami-btn-accedi:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(8,24,76,0.45) !important;
+  }
+  .dami-btn-accedi:active {
+    transform: scale(0.97);
+    box-shadow: 0 4px 12px rgba(8,24,76,0.25) !important;
   }
 `
 
@@ -173,7 +214,6 @@ function Login({ onLogin }) {
     }
   }
 
-  // FIX: rimossi dynamic import — firebase, db e decrypt già importati staticamente
   async function handleTokenLogin() {
     if (!token.trim()) { setError('Inserisci il token'); return }
     setCheckingToken(true)
@@ -200,18 +240,24 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f3f4f7',fontFamily:"-apple-system,'Segoe UI',sans-serif",padding:'20px'}}>
-      <div style={{background:'#feffff',borderRadius:'28px',overflow:'hidden',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.20),0 8px 20px rgba(2,21,63,0.10)'}}>
+    <div style={{minHeight:'100dvh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f3f4f7',fontFamily:"-apple-system,'Segoe UI',sans-serif",padding:'20px'}}>
+      <div className="dami-login-card" style={{background:'#feffff',borderRadius:'28px',overflow:'hidden',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.20),0 8px 20px rgba(2,21,63,0.10)'}}>
         <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'36px 24px 30px',textAlign:'center',position:'relative'}}>
           <div style={{position:'absolute',top:'10px',right:'14px',fontSize:f(10),color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>v{VERSION}</div>
-          <img src="/DamiLogo.png" alt="logo" style={{width:'100px',height:'100px',borderRadius:'50%',objectFit:'contain',background:'#f3f4f7',marginBottom:'16px',border:'3px solid rgba(255,255,255,0.25)',boxShadow:'0 12px 40px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.3)'}} onError={e=>{e.target.style.display='none'}}/>
+          <img
+            src="/DamiLogo.png"
+            alt="logo"
+            className="dami-login-logo"
+            style={{width:'100px',height:'100px',borderRadius:'50%',objectFit:'contain',background:'#f3f4f7',marginBottom:'16px',border:'3px solid rgba(255,255,255,0.25)'}}
+            onError={e=>{e.target.style.display='none'}}
+          />
           <div style={{fontSize:f(28),fontWeight:'900',color:'#fff',letterSpacing:'-0.5px'}}>DamiAPP</div>
           <div style={{fontSize:f(12),color:'rgba(255,255,255,0.5)',marginTop:'4px'}}>Il tuo assistente quotidiano</div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#f3f4f7',margin:'16px 16px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
           {['paziente','medico'].map(t=>(
             <button type="button" key={t} onClick={()=>{setTab(t);setError('');setPin('');setToken('')}}
-              style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(12),fontFamily:'inherit',background:tab===t?'#feffff':'transparent',color:tab===t?'#08184c':'#7c8088',boxShadow:tab===t?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
+              style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(12),fontFamily:'inherit',background:tab===t?'#feffff':'transparent',color:tab===t?'#08184c':'#7c8088',boxShadow:tab===t?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)'}}>
               {t==='paziente'?'👤 Paziente':'👨‍⚕️ Medico'}
             </button>
           ))}
@@ -221,13 +267,16 @@ function Login({ onLogin }) {
             <>
               <div style={{fontSize:f(11),fontWeight:'700',color:'#7c8088',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'10px'}}>PIN di accesso</div>
               <input
-                type="password" value={pin}
+                type="password"
+                inputMode="numeric"
+                value={pin}
                 onChange={e=>setPin(e.target.value)}
                 onKeyDown={e=>e.key==='Enter'&&handlePinLogin()}
-                placeholder="• • • • • •" maxLength={6}
-                style={{width:'100%',padding:'16px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:'26px',textAlign:'center',letterSpacing:'12px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:'inherit'}}
-                onFocus={e=>e.target.style.borderColor='#2e84e9'}
-                onBlur={e=>e.target.style.borderColor='#e8eaf0'}
+                placeholder="• • • • • •"
+                maxLength={6}
+                style={{width:'100%',padding:'16px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:'26px',textAlign:'center',letterSpacing:'12px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:'inherit',transition:'border-color 0.2s, box-shadow 0.2s'}}
+                onFocus={e=>{e.target.style.borderColor='#2e84e9';e.target.style.boxShadow='0 0 0 3px rgba(46,132,233,0.12)'}}
+                onBlur={e=>{e.target.style.borderColor='#e8eaf0';e.target.style.boxShadow='none'}}
               />
               <div onClick={()=>setRicordaPin(!ricordaPin)} style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',marginBottom:'14px',userSelect:'none'}}>
                 <div style={{width:'20px',height:'20px',borderRadius:'6px',border:`2px solid ${ricordaPin?'#193f9e':'#dde0ed'}`,background:ricordaPin?'#193f9e':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.2s'}}>
@@ -236,7 +285,12 @@ function Login({ onLogin }) {
                 <span style={{fontSize:f(12),color:'#7c8088',fontWeight:'600'}}>Ricorda PIN per accesso rapido</span>
               </div>
               {error && <div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
-              <button type="button" onClick={handlePinLogin} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 8px 24px rgba(8,24,76,0.35)'}}>
+              <button
+                type="button"
+                onClick={handlePinLogin}
+                className="dami-btn-accedi"
+                style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(16),color:'#fff',background:'linear-gradient(135deg,#08184c,#193f9e)',boxShadow:'0 8px 24px rgba(8,24,76,0.35)'}}
+              >
                 Accedi
               </button>
               <div style={{textAlign:'center',marginTop:'12px',fontSize:f(11),color:'#bec1cc'}}>💡 PIN demo disponibile per la presentazione</div>
@@ -249,9 +303,9 @@ function Login({ onLogin }) {
                 onChange={e=>setToken(e.target.value.toUpperCase())}
                 onKeyDown={e=>e.key==='Enter'&&handleTokenLogin()}
                 placeholder="Es: DMIABCD12345"
-                style={{width:'100%',padding:'14px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:f(16),textAlign:'center',letterSpacing:'2px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:"'Courier New',monospace"}}
-                onFocus={e=>e.target.style.borderColor='#2e84e9'}
-                onBlur={e=>e.target.style.borderColor='#e8eaf0'}
+                style={{width:'100%',padding:'14px',borderRadius:'14px',border:'2px solid #e8eaf0',fontSize:f(16),textAlign:'center',letterSpacing:'2px',marginBottom:'10px',outline:'none',boxSizing:'border-box',color:'#02153f',background:'#f3f4f7',fontFamily:"'Courier New',monospace",transition:'border-color 0.2s, box-shadow 0.2s'}}
+                onFocus={e=>{e.target.style.borderColor='#2e84e9';e.target.style.boxShadow='0 0 0 3px rgba(46,132,233,0.12)'}}
+                onBlur={e=>{e.target.style.borderColor='#e8eaf0';e.target.style.boxShadow='none'}}
               />
               {error && <div style={{color:'#e53935',fontSize:f(13),textAlign:'center',marginBottom:'12px',fontWeight:'600'}}>❌ {error}</div>}
               <button type="button" onClick={handleTokenLogin} disabled={checkingToken}
@@ -273,7 +327,7 @@ function Login({ onLogin }) {
 
 function PaginaInArrivo({ onBack }) {
   return (
-    <div style={{minHeight:'100vh',background:'#f3f4f7',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif",paddingBottom:'80px'}}>
+    <div style={{minHeight:'100dvh',background:'#f3f4f7',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif",paddingBottom:'80px'}}>
       <div style={{textAlign:'center',padding:'40px'}}>
         <div style={{fontSize:'48px',marginBottom:'16px'}}>🚧</div>
         <div style={{fontSize:f(18),fontWeight:'900',color:'#02153f',marginBottom:'8px'}}>In arrivo</div>
@@ -365,7 +419,6 @@ export default function App() {
     localStorage.setItem('damiapp_install_dismissed', '1')
   }
 
-  // FIX: conteggio messaggi senza race condition — Promise.all
   useEffect(() => {
     if (!authenticated || isDemo || isMedico) return
     const unsub = onValue(ref(db, 'sharetokens'), snapTokens => {
@@ -451,31 +504,33 @@ export default function App() {
 
           {!noNav.includes(page) && (
             <>
-              {page==='home' && (
-                <Home2
-                  nomeUtente={nomeEffettivo}
-                  isDemo={isDemo}
-                  onNavigate={handleNavigate}
-                  showExtra={showExtra}
-                  onToggleExtra={()=>setShowExtra(p=>!p)}
-                  msgNonLetti={msgNonLetti}
-                />
-              )}
-              {page==='diario'        && <DiarioCrisi    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='terapie'       && <TerapiePage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='toilet'        && <ToiletPage      onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='condividi'     && <CondividiPage   onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='messaggi'      && <MessaggiPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='report'        && <ReportPage      onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='magazzino'     && <MagazzinoPage   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='disturbi'      && <DisturbPage     onBack={()=>setPage('home')} isDemo={isDemo}/>}
-              {page==='utility'       && <UtilityPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-              {page==='rubrica'       && <RubricaPage     onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='pagamenti'     && <PagamentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='cosa_portare'  && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-              {page==='doc_medici'    && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
-              {page==='doc_personali' && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
-              {page==='admin'         && <PaginaInArrivo  onBack={()=>handleNavigate('home')}/>}
+              <div key={page} className="dami-page-enter">
+                {page==='home' && (
+                  <Home2
+                    nomeUtente={nomeEffettivo}
+                    isDemo={isDemo}
+                    onNavigate={handleNavigate}
+                    showExtra={showExtra}
+                    onToggleExtra={()=>setShowExtra(p=>!p)}
+                    msgNonLetti={msgNonLetti}
+                  />
+                )}
+                {page==='diario'        && <DiarioCrisi    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+                {page==='terapie'       && <TerapiePage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+                {page==='toilet'        && <ToiletPage      onBack={()=>setPage('home')} isDemo={isDemo}/>}
+                {page==='condividi'     && <CondividiPage   onBack={()=>setPage('home')} isDemo={isDemo}/>}
+                {page==='messaggi'      && <MessaggiPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
+                {page==='report'        && <ReportPage      onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+                {page==='magazzino'     && <MagazzinoPage   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+                {page==='disturbi'      && <DisturbPage     onBack={()=>setPage('home')} isDemo={isDemo}/>}
+                {page==='utility'       && <UtilityPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+                {page==='rubrica'       && <RubricaPage     onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+                {page==='pagamenti'     && <PagamentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+                {page==='cosa_portare'  && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+                {page==='doc_medici'    && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
+                {page==='doc_personali' && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
+                {page==='admin'         && <PaginaInArrivo  onBack={()=>handleNavigate('home')}/>}
+              </div>
 
               {page !== 'home' && (
                 <NavbarInterna page={page} onNavigate={handleNavigate} msgNonLetti={msgNonLetti}/>
