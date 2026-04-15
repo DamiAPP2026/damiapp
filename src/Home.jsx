@@ -18,7 +18,7 @@ const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
 const NAV_H   = 58   // navbar principale
 const EXTRA_H = 52   // barra secondaria
 
-// Navbar principale — 6 voci esatte richieste
+// Navbar principale — 6 voci
 const NAV_BOTTOM = [
   { Icon: Home,          label: 'Home',     page: 'home'      },
   { Icon: BookOpen,      label: 'Diario',   page: 'diario'    },
@@ -28,19 +28,19 @@ const NAV_BOTTOM = [
   { Icon: MoreHorizontal,label: 'Altro',    page: '__extra__' },
 ]
 
-// Barra secondaria — 5 voci
+// Barra secondaria — 5 voci — chiavi corrette con underscore
 const NAV_EXTRA = [
-  { Icon: FileText,  label: 'Documenti', page: 'docmedici'    },
-  { Icon: Package,   label: 'Magazzino', page: 'magazzino'    },
-  { Icon: Pill,      label: 'Terapie',   page: 'terapie'      },
-  { Icon: BarChart2, label: 'Report',    page: 'report'       },
-  { Icon: Layers,    label: 'Utility',   page: 'utility'      },
+  { Icon: FileText,  label: 'Documenti', page: 'doc_medici'  },
+  { Icon: Package,   label: 'Magazzino', page: 'magazzino'   },
+  { Icon: Pill,      label: 'Terapie',   page: 'terapie'     },
+  { Icon: BarChart2, label: 'Report',    page: 'report'      },
+  { Icon: Layers,    label: 'Utility',   page: 'utility'     },
 ]
 
-// Pagine considerate "extra" per il badge Altro
+// Pagine considerate "extra" — chiavi corrette con underscore
 const EXTRA_PAGES = new Set([
-  'docmedici','docpersonali','magazzino','terapie','report','utility',
-  'rubrica','pagamenti','cosaportare','condividi',
+  'doc_medici','doc_personali','magazzino','terapie','report','utility',
+  'rubrica','pagamenti','cosa_portare','condividi',
 ])
 
 const FRASI = [
@@ -89,6 +89,66 @@ function matchOggi(dataField) {
   const oggiRaw = oggi.replace(/[\/\-\s]/g,'')
   return raw === oggiRaw || String(dataField) === oggi
 }
+
+// ─── CSS NAVBAR TRANSIZIONE B (spring elastico) ──────────────
+const NAVBAR_CSS = `
+  .nav-extra-bar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%) scaleY(0);
+    transform-origin: bottom center;
+    width: 100%;
+    max-width: 480px;
+    background: #feffff;
+    border-top: 1px solid #eef0f5;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 -2px 12px rgba(2,21,63,0.08);
+    z-index: 1100;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform 0.30s cubic-bezier(0.34,1.56,0.64,1),
+      opacity   0.18s ease;
+    will-change: transform, opacity;
+  }
+  .nav-extra-bar.open {
+    transform: translateX(-50%) scaleY(1);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .nav-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(2,21,63,0.12);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    backdrop-filter: blur(0.5px);
+  }
+  .nav-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .nav-btn {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    padding: 3px 2px;
+    position: relative;
+    border: none;
+    background: transparent;
+  }
+`
 
 export default function HomeScreen({
   nomeUtente, isDemo, onNavigate,
@@ -157,12 +217,10 @@ export default function HomeScreen({
   function go(page) {
     if (page === '__extra__') { onToggleExtra?.(); return }
     setAP(page)
-    if (EXTRA_PAGES.has(page) && !showExtra) { /* lascia extra aperta se già aperta */ }
-    else if (!EXTRA_PAGES.has(page) && showExtra) onToggleExtra?.()
+    if (!EXTRA_PAGES.has(page) && showExtra) onToggleExtra?.()
     onNavigate?.(page)
   }
 
-  // stabilisce se la voce navbar principale è attiva
   function isNavActive(page) {
     if (page === '__extra__') return showExtra || EXTRA_PAGES.has(activePage)
     if (page === 'home')      return activePage === 'home'
@@ -201,10 +259,9 @@ export default function HomeScreen({
 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
 
-  // Padding bottom contenuto: lascia spazio a navbar + eventuale barra extra
   const pbContent = showExtra ? NAV_H + EXTRA_H + 4 : NAV_H + 4
 
-  // stile voce navbar (div cliccabile)
+  // stile voce navbar inline (per le voci che non usano .nav-btn)
   const ni = {
     flex:1, display:'flex', flexDirection:'column', alignItems:'center',
     gap:'3px', cursor:'pointer', touchAction:'manipulation',
@@ -215,39 +272,23 @@ export default function HomeScreen({
   return (
     <div style={{fontFamily:"-apple-system,'Segoe UI',sans-serif", minHeight:'100vh', background:'#f3f4f7', paddingBottom:`${pbContent}px`}}>
 
-      {/* ── OVERLAY chiude extra al tap fuori ────────────────── */}
-      {showExtra && (
-        <div
-          onClick={onToggleExtra}
-          style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(2,21,63,0.12)',backdropFilter:'blur(0.5px)'}}
-        />
-      )}
+      <style>{NAVBAR_CSS}</style>
 
-      {/* ════════ BARRA EXTRA (secondaria) ═══════════════════ */}
-      <div style={{
-        position: 'fixed',
-        bottom: showExtra ? NAV_H : -(EXTRA_H + 2),
-        left:'50%', transform:'translateX(-50%)',
-        width:'100%', maxWidth:'480px',
-        height:`${EXTRA_H}px`,
-        background:'#feffff',
-        borderTop:'1px solid #eef0f5',
-        display:'flex', alignItems:'center',
-        boxShadow:'0 -2px 12px rgba(2,21,63,0.08)',
-        zIndex:1100,
-        transition:'bottom 0.30s cubic-bezier(.4,0,.2,1)',
-        willChange:'bottom',
-        opacity: showExtra ? 1 : 0,
-        pointerEvents: showExtra ? 'auto' : 'none',
-      }}>
+      {/* ── OVERLAY — fade coordinato ─────────────────────── */}
+      <div
+        className={`nav-overlay${showExtra ? ' open' : ''}`}
+        onClick={onToggleExtra}
+      />
+
+      {/* ════════ BARRA EXTRA — transizione B spring ════════ */}
+      <div
+        className={`nav-extra-bar${showExtra ? ' open' : ''}`}
+        style={{ bottom: NAV_H, height: `${EXTRA_H}px` }}
+      >
         {NAV_EXTRA.map(({ Icon, label, page }) => {
           const active = activePage === page
           return (
-            <button key={page} onClick={() => go(page)} style={{
-              ...ni,
-              height:'100%',
-            }}>
-              {/* stesso indicatore top della navbar principale */}
+            <button key={page} type="button" onClick={() => go(page)} className="nav-btn">
               {active && (
                 <div style={{
                   position:'absolute', top:0, left:'50%',
@@ -290,11 +331,10 @@ export default function HomeScreen({
         paddingBottom:'env(safe-area-inset-bottom)',
       }}>
         {NAV_BOTTOM.map(({ Icon, label, page, isBadge }) => {
-          const isExtra  = page === '__extra__'
-          const active   = isNavActive(page)
+          const isExtra = page === '__extra__'
+          const active  = isNavActive(page)
           return (
-            <button key={page} onClick={() => go(page)} style={{ ...ni, height:'100%' }}>
-              {/* indicatore top */}
+            <button key={page} type="button" onClick={() => go(page)} className="nav-btn" style={{height:'100%'}}>
               {active && (
                 <div style={{
                   position:'absolute', top:0, left:'50%',
@@ -316,11 +356,13 @@ export default function HomeScreen({
                   ? <ChevronUp
                       size={17}
                       color={showExtra ? '#193f9e' : '#bec1cc'}
-                      style={{transform:showExtra?'rotate(0deg)':'rotate(180deg)',transition:'transform 0.30s cubic-bezier(.4,0,.2,1)'}}
+                      style={{
+                        transform: showExtra ? 'rotate(0deg)' : 'rotate(180deg)',
+                        transition: 'transform 0.30s cubic-bezier(0.34,1.56,0.64,1)',
+                      }}
                     />
                   : <Icon size={17} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
                 }
-                {/* badge messaggi */}
                 {isBadge && msgNonLetti > 0 && (
                   <span style={{
                     position:'absolute', top:'-4px', right:'-4px',
@@ -339,7 +381,7 @@ export default function HomeScreen({
                 color: active ? '#193f9e' : '#bec1cc',
                 transition:'color 0.2s', lineHeight:1,
               }}>
-                {label}
+                {isExtra ? (showExtra ? 'Chiudi' : 'Altro') : label}
               </span>
             </button>
           )
@@ -352,7 +394,7 @@ export default function HomeScreen({
           <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
               <span style={{fontSize:f(16),fontWeight:'900',color:'#02153f'}}>Priorità rapide</span>
-              <button onClick={()=>setQEdit(false)} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <button type="button" onClick={()=>setQEdit(false)} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <X size={16} color="#7c8088"/>
               </button>
             </div>
@@ -374,7 +416,7 @@ export default function HomeScreen({
                 </div>
               )
             })}
-            <button onClick={()=>setQEdit(false)} style={{width:'100%',padding:'14px',borderRadius:'50px',border:'none',cursor:'pointer',background:'linear-gradient(135deg,#193f9e,#2e84e9)',color:'#fff',fontWeight:'800',fontSize:f(14),marginTop:'8px',fontFamily:'inherit'}}>
+            <button type="button" onClick={()=>setQEdit(false)} style={{width:'100%',padding:'14px',borderRadius:'50px',border:'none',cursor:'pointer',background:'linear-gradient(135deg,#193f9e,#2e84e9)',color:'#fff',fontWeight:'800',fontSize:f(14),marginTop:'8px',fontFamily:'inherit'}}>
               Fatto
             </button>
           </div>
@@ -390,9 +432,33 @@ export default function HomeScreen({
             <span style={{fontSize:f(10),color:'#bec1cc',fontWeight:'600'}}>{dataStr}</span>
             <span style={{fontSize:f(13),fontWeight:'900',color:'#bec1cc',fontVariantNumeric:'tabular-nums'}}>{timeStr}</span>
           </div>
+
+          {/* LOGO — fix: contain + sfondo + bordo + dimensione maggiore */}
           <div style={{display:'flex',justifyContent:'center',marginBottom:'10px'}}>
-            <img src="/DamiLogo.png" alt="logo" style={{width:'62px',height:'62px',borderRadius:'50%',objectFit:'cover',boxShadow:'0 6px 20px rgba(8,24,76,0.18)'}}/>
+            <div style={{
+              width:'80px', height:'80px',
+              borderRadius:'50%',
+              background:'#feffff',
+              border:'2px solid #eef0f5',
+              boxShadow:'0 6px 20px rgba(8,24,76,0.14), 0 2px 8px rgba(0,0,0,0.06)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              overflow:'hidden',
+              flexShrink:0,
+            }}>
+              <img
+                src="/DamiLogo.png"
+                alt="DamiAPP logo"
+                style={{
+                  width:'72px',
+                  height:'72px',
+                  objectFit:'contain',
+                  borderRadius:'50%',
+                }}
+                onError={e=>{e.target.style.display='none'}}
+              />
+            </div>
           </div>
+
           {isDemo && (
             <div style={{textAlign:'center',marginBottom:'8px'}}>
               <span style={{background:'linear-gradient(135deg,#FFD93D,#FF8C42)',color:'#5a3000',fontSize:f(10),fontWeight:'800',padding:'3px 12px',borderRadius:'20px'}}>
@@ -435,7 +501,7 @@ export default function HomeScreen({
           )}
 
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-            <button onClick={()=>go('crisi')} style={{position:'relative',height:'50px',borderRadius:'50px',border:'none',overflow:'hidden',cursor:'pointer',boxShadow:'0 6px 20px rgba(25,63,158,0.35)',touchAction:'manipulation'}}>
+            <button type="button" onClick={()=>go('crisi')} style={{position:'relative',height:'50px',borderRadius:'50px',border:'none',overflow:'hidden',cursor:'pointer',boxShadow:'0 6px 20px rgba(25,63,158,0.35)',touchAction:'manipulation'}}>
               <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#193f9e,#2e84e9)'}}/>
               <div style={{position:'absolute',left:0,bottom:0,width:'40px',height:'40px',background:'linear-gradient(135deg,#FF5B8D,#FF9F3F)',borderRadius:'0 50% 0 50px',opacity:0.75}}/>
               <div style={{position:'absolute',right:0,top:0,width:'30px',height:'30px',background:'linear-gradient(135deg,#FFD93D,#FF8C42)',borderRadius:'50px 0 50% 0',opacity:0.65}}/>
@@ -444,7 +510,7 @@ export default function HomeScreen({
                 <span style={{color:'#fff',fontSize:f(12),fontWeight:'800'}}>Avvia timer crisi</span>
               </div>
             </button>
-            <button onClick={()=>go('sos')} style={{height:'50px',borderRadius:'50px',border:'2.5px solid #e53935',background:'#feffff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',boxShadow:'0 4px 14px rgba(229,57,53,0.18)',touchAction:'manipulation'}}>
+            <button type="button" onClick={()=>go('sos')} style={{height:'50px',borderRadius:'50px',border:'2.5px solid #e53935',background:'#feffff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',boxShadow:'0 4px 14px rgba(229,57,53,0.18)',touchAction:'manipulation'}}>
               <Phone size={15} color="#e53935"/>
               <span style={{fontSize:f(13),fontWeight:'900',color:'#e53935'}}>SOCCORSO</span>
             </button>
