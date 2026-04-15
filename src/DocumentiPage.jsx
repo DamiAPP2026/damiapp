@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   ChevronLeft, Plus, Trash2, Edit2, Check, X,
   FileText, Search, ExternalLink, Eye, ZoomIn,
   ChevronRight, Brain, Pill, ClipboardList,
   HeartPulse, FlaskConical, ScrollText, Camera,
   CreditCard, Paperclip, Users, School,
-  User, BookOpen
+  User, BookOpen, Upload, Download, AlertCircle
 } from 'lucide-react'
 import { db } from './firebase'
 import { ref, push, remove, set, onValue } from 'firebase/database'
@@ -15,7 +15,6 @@ const f = (base) => `${Math.round(base * 1.15)}px`
 const sh   = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
 
-// Tipi documento con icone Lucide (NO emoji nell'UI)
 const TIPI = [
   { key:'eeg',         label:'EEG',         Icon:Brain,         color:'#F7295A', bg:'#FEF0F4' },
   { key:'ricetta',     label:'Ricetta',      Icon:Pill,          color:'#2e84e9', bg:'#EEF3FD' },
@@ -28,7 +27,6 @@ const TIPI = [
   { key:'altro',       label:'Altro',        Icon:Paperclip,     color:'#394058', bg:'#f3f4f7' },
 ]
 
-// Sezioni/cartelle per persona — icone Lucide
 const SEZIONI = [
   { key:'damiano',  label:'Damiano',  sub:'Documenti personali', color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#7B5EA7)', Icon:User   },
   { key:'papa',     label:'Papà',     sub:'Documenti personali', color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', Icon:User   },
@@ -40,94 +38,192 @@ const SEZIONI = [
 function getTipo(key)    { return TIPI.find(t => t.key === key) || TIPI[TIPI.length - 1] }
 function getSezione(key) { return SEZIONI.find(s => s.key === key) || SEZIONI[0] }
 
-// Migrazione automatica vecchio campo "categoria" → nuovo "sezione"
 function normalizzaDoc(d) {
   if (d.sezione) return d
   const map = { medici:'damiano', personali:'damiano', scuola:'scuola' }
   return { ...d, sezione: map[d.categoria] || 'damiano' }
 }
 
+// ── Rileva tipo contenuto dal data URI o URL esterno ──────────
+function detectContent(url, filename) {
+  if (!url) return null
+  // Base64 data URI (metodo vecchia app)
+  if (url.startsWith('data:')) {
+    const mimeMatch = url.match(/data:([^;]+);/)
+    const mime = mimeMatch ? mimeMatch[1] : ''
+    if (mime.startsWith('image/') || (filename && filename.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)))
+      return { type: 'image', url }
+    if (mime === 'application/pdf' || (filename && filename.toLowerCase().endsWith('.pdf')))
+      return { type: 'pdf', url }
+    if (mime.startsWith('text/')) {
+      try {
+        const text = atob(url.split(',')[1])
+        return { type: 'text', data: text, url }
+      } catch { return { type: 'download', url, filename } }
+    }
+    return { type: 'download', url, filename }
+  }
+  // URL esterno — fallback con rilevamento estensione
+  if (/\.(jpg|jpeg|png|gif|webp|svg)/i.test(url)) return { type: 'image', url }
+  if (/\.pdf/i.test(url))                          return { type: 'pdf', url }
+  return { type: 'download', url, filename }
+}
+
 const oggi = new Date()
 const fmtOggi = `${String(oggi.getDate()).padStart(2,'0')}/${String(oggi.getMonth()+1).padStart(2,'0')}/${oggi.getFullYear()}`
 
 const DEMO_DOCS = [
-  { id:1, tipo:'eeg',         sezione:'damiano',  nome:'EEG 12-04-2026',           data:fmtOggi,      url:'', note:'Ambulatorio neurologia'   },
-  { id:2, tipo:'ricetta',     sezione:'damiano',  nome:'Ricetta Keppra apr-2026',   data:'01/04/2026', url:'', note:'Valida 30 giorni'          },
-  { id:3, tipo:'referto',     sezione:'damiano',  nome:'Visita neurologica mar-26', data:'15/03/2026', url:'', note:'Dr. Rossi'                 },
-  { id:4, tipo:'tessera',     sezione:'papa',     nome:'Tessera sanitaria',         data:'01/01/2026', url:'', note:'Scadenza 2030'              },
-  { id:5, tipo:'certificato', sezione:'damiano',  nome:'Certificato L.104',         data:'10/01/2025', url:'', note:'art.3 c.3'                 },
-  { id:6, tipo:'verbale',     sezione:'scuola',   nome:'Piano educativo 2025/26',   data:'10/09/2025', url:'', note:'PEI approvato'              },
-  { id:7, tipo:'foto',        sezione:'papa',     nome:'Foto documento fronte/r.',  data:'01/01/2026', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Gatto_europeo4.jpg/320px-Gatto_europeo4.jpg', note:'Fronte/retro' },
-  { id:8, tipo:'verbale',     sezione:'famiglia', nome:'Verbale riunione UVMD',     data:'20/02/2026', url:'', note:'Commissione disabilità'    },
+  { id:1, tipo:'eeg',         sezione:'damiano',  nome:'EEG 12-04-2026',           filename:'EEG_12042026.pdf',   data:fmtOggi,      url:'', note:'Ambulatorio neurologia'   },
+  { id:2, tipo:'ricetta',     sezione:'damiano',  nome:'Ricetta Keppra apr-2026',   filename:'Ricetta_apr26.pdf',  data:'01/04/2026', url:'', note:'Valida 30 giorni'          },
+  { id:3, tipo:'referto',     sezione:'damiano',  nome:'Visita neurologica mar-26', filename:'Referto_mar26.pdf',  data:'15/03/2026', url:'', note:'Dr. Rossi'                 },
+  { id:4, tipo:'tessera',     sezione:'papa',     nome:'Tessera sanitaria',         filename:'tessera.jpg',        data:'01/01/2026', url:'', note:'Scadenza 2030'              },
+  { id:5, tipo:'certificato', sezione:'damiano',  nome:'Certificato L.104',         filename:'L104.pdf',           data:'10/01/2025', url:'', note:'art.3 c.3'                 },
+  { id:6, tipo:'verbale',     sezione:'scuola',   nome:'Piano educativo 2025/26',   filename:'PEI_2526.pdf',       data:'10/09/2025', url:'', note:'PEI approvato'              },
+  { id:7, tipo:'foto',        sezione:'papa',     nome:'Foto documento fronte/r.',  filename:'foto_doc.jpg',       data:'01/01/2026', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Gatto_europeo4.jpg/320px-Gatto_europeo4.jpg', note:'Fronte/retro' },
+  { id:8, tipo:'verbale',     sezione:'famiglia', nome:'Verbale riunione UVMD',     filename:'UVMD_feb26.pdf',     data:'20/02/2026', url:'', note:'Commissione disabilità'    },
 ].map((d,i) => ({ ...d, _firebaseKey: `demo_${i}` }))
 
-const EMPTY_FORM = { tipo:'referto', sezione:'damiano', nome:'', data:fmtOggi, url:'', note:'' }
+const EMPTY_FORM = { tipo:'referto', sezione:'damiano', nome:'', data:fmtOggi, url:'', filename:'', note:'' }
 
-// ── Lightbox ──────────────────────────────────────────────────
+// ── Lightbox — stesso approccio della vecchia app ─────────────
 function Lightbox({ doc, onClose }) {
   const tipo = getTipo(doc.tipo)
   const { Icon: TipoIcon } = tipo
-  const isImage = doc.url && /\.(jpg|jpeg|png|gif|webp|svg)/i.test(doc.url)
-  const isPDF   = doc.url && /\.pdf/i.test(doc.url)
+  const [content, setContent] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState('')
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     const onKey = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
-    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey) }
-  }, [])
+    setLoading(true)
+    setError('')
+    try {
+      const c = detectContent(doc.url, doc.filename || doc.nome)
+      if (c) setContent(c)
+      else setError('Nessun file allegato a questo documento')
+    } catch(e) {
+      setError('Errore nel caricamento del documento')
+    }
+    setLoading(false)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [doc])
+
+  function handleDownload() {
+    if (!doc.url) return
+    const a = document.createElement('a')
+    a.href = doc.url
+    a.download = doc.filename || doc.nome || 'documento'
+    a.click()
+  }
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.96)', zIndex:9000, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:"-apple-system,'Segoe UI',sans-serif", cursor:'pointer' }}>
-      <div onClick={e => e.stopPropagation()} style={{ position:'fixed', top:0, left:0, right:0, background:'rgba(0,0,0,0.7)', padding:'16px 20px', display:'flex', alignItems:'center', gap:'12px', zIndex:9001, backdropFilter:'blur(10px)' }}>
+
+      {/* Header */}
+      <div onClick={e => e.stopPropagation()} style={{ position:'fixed', top:0, left:0, right:0, background:'rgba(0,0,0,0.75)', padding:'14px 16px', display:'flex', alignItems:'center', gap:'12px', zIndex:9001, backdropFilter:'blur(10px)' }}>
         <div style={{ width:'36px', height:'36px', borderRadius:'10px', background:tipo.color, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <TipoIcon size={18} color="#fff"/>
         </div>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:f(14), fontWeight:'800', color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.nome}</div>
-          <div style={{ fontSize:f(11), color:'rgba(255,255,255,0.5)' }}>{doc.data} · {tipo.label}</div>
+          <div style={{ fontSize:f(10), color:'rgba(255,255,255,0.5)' }}>{doc.data} · {tipo.label}{doc.filename ? ` · ${doc.filename}` : ''}</div>
         </div>
         <div style={{ display:'flex', gap:'8px', flexShrink:0 }}>
           {doc.url && (
-            <button onClick={e => { e.stopPropagation(); window.open(doc.url, '_blank') }} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <ExternalLink size={16} color="#fff"/>
+            <button type="button" onClick={e => { e.stopPropagation(); handleDownload() }} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Download size={16} color="#fff"/>
             </button>
           )}
-          <button onClick={onClose} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <button type="button" onClick={onClose} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <X size={18} color="#fff"/>
           </button>
         </div>
       </div>
-      <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:'480px', marginTop:'70px', marginBottom:'20px', padding:'0 16px', display:'flex', flexDirection:'column', alignItems:'center' }}>
-        {isImage ? (
-          <img src={doc.url} alt={doc.nome} style={{ width:'100%', maxHeight:'60vh', objectFit:'contain', borderRadius:'12px', boxShadow:'0 0 40px rgba(255,255,255,0.1)' }}/>
-        ) : isPDF ? (
-          <iframe src={doc.url} title={doc.nome} style={{ width:'100%', height:'65vh', border:'none', borderRadius:'12px', background:'#fff' }}/>
-        ) : (
-          <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:'20px', padding:'28px', width:'100%', textAlign:'center' }}>
-            <div style={{ width:'64px', height:'64px', borderRadius:'18px', background:tipo.color, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
-              <TipoIcon size={32} color="#fff"/>
-            </div>
-            <div style={{ fontSize:f(20), fontWeight:'900', color:'#fff', marginBottom:'8px' }}>{doc.nome}</div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:'8px', justifyContent:'center', marginBottom:'16px' }}>
-              <span style={{ padding:'4px 12px', borderRadius:'20px', background:tipo.color+'33', color:tipo.color, fontWeight:'700', fontSize:f(12) }}>{tipo.label}</span>
-              <span style={{ padding:'4px 12px', borderRadius:'20px', background:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.7)', fontWeight:'700', fontSize:f(12) }}>{doc.data}</span>
-              <span style={{ padding:'4px 12px', borderRadius:'20px', background:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.7)', fontWeight:'700', fontSize:f(12) }}>{getSezione(doc.sezione).label}</span>
-            </div>
-            {doc.note && <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'12px', padding:'12px 16px', fontSize:f(13), color:'rgba(255,255,255,0.6)', lineHeight:'1.6', fontStyle:'italic' }}>{doc.note}</div>}
-            {!doc.url && <div style={{ marginTop:'16px', fontSize:f(11), color:'rgba(255,255,255,0.3)' }}>Nessun file allegato</div>}
+
+      {/* Contenuto */}
+      <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:'480px', marginTop:'68px', marginBottom:'40px', padding:'0 16px', display:'flex', flexDirection:'column', alignItems:'center' }}>
+        {loading ? (
+          <div style={{ textAlign:'center', padding:'60px 0' }}>
+            <div style={{ width:'40px', height:'40px', border:'3px solid rgba(255,255,255,0.1)', borderTop:'3px solid #fff', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 16px' }}/>
+            <div style={{ color:'rgba(255,255,255,0.5)', fontSize:f(13) }}>Caricamento...</div>
           </div>
-        )}
-        {doc.note && (isImage || isPDF) && (
-          <div style={{ marginTop:'14px', padding:'10px 14px', background:'rgba(255,255,255,0.08)', borderRadius:'12px', fontSize:f(12), color:'rgba(255,255,255,0.6)', width:'100%', textAlign:'center' }}>{doc.note}</div>
-        )}
+        ) : error ? (
+          <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:'20px', padding:'32px', width:'100%', textAlign:'center' }}>
+            <AlertCircle size={40} color="rgba(255,255,255,0.3)" style={{ margin:'0 auto 14px', display:'block' }}/>
+            <div style={{ fontSize:f(14), color:'rgba(255,255,255,0.6)', marginBottom:'8px' }}>{error}</div>
+            <div style={{ fontSize:f(11), color:'rgba(255,255,255,0.3)' }}>Nessun file allegato — aggiungi un file dal form di modifica</div>
+          </div>
+        ) : content ? (
+          <>
+            {content.type === 'image' && (
+              <div style={{ textAlign:'center', width:'100%' }}>
+                <img
+                  src={content.url}
+                  alt={doc.nome}
+                  style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', borderRadius:'12px', boxShadow:'0 0 40px rgba(255,255,255,0.08)' }}
+                  onError={() => setError("Impossibile visualizzare l'immagine")}
+                />
+                <button type="button" onClick={handleDownload} style={{ marginTop:'14px', padding:'10px 24px', borderRadius:'50px', border:'none', cursor:'pointer', background:'rgba(255,255,255,0.15)', color:'#fff', fontWeight:'700', fontSize:f(12), display:'inline-flex', alignItems:'center', gap:'6px', fontFamily:'inherit' }}>
+                  <Download size={14} color="#fff"/> Scarica immagine
+                </button>
+              </div>
+            )}
+            {content.type === 'pdf' && (
+              <div style={{ width:'100%', textAlign:'center' }}>
+                <iframe
+                  src={content.url}
+                  title={doc.nome}
+                  style={{ width:'100%', height:'65vh', border:'none', borderRadius:'12px', background:'#fff' }}
+                  onError={() => setError('Impossibile visualizzare il PDF')}
+                />
+                <button type="button" onClick={handleDownload} style={{ marginTop:'14px', padding:'10px 24px', borderRadius:'50px', border:'none', cursor:'pointer', background:'rgba(255,255,255,0.15)', color:'#fff', fontWeight:'700', fontSize:f(12), display:'inline-flex', alignItems:'center', gap:'6px', fontFamily:'inherit' }}>
+                  <Download size={14} color="#fff"/> Scarica PDF
+                </button>
+              </div>
+            )}
+            {content.type === 'text' && (
+              <div style={{ width:'100%' }}>
+                <pre style={{ whiteSpace:'pre-wrap', background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.85)', padding:'20px', borderRadius:'12px', maxHeight:'65vh', overflow:'auto', fontSize:f(12), lineHeight:'1.6', fontFamily:"'Courier New',monospace" }}>
+                  {content.data}
+                </pre>
+                <button type="button" onClick={handleDownload} style={{ marginTop:'14px', padding:'10px 24px', borderRadius:'50px', border:'none', cursor:'pointer', background:'rgba(255,255,255,0.15)', color:'#fff', fontWeight:'700', fontSize:f(12), display:'inline-flex', alignItems:'center', gap:'6px', fontFamily:'inherit' }}>
+                  <Download size={14} color="#fff"/> Scarica file
+                </button>
+              </div>
+            )}
+            {content.type === 'download' && (
+              <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:'20px', padding:'32px', width:'100%', textAlign:'center' }}>
+                <div style={{ width:'64px', height:'64px', borderRadius:'18px', background:tipo.color, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
+                  <TipoIcon size={32} color="#fff"/>
+                </div>
+                <div style={{ fontSize:f(18), fontWeight:'900', color:'#fff', marginBottom:'8px' }}>{doc.nome}</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:'8px', justifyContent:'center', marginBottom:'20px' }}>
+                  <span style={{ padding:'4px 12px', borderRadius:'20px', background:tipo.color+'33', color:tipo.color, fontWeight:'700', fontSize:f(11) }}>{tipo.label}</span>
+                  <span style={{ padding:'4px 12px', borderRadius:'20px', background:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.7)', fontWeight:'700', fontSize:f(11) }}>{doc.data}</span>
+                </div>
+                {doc.note && <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'12px', padding:'12px 16px', fontSize:f(12), color:'rgba(255,255,255,0.5)', lineHeight:'1.6', fontStyle:'italic', marginBottom:'16px' }}>{doc.note}</div>}
+                <div style={{ fontSize:f(12), color:'rgba(255,255,255,0.4)', marginBottom:'16px' }}>Anteprima non disponibile per questo tipo di file</div>
+                <button type="button" onClick={handleDownload} style={{ padding:'12px 28px', borderRadius:'50px', border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00BFA6,#2e84e9)', color:'#fff', fontWeight:'800', fontSize:f(14), display:'inline-flex', alignItems:'center', gap:'8px', fontFamily:'inherit' }}>
+                  <Download size={16} color="#fff"/> Scarica {doc.filename || 'file'}
+                </button>
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
-      <div style={{ position:'fixed', bottom:'24px', fontSize:f(11), color:'rgba(255,255,255,0.25)' }}>Tocca lo schermo per chiudere</div>
+
+      <div style={{ position:'fixed', bottom:'16px', fontSize:f(10), color:'rgba(255,255,255,0.2)' }}>Tocca lo schermo per chiudere · ESC per uscire</div>
+      <style>{`@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
 
-// ── Hub sezioni (schermata principale) ────────────────────────
+// ── Hub sezioni ───────────────────────────────────────────────
 function HubSezioni({ documenti, onSezione }) {
   const totale = documenti.length
   return (
@@ -166,18 +262,20 @@ function HubSezioni({ documenti, onSezione }) {
 
 // ════════════════════════════════════════════════════════════
 export default function DocumentiPage({ onBack, isDemo }) {
-  const [documenti,      setDocumenti]      = useState([])
-  const [loading,        setLoading]        = useState(true)
-  const [sezioneAttiva,  setSezioneAttiva]  = useState(null)
-  const [showForm,       setShowForm]       = useState(false)
-  const [editTarget,     setEditTarget]     = useState(null)
-  const [form,           setForm]           = useState({ ...EMPTY_FORM })
-  const [search,         setSearch]         = useState('')
-  const [filtroTipo,     setFiltroTipo]     = useState('tutti')
-  const [saved,          setSaved]          = useState(false)
-  const [preview,        setPreview]        = useState(null)
-  // Stato per il cambio sezione inline su una card
+  const [documenti,       setDocumenti]       = useState([])
+  const [loading,         setLoading]         = useState(true)
+  const [sezioneAttiva,   setSezioneAttiva]   = useState(null)
+  const [showForm,        setShowForm]        = useState(false)
+  const [editTarget,      setEditTarget]      = useState(null)
+  const [form,            setForm]            = useState({ ...EMPTY_FORM })
+  const [search,          setSearch]          = useState('')
+  const [filtroTipo,      setFiltroTipo]      = useState('tutti')
+  const [saved,           setSaved]           = useState(false)
+  const [preview,         setPreview]         = useState(null)
   const [changingSezione, setChangingSezione] = useState(null)
+  const [uploading,       setUploading]       = useState(false)
+  const [uploadError,     setUploadError]     = useState('')
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (isDemo) { setDocumenti(DEMO_DOCS); setLoading(false); return }
@@ -192,13 +290,42 @@ export default function DocumentiPage({ onBack, isDemo }) {
     return () => u()
   }, [isDemo])
 
+  // ── Upload file — stesso metodo vecchia app (FileReader base64) ──
+  function handleFileSelect(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('File troppo grande! Massimo 10MB')
+      e.target.value = ''
+      return
+    }
+    setUploadError('')
+    setUploading(true)
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setForm(p => ({ ...p, url: event.target.result, filename: file.name }))
+      setUploading(false)
+    }
+    reader.onerror = () => {
+      setUploadError('Errore durante la lettura del file')
+      setUploading(false)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
   function apriNuovo() {
     setForm({ ...EMPTY_FORM, sezione: sezioneAttiva || 'damiano' })
-    setEditTarget(null); setShowForm(true)
+    setUploadError('')
+    setEditTarget(null)
+    setShowForm(true)
   }
+
   function apriModifica(d) {
-    setForm({ tipo:d.tipo||'altro', sezione:d.sezione||'damiano', nome:d.nome||'', data:d.data||'', url:d.url||'', note:d.note||'' })
-    setEditTarget(d); setShowForm(true)
+    setForm({ tipo:d.tipo||'altro', sezione:d.sezione||'damiano', nome:d.nome||'', data:d.data||'', url:d.url||'', filename:d.filename||'', note:d.note||'' })
+    setUploadError('')
+    setEditTarget(d)
+    setShowForm(true)
   }
 
   function handleSalva() {
@@ -221,7 +348,6 @@ export default function DocumentiPage({ onBack, isDemo }) {
     else setDocumenti(prev => prev.filter(x => x.id !== d.id))
   }
 
-  // Cambio sezione rapido da card (senza aprire il form)
   function handleCambioSezione(doc, nuovaSezione) {
     const updated = { ...doc, sezione: nuovaSezione }
     if (!isDemo && doc._firebaseKey) set(ref(db, `documents/${doc._firebaseKey}`), encrypt(updated))
@@ -229,21 +355,24 @@ export default function DocumentiPage({ onBack, isDemo }) {
     setChangingSezione(null)
   }
 
-  const sezioneInfo = sezioneAttiva ? getSezione(sezioneAttiva) : null
+  function rimuoviFile() {
+    setForm(p => ({ ...p, url: '', filename: '' }))
+  }
+
+  const sezioneInfo   = sezioneAttiva ? getSezione(sezioneAttiva) : null
+  const headerGrad    = sezioneInfo ? sezioneInfo.grad : 'linear-gradient(135deg,#2e84e9,#7B5EA7)'
 
   const docsFiltrati = (sezioneAttiva
     ? documenti.filter(d => d.sezione === sezioneAttiva)
     : documenti
   ).filter(d => {
-    const mS = !search || (d.nome || '').toLowerCase().includes(search.toLowerCase()) || (d.note || '').toLowerCase().includes(search.toLowerCase())
+    const mS = !search || (d.nome||'').toLowerCase().includes(search.toLowerCase()) || (d.note||'').toLowerCase().includes(search.toLowerCase())
     const mT = filtroTipo === 'tutti' || d.tipo === filtroTipo
     return mS && mT
   })
 
   const inStyle = { width:'100%', padding:'11px 12px', borderRadius:'12px', border:'1.5px solid #f0f1f4', fontSize:f(13), color:'#02153f', background:'#f3f4f7', fontFamily:'inherit', outline:'none', boxSizing:'border-box' }
   const lbStyle = { fontSize:f(11), fontWeight:'700', color:'#7c8088', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'5px', display:'block' }
-
-  const headerGrad = sezioneInfo ? sezioneInfo.grad : 'linear-gradient(135deg,#2e84e9,#7B5EA7)'
 
   if (loading) return (
     <div style={{ minHeight:'100vh', background:'#f3f4f7', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"-apple-system,'Segoe UI',sans-serif" }}>
@@ -261,13 +390,13 @@ export default function DocumentiPage({ onBack, isDemo }) {
 
         {preview && <Lightbox doc={preview} onClose={() => setPreview(null)}/>}
 
-        {/* Overlay cambio sezione rapido */}
+        {/* Overlay cambio sezione */}
         {changingSezione && (
           <div onClick={() => setChangingSezione(null)} style={{ position:'fixed', inset:0, background:'rgba(2,21,63,0.45)', zIndex:3000, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
             <div onClick={e => e.stopPropagation()} style={{ background:'#feffff', borderRadius:'24px 24px 0 0', padding:'20px', width:'100%', maxWidth:'480px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
                 <span style={{ fontSize:f(15), fontWeight:'900', color:'#02153f' }}>Sposta in cartella</span>
-                <button onClick={() => setChangingSezione(null)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <button type="button" onClick={() => setChangingSezione(null)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <X size={14} color="#7c8088"/>
                 </button>
               </div>
@@ -277,7 +406,7 @@ export default function DocumentiPage({ onBack, isDemo }) {
                 const isAttuale = s.key === changingSezione.sezione
                 return (
                   <div key={s.key} onClick={() => !isAttuale && handleCambioSezione(changingSezione, s.key)}
-                    style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px', borderRadius:'14px', marginBottom:'6px', cursor:isAttuale?'default':'pointer', background:isAttuale?s.color+'12':'#f3f4f7', border:`2px solid ${isAttuale?s.color:'transparent'}`, opacity:isAttuale?1:0.85, transition:'all 0.15s' }}>
+                    style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px', borderRadius:'14px', marginBottom:'6px', cursor:isAttuale?'default':'pointer', background:isAttuale?s.color+'12':'#f3f4f7', border:`2px solid ${isAttuale?s.color:'transparent'}`, transition:'all 0.15s' }}>
                     <div style={{ width:'36px', height:'36px', borderRadius:'10px', background:isAttuale?s.color:s.color+'22', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                       <SIcon size={16} color={isAttuale?'#fff':s.color}/>
                     </div>
@@ -293,7 +422,7 @@ export default function DocumentiPage({ onBack, isDemo }) {
         {/* HEADER */}
         <div style={{ background:headerGrad, padding:'14px 16px 20px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom: sezioneAttiva ? '14px' : '6px' }}>
-            <button
+            <button type="button"
               onClick={() => { if (sezioneAttiva) { setSezioneAttiva(null); setSearch(''); setFiltroTipo('tutti') } else onBack() }}
               style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.2)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
             >
@@ -313,7 +442,7 @@ export default function DocumentiPage({ onBack, isDemo }) {
               </div>
             </div>
             {sezioneAttiva && (
-              <button onClick={apriNuovo} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.25)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+              <button type="button" onClick={apriNuovo} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.25)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
                 <Plus size={20} color="#fff"/>
               </button>
             )}
@@ -323,11 +452,12 @@ export default function DocumentiPage({ onBack, isDemo }) {
             <>
               <div style={{ position:'relative', marginBottom:'10px' }}>
                 <Search size={15} color="#bec1cc" style={{ position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)' }}/>
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca documento..." style={{ ...inStyle, paddingLeft:'34px', background:'rgba(255,255,255,0.95)', border:'none' }}/>
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca documento..."
+                  style={{ ...inStyle, paddingLeft:'34px', background:'rgba(255,255,255,0.95)', border:'none' }}/>
               </div>
               <div style={{ overflowX:'auto' }}>
                 <div style={{ display:'flex', gap:'5px', paddingBottom:'2px', width:'max-content' }}>
-                  <button onClick={() => setFiltroTipo('tutti')} style={{ padding:'5px 10px', borderRadius:'20px', border:'none', cursor:'pointer', fontWeight:'700', fontSize:f(10), fontFamily:'inherit', background:filtroTipo==='tutti'?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.2)', color:filtroTipo==='tutti'?'#394058':'#fff', whiteSpace:'nowrap' }}>
+                  <button type="button" onClick={() => setFiltroTipo('tutti')} style={{ padding:'5px 10px', borderRadius:'20px', border:'none', cursor:'pointer', fontWeight:'700', fontSize:f(10), fontFamily:'inherit', background:filtroTipo==='tutti'?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.2)', color:filtroTipo==='tutti'?'#394058':'#fff', whiteSpace:'nowrap' }}>
                     Tutti
                   </button>
                   {TIPI.map(t => {
@@ -335,7 +465,7 @@ export default function DocumentiPage({ onBack, isDemo }) {
                     if (n === 0) return null
                     const { Icon: TIcon } = t
                     return (
-                      <button key={t.key} onClick={() => setFiltroTipo(t.key)} style={{ padding:'5px 10px', borderRadius:'20px', border:'none', cursor:'pointer', fontWeight:'700', fontSize:f(10), fontFamily:'inherit', background:filtroTipo===t.key?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.2)', color:filtroTipo===t.key?t.color:'#fff', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:'4px' }}>
+                      <button type="button" key={t.key} onClick={() => setFiltroTipo(t.key)} style={{ padding:'5px 10px', borderRadius:'20px', border:'none', cursor:'pointer', fontWeight:'700', fontSize:f(10), fontFamily:'inherit', background:filtroTipo===t.key?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.2)', color:filtroTipo===t.key?t.color:'#fff', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:'4px' }}>
                         <TIcon size={11} color={filtroTipo===t.key?t.color:'#fff'}/> {t.label} ({n})
                       </button>
                     )
@@ -367,11 +497,17 @@ export default function DocumentiPage({ onBack, isDemo }) {
                 const sez     = getSezione(d.sezione)
                 const { Icon: TIcon } = tipo
                 const { Icon: SIcon } = sez
-                const hasFile = !!d.url
-                const isImage = hasFile && /\.(jpg|jpeg|png|gif|webp|svg)/i.test(d.url)
+                const content   = detectContent(d.url, d.filename || d.nome)
+                const hasFile   = !!d.url
+                const isImg     = content?.type === 'image'
+                const isPdf     = content?.type === 'pdf'
+                const isDownload= content?.type === 'download'
+
                 return (
                   <div key={d.id || i} style={{ background:'#feffff', borderRadius:'18px', marginBottom:'10px', boxShadow:shSm, overflow:'hidden' }}>
-                    {isImage && (
+
+                    {/* Thumbnail immagine inline */}
+                    {isImg && (
                       <div onClick={() => setPreview(d)} style={{ width:'100%', height:'120px', overflow:'hidden', cursor:'pointer', position:'relative', background:'#f3f4f7' }}>
                         <img src={d.url} alt={d.nome} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
                         <div style={{ position:'absolute', bottom:'6px', right:'6px', background:'rgba(0,0,0,0.5)', borderRadius:'8px', padding:'3px 8px', fontSize:f(10), color:'#fff', fontWeight:'700', display:'flex', alignItems:'center', gap:'4px' }}>
@@ -379,52 +515,62 @@ export default function DocumentiPage({ onBack, isDemo }) {
                         </div>
                       </div>
                     )}
+
                     <div style={{ padding:'12px' }}>
                       <div style={{ display:'flex', alignItems:'flex-start', gap:'10px' }}>
                         {/* Icona tipo */}
                         <div onClick={() => setPreview(d)} style={{ width:'44px', height:'44px', borderRadius:'12px', background:tipo.color, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, cursor:'pointer', boxShadow:`0 3px 10px ${tipo.color}44` }}>
                           <TIcon size={20} color="#fff"/>
                         </div>
-                        {/* Info */}
+
+                        {/* Info documento */}
                         <div style={{ flex:1, minWidth:0 }}>
                           <div onClick={() => setPreview(d)} style={{ fontSize:f(14), fontWeight:'800', color:'#02153f', marginBottom:'5px', cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.nome}</div>
                           <div style={{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' }}>
                             <span style={{ fontSize:f(10), fontWeight:'700', padding:'2px 8px', borderRadius:'20px', background:tipo.bg, color:tipo.color, display:'flex', alignItems:'center', gap:'3px' }}>
                               <TIcon size={10} color={tipo.color}/> {tipo.label}
                             </span>
-                            {/* Badge sezione — cliccabile per cambiare cartella */}
-                            <span
-                              onClick={() => setChangingSezione(d)}
-                              style={{ fontSize:f(10), fontWeight:'700', padding:'2px 8px', borderRadius:'20px', background:sez.color+'18', color:sez.color, display:'flex', alignItems:'center', gap:'3px', cursor:'pointer' }}
-                              title="Tocca per spostare in un'altra cartella"
-                            >
+                            <span onClick={() => setChangingSezione(d)} style={{ fontSize:f(10), fontWeight:'700', padding:'2px 8px', borderRadius:'20px', background:sez.color+'18', color:sez.color, display:'flex', alignItems:'center', gap:'3px', cursor:'pointer' }} title="Tocca per spostare">
                               <SIcon size={10} color={sez.color}/> {sez.label}
                             </span>
                             {d.data && <span style={{ fontSize:f(10), color:'#bec1cc' }}>{d.data}</span>}
-                            {hasFile && !isImage && <span style={{ fontSize:f(10), fontWeight:'700', padding:'2px 7px', borderRadius:'20px', background:'#E8FBF8', color:'#00BFA6', display:'flex', alignItems:'center', gap:'3px' }}><Paperclip size={10} color="#00BFA6"/> file</span>}
+                            {hasFile && !isImg && (
+                              <span style={{ fontSize:f(10), fontWeight:'700', padding:'2px 7px', borderRadius:'20px', background:'#E8FBF8', color:'#00BFA6', display:'flex', alignItems:'center', gap:'3px' }}>
+                                <Paperclip size={10} color="#00BFA6"/> {isPdf ? 'PDF' : isDownload ? 'file' : 'allegato'}
+                              </span>
+                            )}
                           </div>
                           {d.note && <div style={{ fontSize:f(10), color:'#bec1cc', marginTop:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.note}</div>}
+                          {d.filename && <div style={{ fontSize:f(9), color:'#dde0ed', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.filename}</div>}
                         </div>
+
                         {/* Azioni */}
                         <div style={{ display:'flex', flexDirection:'column', gap:'5px', flexShrink:0 }}>
-                          <button onClick={() => setPreview(d)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          <button type="button" onClick={() => setPreview(d)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                             <Eye size={13} color="#7c8088"/>
                           </button>
-                          <button onClick={() => apriModifica(d)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#EEF3FD', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          <button type="button" onClick={() => apriModifica(d)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#EEF3FD', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                             <Edit2 size={13} color="#2e84e9"/>
                           </button>
-                          <button onClick={() => handleElimina(d)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#FEF0F4', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          <button type="button" onClick={() => handleElimina(d)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#FEF0F4', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                             <Trash2 size={13} color="#F7295A"/>
                           </button>
                         </div>
                       </div>
-                      {hasFile && !isImage && (
-                        <button onClick={() => window.open(d.url, '_blank')} style={{ width:'100%', marginTop:'10px', padding:'9px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#EEF3FD', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontWeight:'700', fontSize:f(11), color:'#2e84e9', fontFamily:'inherit' }}>
-                          <ExternalLink size={13} color="#2e84e9"/> Apri documento
+
+                      {/* Bottone azione file */}
+                      {hasFile && !isImg && (
+                        <button type="button"
+                          onClick={() => isPdf || isDownload ? setPreview(d) : setPreview(d)}
+                          style={{ width:'100%', marginTop:'10px', padding:'9px', borderRadius:'10px', border:'none', cursor:'pointer', background: isPdf ? '#FEF0F4' : '#EEF3FD', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontWeight:'700', fontSize:f(11), color: isPdf ? '#F7295A' : '#2e84e9', fontFamily:'inherit' }}>
+                          {isPdf
+                            ? <><Eye size={13} color="#F7295A"/> Visualizza PDF</>
+                            : <><ExternalLink size={13} color="#2e84e9"/> Apri documento</>
+                          }
                         </button>
                       )}
-                      {hasFile && isImage && (
-                        <button onClick={() => setPreview(d)} style={{ width:'100%', marginTop:'10px', padding:'9px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#f3f4f7', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontWeight:'700', fontSize:f(11), color:'#7c8088', fontFamily:'inherit' }}>
+                      {isImg && (
+                        <button type="button" onClick={() => setPreview(d)} style={{ width:'100%', marginTop:'10px', padding:'9px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#f3f4f7', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontWeight:'700', fontSize:f(11), color:'#7c8088', fontFamily:'inherit' }}>
                           <ZoomIn size={13} color="#7c8088"/> Vedi a schermo intero
                         </button>
                       )}
@@ -440,19 +586,21 @@ export default function DocumentiPage({ onBack, isDemo }) {
         {showForm && (
           <div style={{ position:'fixed', inset:0, background:'rgba(2,21,63,0.55)', zIndex:2000, display:'flex', alignItems:'flex-end', justifyContent:'center', fontFamily:"-apple-system,'Segoe UI',sans-serif" }}>
             <div style={{ background:'#feffff', borderRadius:'24px 24px 0 0', padding:'20px', width:'100%', maxWidth:'480px', maxHeight:'92vh', overflowY:'auto' }}>
+
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
                 <span style={{ fontSize:f(16), fontWeight:'900', color:'#02153f' }}>{editTarget ? 'Modifica documento' : 'Nuovo documento'}</span>
-                <button onClick={() => setShowForm(false)} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <button type="button" onClick={() => setShowForm(false)} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <X size={16} color="#7c8088"/>
                 </button>
               </div>
 
               {/* Nome */}
               <label style={lbStyle}>Nome documento *</label>
-              <input value={form.nome} onChange={e => setForm(p => ({ ...p, nome:e.target.value }))} placeholder="Es: EEG 12/04/2026" style={{ ...inStyle, marginBottom:'12px' }}
+              <input value={form.nome} onChange={e => setForm(p => ({ ...p, nome:e.target.value }))} placeholder="Es: EEG 12/04/2026"
+                style={{ ...inStyle, marginBottom:'12px' }}
                 onFocus={e => e.target.style.borderColor='#2e84e9'} onBlur={e => e.target.style.borderColor='#f0f1f4'}/>
 
-              {/* Cartella / Sezione */}
+              {/* Cartella */}
               <label style={lbStyle}>Cartella</label>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px', marginBottom:'12px' }}>
                 {SEZIONI.map(s => {
@@ -486,27 +634,84 @@ export default function DocumentiPage({ onBack, isDemo }) {
                 })}
               </div>
 
-              {/* Data + Link */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
-                <div>
-                  <label style={lbStyle}>Data</label>
-                  <input value={form.data} onChange={e => setForm(p => ({ ...p, data:e.target.value }))} placeholder="gg/mm/aaaa" style={inStyle}
-                    onFocus={e => e.target.style.borderColor='#2e84e9'} onBlur={e => e.target.style.borderColor='#f0f1f4'}/>
+              {/* Data */}
+              <label style={lbStyle}>Data</label>
+              <input value={form.data} onChange={e => setForm(p => ({ ...p, data:e.target.value }))} placeholder="gg/mm/aaaa"
+                style={{ ...inStyle, marginBottom:'12px' }}
+                onFocus={e => e.target.style.borderColor='#2e84e9'} onBlur={e => e.target.style.borderColor='#f0f1f4'}/>
+
+              {/* Upload file — metodo base64 come vecchia app */}
+              <label style={lbStyle}>File allegato</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"
+                onChange={handleFileSelect}
+                style={{ display:'none' }}
+              />
+
+              {form.url ? (
+                /* File caricato — anteprima + rimuovi */
+                <div style={{ marginBottom:'12px' }}>
+                  {detectContent(form.url, form.filename)?.type === 'image' ? (
+                    <div style={{ position:'relative', borderRadius:'12px', overflow:'hidden', marginBottom:'8px', background:'#f3f4f7' }}>
+                      <img src={form.url} alt="anteprima" style={{ width:'100%', maxHeight:'160px', objectFit:'contain', display:'block' }}/>
+                    </div>
+                  ) : (
+                    <div style={{ background:'#f3f4f7', borderRadius:'12px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px' }}>
+                      <FileText size={22} color="#2e84e9"/>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:f(12), fontWeight:'700', color:'#02153f', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{form.filename || 'File allegato'}</div>
+                        <div style={{ fontSize:f(10), color:'#7c8088' }}>{detectContent(form.url, form.filename)?.type?.toUpperCase() || 'FILE'}</div>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+                    <button type="button" onClick={() => fileInputRef.current?.click()} style={{ padding:'9px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#EEF3FD', color:'#2e84e9', fontWeight:'700', fontSize:f(11), display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'inherit' }}>
+                      <Upload size={13} color="#2e84e9"/> Sostituisci
+                    </button>
+                    <button type="button" onClick={rimuoviFile} style={{ padding:'9px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#FEF0F4', color:'#F7295A', fontWeight:'700', fontSize:f(11), display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'inherit' }}>
+                      <X size={13} color="#F7295A"/> Rimuovi
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label style={lbStyle}>Link file (opz.)</label>
-                  <input value={form.url} onChange={e => setForm(p => ({ ...p, url:e.target.value }))} placeholder="https://..." type="url" style={inStyle}
-                    onFocus={e => e.target.style.borderColor='#2e84e9'} onBlur={e => e.target.style.borderColor='#f0f1f4'}/>
+              ) : (
+                /* Nessun file — area upload */
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ border:'2px dashed #dde0ed', borderRadius:'14px', padding:'20px', textAlign:'center', cursor:'pointer', marginBottom:'12px', background:'#fafbff', transition:'border-color 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor='#2e84e9'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor='#dde0ed'}
+                >
+                  {uploading ? (
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'8px' }}>
+                      <div style={{ width:'28px', height:'28px', border:'3px solid #EEF3FD', borderTop:'3px solid #2e84e9', borderRadius:'50%', animation:'spin 0.8s linear infinite' }}/>
+                      <span style={{ fontSize:f(12), color:'#7c8088' }}>Caricamento in corso...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload size={24} color="#bec1cc" style={{ margin:'0 auto 8px', display:'block' }}/>
+                      <div style={{ fontSize:f(13), fontWeight:'700', color:'#394058', marginBottom:'4px' }}>Tocca per selezionare un file</div>
+                      <div style={{ fontSize:f(10), color:'#bec1cc' }}>Immagini, PDF, Word, Excel · Max 10MB</div>
+                    </>
+                  )}
                 </div>
-              </div>
-              {form.url && <div style={{ fontSize:f(11), color:'#7c8088', marginBottom:'10px', padding:'6px 10px', background:'#f3f4f7', borderRadius:'8px' }}>Incolla il link diretto al file (Google Drive, Dropbox, ecc.)</div>}
+              )}
+
+              {uploadError && (
+                <div style={{ background:'#FEF0F4', borderRadius:'10px', padding:'10px 12px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px' }}>
+                  <AlertCircle size={15} color="#F7295A"/>
+                  <span style={{ fontSize:f(12), color:'#F7295A', fontWeight:'600' }}>{uploadError}</span>
+                </div>
+              )}
 
               {/* Note */}
               <label style={lbStyle}>Note</label>
-              <textarea value={form.note} onChange={e => setForm(p => ({ ...p, note:e.target.value }))} placeholder="Es: Dr. Rossi, scadenza 30 giorni..." rows={2} style={{ ...inStyle, resize:'none', marginBottom:'16px' }}
+              <textarea value={form.note} onChange={e => setForm(p => ({ ...p, note:e.target.value }))} placeholder="Es: Dr. Rossi, scadenza 30 giorni..." rows={2}
+                style={{ ...inStyle, resize:'none', marginBottom:'16px' }}
                 onFocus={e => e.target.style.borderColor='#2e84e9'} onBlur={e => e.target.style.borderColor='#f0f1f4'}/>
 
-              <button onClick={handleSalva} style={{ width:'100%', padding:'15px', borderRadius:'50px', border:'none', cursor:'pointer', fontWeight:'800', fontSize:f(15), color:'#fff', background:saved?'linear-gradient(135deg,#00BFA6,#2e84e9)':'linear-gradient(135deg,#2e84e9,#7B5EA7)', boxShadow:'0 6px 20px rgba(46,132,233,0.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'all 0.3s', fontFamily:'inherit' }}>
+              <button type="button" onClick={handleSalva} style={{ width:'100%', padding:'15px', borderRadius:'50px', border:'none', cursor:'pointer', fontWeight:'800', fontSize:f(15), color:'#fff', background:saved?'linear-gradient(135deg,#00BFA6,#2e84e9)':'linear-gradient(135deg,#2e84e9,#7B5EA7)', boxShadow:'0 6px 20px rgba(46,132,233,0.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'all 0.3s', fontFamily:'inherit' }}>
                 {saved ? <><Check size={18} color="#fff"/>Salvato!</> : <>{editTarget ? 'Aggiorna documento' : 'Aggiungi documento'}</>}
               </button>
               {isDemo && <div style={{ textAlign:'center', marginTop:'10px', fontSize:f(11), color:'#8B6914', fontWeight:'600' }}>Demo — non salvato su Firebase</div>}
@@ -514,6 +719,7 @@ export default function DocumentiPage({ onBack, isDemo }) {
           </div>
         )}
 
+        <style>{`@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}`}</style>
       </div>
     </>
   )
