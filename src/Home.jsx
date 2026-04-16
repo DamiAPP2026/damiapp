@@ -164,7 +164,7 @@ export default function HomeScreen({
       {/* ════════ MODAL PERSONALIZZA QUICK ACTIONS ═══════════ */}
       {showQEdit && (
         <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.50)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto'}}>
+          <div style={{background:'#feffff',borderRadius:'24px 24px 0 0',padding:'20px',width:'100%',maxWidth:'480px',maxHeight:'80vh',overflowY:'auto',paddingBottom:'calc(20px + env(safe-area-inset-bottom) + 72px)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
               <span style={{fontSize:f(16),fontWeight:'900',color:'#02153f'}}>Priorità rapide</span>
               <button type="button" onClick={()=>setQEdit(false)} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>

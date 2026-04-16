@@ -8,3 +8,7 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+if (typeof window.__damiSplashDone === 'function') {
+  window.__damiSplashDone()
+}

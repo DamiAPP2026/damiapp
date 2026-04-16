@@ -3,12 +3,13 @@ import {
   LogOut, AlertTriangle, Pill, Phone, FileText,
   MessageCircle, Send, CheckCheck, Check, Clock,
   Save, ChevronLeft, Eye, Droplets, BarChart2,
-  Activity, Package, BookOpen, Shield
+  Activity, Package, BookOpen, Shield, BarChart3
 } from 'lucide-react'
 import { db } from './firebase'
 import { ref, get, push, onValue, serverTimestamp, update, set } from 'firebase/database'
 import { decrypt, encrypt, processFirebaseSnap } from './crypto'
 import ToiletCharts from './ToiletCharts'
+import ReportPage from './ReportPage'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh   = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
@@ -151,7 +152,6 @@ function ChatMedico({ tokenData }) {
         <div ref={bottomRef} style={{height:'8px'}}/>
       </div>
 
-      {/* Disclaimer chat */}
       <div style={{background:'#FFF5EE',borderTop:'1px solid #FF8C4222',padding:'6px 14px',fontSize:f(9),color:'#8B6914',lineHeight:'1.5',flexShrink:0}}>
         ⚠️ Messaggi <strong>permanenti e non eliminabili</strong>. DamiAPP non è responsabile del contenuto. Non sostituisce una visita medica.
       </div>
@@ -206,7 +206,6 @@ function ToiletWriterView({ tokenData, onLogout }) {
     <>
       <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.tw-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:80px;width:100%;max-width:480px;margin:0 auto;}`}</style>
       <div className="tw-wrap">
-        {/* Header */}
         <div style={{background:'linear-gradient(135deg,#7B5EA7,#2e84e9)',padding:'14px 16px 20px'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
             <div>
@@ -226,7 +225,6 @@ function ToiletWriterView({ tokenData, onLogout }) {
         </div>
 
         <div style={{padding:'12px'}}>
-          {/* Data/Ora */}
           <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
             <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📅 Data e ora</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
@@ -241,7 +239,6 @@ function ToiletWriterView({ tokenData, onLogout }) {
             </div>
           </div>
 
-          {/* Incidenti */}
           <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
             <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'4px'}}>⚠️ Incidente addosso</div>
             <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Indipendente dal bagno</div>
@@ -269,7 +266,6 @@ function ToiletWriterView({ tokenData, onLogout }) {
             ))}
           </div>
 
-          {/* Bagno */}
           <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
             <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'4px'}}>🚽 Ha usato il bagno?</div>
             <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Opzionale</div>
@@ -314,7 +310,7 @@ function ToiletWriterView({ tokenData, onLogout }) {
   )
 }
 
-// ─── VIEW VIEWER (sola lettura leggera) ───────────────────────
+// ─── VIEW VIEWER ──────────────────────────────────────────────
 function ViewerView({ tokenData, onLogout }) {
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
@@ -387,7 +383,6 @@ function ViewerView({ tokenData, onLogout }) {
         </div>
 
         <div style={{padding:'12px'}}>
-          {/* Terapie */}
           {terapieOggi.length>0&&(
             <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
               <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>💊 Terapie di oggi</div>
@@ -408,7 +403,6 @@ function ViewerView({ tokenData, onLogout }) {
             </div>
           )}
 
-          {/* Crisi ultima settimana */}
           <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
               <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f'}}>⚡ Crisi ultima settimana</div>
@@ -430,7 +424,6 @@ function ViewerView({ tokenData, onLogout }) {
             })}
           </div>
 
-          {/* Toilet grafici */}
           {(data?.toilet?.length||0)>0&&(
             <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
               <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🚽 Toilet Training</div>
@@ -451,15 +444,16 @@ function ViewerView({ tokenData, onLogout }) {
 }
 
 // ─── DOCTOR VIEW PRINCIPALE ───────────────────────────────────
+// FIX: aggiunto tab Report — visibile sempre al medico
 const TABS_MEDICO = [
   {key:'dati',     label:'Dati Paziente', Icon:FileText},
+  {key:'report',   label:'Report',        Icon:BarChart3},
   {key:'messaggi', label:'Messaggi',      Icon:MessageCircle},
 ]
 
 export default function DoctorView({ tokenData, onLogout }) {
   const role = tokenData.role || 'medico'
 
-  // Smistamento per ruolo
   if (role==='toilet_writer') return <ToiletWriterView tokenData={tokenData} onLogout={onLogout}/>
   if (role==='viewer')        return <ViewerView        tokenData={tokenData} onLogout={onLogout}/>
 
@@ -485,15 +479,13 @@ export default function DoctorView({ tokenData, onLogout }) {
   async function loadData() {
     try {
       const selectedDocIds = perms.selectedDocIds || []
-      const [crisiSnap,terapieSnap,docsSnap,toiletSnap,diarioSnap,magazzinoSnap,disturbiSnap,reportSnap] = await Promise.all([
+      const [crisiSnap,terapieSnap,docsSnap,toiletSnap,magazzinoSnap,disturbiSnap] = await Promise.all([
         get(ref(db,'crises')),
         perms.shareTerapie   ? get(ref(db,'terapies'))        : Promise.resolve(null),
         perms.shareDocuments ? get(ref(db,'documents'))       : Promise.resolve(null),
         perms.shareToilet    ? get(ref(db,'toilet_training')) : Promise.resolve(null),
-        perms.shareDiario    ? get(ref(db,'crises'))          : Promise.resolve(null),
         perms.shareMagazzino ? get(ref(db,'magazzino'))       : Promise.resolve(null),
         perms.shareDisturbi  ? get(ref(db,'disturbi'))        : Promise.resolve(null),
-        Promise.resolve(null),
       ])
       function parse(snap) {
         if (!snap?.val()) return []
@@ -502,7 +494,6 @@ export default function DoctorView({ tokenData, onLogout }) {
           return d?{...d,_key:k}:null
         }).filter(Boolean)
       }
-      // Filtra documenti selezionati
       let documenti = parse(docsSnap)
       if (selectedDocIds.length>0) documenti = documenti.filter(d=>selectedDocIds.includes(d._key||d.id?.toString()))
       setData({
@@ -591,12 +582,12 @@ export default function DoctorView({ tokenData, onLogout }) {
                 <button key={key} type="button" onClick={()=>setTab(key)} style={{
                   flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',
                   padding:'10px 8px 12px',border:'none',cursor:'pointer',fontFamily:'inherit',
-                  fontWeight:'800',fontSize:f(12),
+                  fontWeight:'800',fontSize:f(11),
                   background:active?'#f3f4f7':'transparent',
                   color:active?'#193f9e':'rgba(255,255,255,0.65)',
                   borderRadius:'12px 12px 0 0',transition:'all 0.2s',position:'relative'
                 }}>
-                  <Icon size={15}/>{label}
+                  <Icon size={14}/>{label}
                   {badge&&(
                     <span style={{position:'absolute',top:'6px',right:'10px',width:'16px',height:'16px',borderRadius:'50%',background:'#F7295A',display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid #193f9e'}}>
                       <span style={{fontSize:'8px',fontWeight:'900',color:'#fff'}}>{msgNonLetti>9?'9+':msgNonLetti}</span>
@@ -608,11 +599,20 @@ export default function DoctorView({ tokenData, onLogout }) {
           </div>
         </div>
 
+        {/* ── TAB MESSAGGI ── */}
         {tab==='messaggi'&&perms.shareChat&&<ChatMedico tokenData={tokenData}/>}
 
+        {/* ── TAB REPORT ── */}
+        {tab==='report'&&(
+          <ReportPage
+            isDemo={false}
+            onBack={()=>setTab('dati')}
+          />
+        )}
+
+        {/* ── TAB DATI ── */}
         {tab==='dati'&&(
           <div style={{padding:'12px'}}>
-            {/* Badge permessi */}
             <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'12px'}}>
               {[
                 {label:'Crisi',color:'#F7295A',bg:'#FEF0F4',show:true},
@@ -621,12 +621,12 @@ export default function DoctorView({ tokenData, onLogout }) {
                 {label:'Documenti',color:'#2e84e9',bg:'#EEF3FD',show:perms.shareDocuments},
                 {label:'Magazzino',color:'#FF8C42',bg:'#FFF5EE',show:perms.shareMagazzino},
                 {label:'Disturbi',color:'#FF8C42',bg:'#FFF5EE',show:perms.shareDisturbi},
+                {label:'Report',color:'#193f9e',bg:'#EEF3FD',show:true},
               ].filter(p=>p.show).map((p,i)=>(
                 <span key={i} style={{fontSize:f(11),fontWeight:'700',padding:'4px 10px',borderRadius:'20px',background:p.bg,color:p.color}}>✓ {p.label}</span>
               ))}
             </div>
 
-            {/* Stats crisi */}
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'7px',marginBottom:'10px'}}>
               {[
                 {label:'Crisi totali',val:data?.crisi?.length||0,color:'#F7295A'},
@@ -640,7 +640,6 @@ export default function DoctorView({ tokenData, onLogout }) {
               ))}
             </div>
 
-            {/* Grafico crisi */}
             <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
               <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'10px'}}>📊 Andamento crisi</div>
               <div style={{display:'flex',gap:'5px',marginBottom:'12px',overflowX:'auto'}}>
@@ -656,7 +655,19 @@ export default function DoctorView({ tokenData, onLogout }) {
               }
             </div>
 
-            {/* Distribuzione per tipo */}
+            {/* Shortcut verso Report */}
+            <div
+              onClick={()=>setTab('report')}
+              style={{background:'linear-gradient(135deg,#193f9e,#2e84e9)',borderRadius:'16px',padding:'14px 16px',marginBottom:'10px',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px',boxShadow:'0 6px 20px rgba(25,63,158,0.30)'}}
+            >
+              <BarChart3 size={22} color="#fff" style={{flexShrink:0}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#fff'}}>Vedi Report completo</div>
+                <div style={{fontSize:f(10),color:'rgba(255,255,255,0.75)',marginTop:'2px'}}>Grafici dettagliati crisi e toilet training</div>
+              </div>
+              <div style={{fontSize:'18px',color:'rgba(255,255,255,0.8)'}}>→</div>
+            </div>
+
             {Object.keys(tipiCount).length>0&&(
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🎯 Distribuzione per tipo</div>
@@ -681,7 +692,6 @@ export default function DoctorView({ tokenData, onLogout }) {
               </div>
             )}
 
-            {/* Ultime crisi */}
             {(data?.crisi?.length||0)>0&&(
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📋 Ultime crisi</div>
@@ -695,12 +705,10 @@ export default function DoctorView({ tokenData, onLogout }) {
                         <span style={{fontSize:f(10),fontWeight:'700',color:'#fff',background:color,padding:'2px 7px',borderRadius:'20px'}}>{c.duration}</span>
                       </div>
                       <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'3px'}}>📅 {c.date}</div>
-                      {c.areas?.length>0&&<div style={{fontSize:f(11),color:'#394058',marginBottom:'2px'}}>🎯 {c.areas.join(', ')}</div>}
                       {c.trigger&&c.trigger!=='Nessuno noto'&&<div style={{fontSize:f(11),color:'#394058',marginBottom:'2px'}}>⚡ {c.trigger}</div>}
                       <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginTop:'5px'}}>
                         {c.intensita&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:c.intensita<=3?'#E8FBF8':c.intensita<=6?'#FFF9E6':'#FEF0F4',color:c.intensita<=3?'#00BFA6':c.intensita<=6?'#FF8C42':'#F7295A'}}>Int. {c.intensita}/10</span>}
                         {c.perdCoscienza&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'#FEF0F4',color:'#F7295A'}}>Perdita coscienza</span>}
-                        {c.postCrisi&&<span style={{fontSize:f(10),fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'#F5F3FF',color:'#7B5EA7'}}>{c.postCrisi}</span>}
                       </div>
                       {c.note&&<div style={{fontSize:f(11),color:'#7c8088',marginTop:'5px',fontStyle:'italic',borderTop:'1px solid #f0f1f4',paddingTop:'5px'}}>📝 {c.note}</div>}
                     </div>
@@ -709,7 +717,6 @@ export default function DoctorView({ tokenData, onLogout }) {
               </div>
             )}
 
-            {/* Terapie */}
             {perms.shareTerapie&&(data?.terapie?.length||0)>0&&(
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>💊 Terapie programmate</div>
@@ -726,7 +733,6 @@ export default function DoctorView({ tokenData, onLogout }) {
               </div>
             )}
 
-            {/* Toilet */}
             {perms.shareToilet&&(data?.toilet?.length||0)>0&&(
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>🚽 Toilet Training</div>
@@ -734,7 +740,6 @@ export default function DoctorView({ tokenData, onLogout }) {
               </div>
             )}
 
-            {/* Documenti selezionati */}
             {perms.shareDocuments&&(data?.documenti?.length||0)>0&&(
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📄 Documenti condivisi</div>
@@ -755,7 +760,6 @@ export default function DoctorView({ tokenData, onLogout }) {
               </div>
             )}
 
-            {/* Magazzino */}
             {perms.shareMagazzino&&(data?.magazzino?.length||0)>0&&(
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📦 Scorte medicinali</div>
@@ -784,7 +788,6 @@ export default function DoctorView({ tokenData, onLogout }) {
             )}
           </div>
         )}
-
       </div>
     </>
   )
