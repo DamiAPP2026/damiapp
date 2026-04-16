@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import {
   ChevronRight, AlertTriangle, Clock, Bell, Pill,
   Droplets, BookOpen, BarChart2, Package, Phone,
-  Link, Home, FileText, Brain,
-  CreditCard, X, Check, Pencil, ChevronUp, Activity, Layers,
-  MessageCircle, MoreHorizontal
+  FileText, Brain,
+  X, Check, Pencil, Activity,
+  MessageCircle,
 } from 'lucide-react'
 import { db } from './firebase'
 import { ref, onValue } from 'firebase/database'
@@ -13,35 +13,6 @@ import { processFirebaseSnap } from './crypto'
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh   = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
-
-// ─── COSTANTI NAVBAR ─────────────────────────────────────────
-const NAV_H   = 58   // navbar principale
-const EXTRA_H = 52   // barra secondaria
-
-// Navbar principale — 6 voci
-const NAV_BOTTOM = [
-  { Icon: Home,          label: 'Home',     page: 'home'      },
-  { Icon: BookOpen,      label: 'Diario',   page: 'diario'    },
-  { Icon: Brain,         label: 'Disturbi', page: 'disturbi'  },
-  { Icon: Droplets,      label: 'Toilet',   page: 'toilet'    },
-  { Icon: MessageCircle, label: 'Messaggi', page: 'messaggi', isBadge: true },
-  { Icon: MoreHorizontal,label: 'Altro',    page: '__extra__' },
-]
-
-// Barra secondaria — 5 voci — chiavi corrette con underscore
-const NAV_EXTRA = [
-  { Icon: FileText,  label: 'Documenti', page: 'doc_medici'  },
-  { Icon: Package,   label: 'Magazzino', page: 'magazzino'   },
-  { Icon: Pill,      label: 'Terapie',   page: 'terapie'     },
-  { Icon: BarChart2, label: 'Report',    page: 'report'      },
-  { Icon: Layers,    label: 'Utility',   page: 'utility'     },
-]
-
-// Pagine considerate "extra" — chiavi corrette con underscore
-const EXTRA_PAGES = new Set([
-  'doc_medici','doc_personali','magazzino','terapie','report','utility',
-  'rubrica','pagamenti','cosa_portare','condividi',
-])
 
 const FRASI = [
   "Ogni giorno è una nuova occasione per essere più forti di ieri.",
@@ -73,7 +44,7 @@ const ALL_QUICK_ACTIONS = [
   { key:'toilet',   Icon:Droplets,      label:'Toilet Training',   sub:'Log sessione',       color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'toilet'   },
   { key:'magazzino',Icon:Package,       label:'Magazzino',         sub:'Scorte medicinali',  color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#193f9e)', page:'magazzino'},
   { key:'report',   Icon:BarChart2,     label:'Report',            sub:'Statistiche',        color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'report'   },
-  { key:'condividi',Icon:Link,          label:'Condividi',         sub:'Token medico',       color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', page:'condividi'},
+  { key:'condividi',Icon:FileText,      label:'Condividi',         sub:'Token medico',       color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', page:'condividi'},
   { key:'disturbi', Icon:Activity,      label:'Disturbi movimento',sub:'Registra episodio',  color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#F7295A)', page:'disturbi' },
   { key:'rubrica',  Icon:Phone,         label:'Rubrica',           sub:'Contatti',           color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#FF8C42)', page:'rubrica'  },
   { key:'messaggi', Icon:MessageCircle, label:'Messaggi Medico',   sub:'Chat con il medico', color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#2e84e9)', page:'messaggi' },
@@ -90,71 +61,9 @@ function matchOggi(dataField) {
   return raw === oggiRaw || String(dataField) === oggi
 }
 
-// ─── CSS NAVBAR TRANSIZIONE B (spring elastico) ──────────────
-const NAVBAR_CSS = `
-  .nav-extra-bar {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%) scaleY(0);
-    transform-origin: bottom center;
-    width: 100%;
-    max-width: 480px;
-    background: #feffff;
-    border-top: 1px solid #eef0f5;
-    display: flex;
-    align-items: center;
-    box-shadow: 0 -2px 12px rgba(2,21,63,0.08);
-    z-index: 1100;
-    opacity: 0;
-    pointer-events: none;
-    transition:
-      transform 0.30s cubic-bezier(0.34,1.56,0.64,1),
-      opacity   0.18s ease;
-    will-change: transform, opacity;
-  }
-  .nav-extra-bar.open {
-    transform: translateX(-50%) scaleY(1);
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .nav-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: rgba(2,21,63,0.12);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.22s ease;
-    backdrop-filter: blur(0.5px);
-  }
-  .nav-overlay.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .nav-btn {
-    flex: 1;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-    padding: 3px 2px;
-    position: relative;
-    border: none;
-    background: transparent;
-  }
-`
-
 export default function HomeScreen({
   nomeUtente, isDemo, onNavigate,
-  showExtra, onToggleExtra,
   msgNonLetti = 0,
-  activePage: activePageProp = 'home',
 }) {
   const [time,         setTime]   = useState(new Date())
   const [crisi,        setCrisi]  = useState([])
@@ -162,7 +71,6 @@ export default function HomeScreen({
   const [magazzino,    setMag]    = useState([])
   const [toiletData,   setToilet] = useState([])
   const [showQEdit,    setQEdit]  = useState(false)
-  const [activePage,   setAP]     = useState(activePageProp)
   const [quickActions, setQA]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('damiapp_quick_actions')) || DEFAULT_QUICK }
     catch { return DEFAULT_QUICK }
@@ -215,16 +123,7 @@ export default function HomeScreen({
   }
 
   function go(page) {
-    if (page === '__extra__') { onToggleExtra?.(); return }
-    setAP(page)
-    if (!EXTRA_PAGES.has(page) && showExtra) onToggleExtra?.()
     onNavigate?.(page)
-  }
-
-  function isNavActive(page) {
-    if (page === '__extra__') return showExtra || EXTRA_PAGES.has(activePage)
-    if (page === 'home')      return activePage === 'home'
-    return activePage === page
   }
 
   const giorni  = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
@@ -259,134 +158,8 @@ export default function HomeScreen({
 
   const selectedActions = quickActions.map(k=>ALL_QUICK_ACTIONS.find(a=>a.key===k)).filter(Boolean)
 
-  const pbContent = showExtra ? NAV_H + EXTRA_H + 4 : NAV_H + 4
-
-  // stile voce navbar inline (per le voci che non usano .nav-btn)
-  const ni = {
-    flex:1, display:'flex', flexDirection:'column', alignItems:'center',
-    gap:'3px', cursor:'pointer', touchAction:'manipulation',
-    WebkitTapHighlightColor:'transparent', userSelect:'none',
-    padding:'3px 2px', position:'relative', border:'none', background:'transparent',
-  }
-
   return (
-    <div style={{fontFamily:"-apple-system,'Segoe UI',sans-serif", minHeight:'100vh', background:'#f3f4f7', paddingBottom:`${pbContent}px`}}>
-
-      <style>{NAVBAR_CSS}</style>
-
-      {/* ── OVERLAY — fade coordinato ─────────────────────── */}
-      <div
-        className={`nav-overlay${showExtra ? ' open' : ''}`}
-        onClick={onToggleExtra}
-      />
-
-      {/* ════════ BARRA EXTRA — transizione B spring ════════ */}
-      <div
-        className={`nav-extra-bar${showExtra ? ' open' : ''}`}
-        style={{ bottom: NAV_H, height: `${EXTRA_H}px` }}
-      >
-        {NAV_EXTRA.map(({ Icon, label, page }) => {
-          const active = activePage === page
-          return (
-            <button key={page} type="button" onClick={() => go(page)} className="nav-btn">
-              {active && (
-                <div style={{
-                  position:'absolute', top:0, left:'50%',
-                  transform:'translateX(-50%)',
-                  width:'28px', height:'3px',
-                  background:'#193f9e',
-                  borderRadius:'0 0 4px 4px',
-                }}/>
-              )}
-              <div style={{
-                width:'34px', height:'26px',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                borderRadius:'10px',
-                background: active ? '#EEF3FD' : 'transparent',
-                transition:'background 0.2s',
-              }}>
-                <Icon size={17} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
-              </div>
-              <span style={{
-                fontSize:f(9), fontWeight: active ? '800' : '500',
-                color: active ? '#193f9e' : '#bec1cc',
-                transition:'color 0.2s', lineHeight:1,
-              }}>{label}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ════════ NAVBAR PRINCIPALE ══════════════════════════ */}
-      <nav style={{
-        position: 'fixed',
-        bottom: 0, left:'50%', transform:'translateX(-50%)',
-        width:'100%', maxWidth:'480px',
-        height:`${NAV_H}px`,
-        background:'#feffff',
-        borderTop:'1px solid #eef0f5',
-        display:'flex', alignItems:'center',
-        boxShadow:'0 -4px 16px rgba(2,21,63,0.09)',
-        zIndex:1200,
-        paddingBottom:'env(safe-area-inset-bottom)',
-      }}>
-        {NAV_BOTTOM.map(({ Icon, label, page, isBadge }) => {
-          const isExtra = page === '__extra__'
-          const active  = isNavActive(page)
-          return (
-            <button key={page} type="button" onClick={() => go(page)} className="nav-btn" style={{height:'100%'}}>
-              {active && (
-                <div style={{
-                  position:'absolute', top:0, left:'50%',
-                  transform:'translateX(-50%)',
-                  width:'28px', height:'3px',
-                  background:'#193f9e',
-                  borderRadius:'0 0 4px 4px',
-                }}/>
-              )}
-              <div style={{
-                width:'34px', height:'26px',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                borderRadius:'10px',
-                background: active ? '#EEF3FD' : 'transparent',
-                transition:'background 0.2s',
-                position:'relative',
-              }}>
-                {isExtra
-                  ? <ChevronUp
-                      size={17}
-                      color={showExtra ? '#193f9e' : '#bec1cc'}
-                      style={{
-                        transform: showExtra ? 'rotate(0deg)' : 'rotate(180deg)',
-                        transition: 'transform 0.30s cubic-bezier(0.34,1.56,0.64,1)',
-                      }}
-                    />
-                  : <Icon size={17} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
-                }
-                {isBadge && msgNonLetti > 0 && (
-                  <span style={{
-                    position:'absolute', top:'-4px', right:'-4px',
-                    minWidth:'15px', height:'15px', borderRadius:'50%',
-                    background:'#F7295A', display:'flex', alignItems:'center',
-                    justifyContent:'center', border:'2px solid #feffff', padding:'0 2px',
-                  }}>
-                    <span style={{fontSize:'8px',fontWeight:'900',color:'#fff',lineHeight:1}}>
-                      {msgNonLetti > 9 ? '9+' : msgNonLetti}
-                    </span>
-                  </span>
-                )}
-              </div>
-              <span style={{
-                fontSize:f(9), fontWeight: active ? '800' : '500',
-                color: active ? '#193f9e' : '#bec1cc',
-                transition:'color 0.2s', lineHeight:1,
-              }}>
-                {isExtra ? (showExtra ? 'Chiudi' : 'Altro') : label}
-              </span>
-            </button>
-          )
-        })}
-      </nav>
+    <div style={{fontFamily:"-apple-system,'Segoe UI',sans-serif", minHeight:'100vh', background:'#f3f4f7'}}>
 
       {/* ════════ MODAL PERSONALIZZA QUICK ACTIONS ═══════════ */}
       {showQEdit && (
@@ -433,7 +206,6 @@ export default function HomeScreen({
             <span style={{fontSize:f(13),fontWeight:'900',color:'#bec1cc',fontVariantNumeric:'tabular-nums'}}>{timeStr}</span>
           </div>
 
-          {/* LOGO — fix: contain + sfondo + bordo + dimensione maggiore */}
           <div style={{display:'flex',justifyContent:'center',marginBottom:'10px'}}>
             <div style={{
               width:'80px', height:'80px',
@@ -448,12 +220,7 @@ export default function HomeScreen({
               <img
                 src="/DamiLogo.png"
                 alt="DamiAPP logo"
-                style={{
-                  width:'72px',
-                  height:'72px',
-                  objectFit:'contain',
-                  borderRadius:'50%',
-                }}
+                style={{width:'72px',height:'72px',objectFit:'contain',borderRadius:'50%'}}
                 onError={e=>{e.target.style.display='none'}}
               />
             </div>

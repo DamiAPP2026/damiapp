@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Home, BookOpen, Pill, Droplets, Link, Settings, Layers } from 'lucide-react'
+import {
+  Home, BookOpen, Brain, Droplets, MessageCircle,
+  MoreHorizontal, ChevronUp,
+  FileText, Package, Pill, BarChart2, Layers,
+  AlertTriangle, Phone
+} from 'lucide-react'
 import { db } from './firebase'
 import { ref, onValue, get } from 'firebase/database'
 import { decrypt } from './crypto'
@@ -26,8 +31,39 @@ const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
 const VERSION   = '05.01.02'
 
-
 const f = (base) => `${Math.round(base * 1.15)}px`
+
+// ─── COSTANTI NAVBAR ─────────────────────────────────────────
+const NAV_H   = 58
+const EXTRA_H = 52
+
+// Navbar principale — 6 voci
+const NAV_BOTTOM = [
+  { Icon: Home,          label: 'Home',     page: 'home'      },
+  { Icon: BookOpen,      label: 'Diario',   page: 'diario'    },
+  { Icon: Brain,         label: 'Disturbi', page: 'disturbi'  },
+  { Icon: Droplets,      label: 'Toilet',   page: 'toilet'    },
+  { Icon: MessageCircle, label: 'Messaggi', page: 'messaggi', isBadge: true },
+  { Icon: MoreHorizontal,label: 'Altro',    page: '__extra__' },
+]
+
+// Barra secondaria — 5 voci
+const NAV_EXTRA = [
+  { Icon: FileText,  label: 'Documenti', page: 'doc_medici'  },
+  { Icon: Package,   label: 'Magazzino', page: 'magazzino'   },
+  { Icon: Pill,      label: 'Terapie',   page: 'terapie'     },
+  { Icon: BarChart2, label: 'Report',    page: 'report'      },
+  { Icon: Layers,    label: 'Utility',   page: 'utility'     },
+]
+
+// Pagine considerate "extra"
+const EXTRA_PAGES = new Set([
+  'doc_medici','doc_personali','magazzino','terapie','report','utility',
+  'rubrica','pagamenti','cosa_portare','condividi',
+])
+
+// Pagine senza navbar
+const NO_NAV = ['crisi', 'sos']
 
 
 const FRASI = [
@@ -62,7 +98,6 @@ const FRASI = [
   "Sei più forte di quanto credi — sempre.",
   "La cura quotidiana è il gesto d'amore più grande.",
 ]
-
 
 export function getFrase() {
   return FRASI[(new Date().getDate() + new Date().getMonth()) % FRASI.length]
@@ -121,6 +156,64 @@ const GLOBAL_CSS = `
   .dami-btn-accedi:active {
     transform: scale(0.97);
     box-shadow: 0 4px 12px rgba(8,24,76,0.25) !important;
+  }
+
+  /* ── NAVBAR UNIFICATA ── */
+  .nav-extra-bar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%) scaleY(0);
+    transform-origin: bottom center;
+    width: 100%;
+    max-width: 480px;
+    background: #feffff;
+    border-top: 1px solid #eef0f5;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 -2px 12px rgba(2,21,63,0.08);
+    z-index: 1100;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform 0.30s cubic-bezier(0.34,1.56,0.64,1),
+      opacity   0.18s ease;
+    will-change: transform, opacity;
+  }
+  .nav-extra-bar.open {
+    transform: translateX(-50%) scaleY(1);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .nav-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(2,21,63,0.12);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    backdrop-filter: blur(0.5px);
+  }
+  .nav-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .nav-btn {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    padding: 3px 2px;
+    position: relative;
+    border: none;
+    background: transparent;
   }
 `
 
@@ -341,35 +434,141 @@ function PaginaInArrivo({ onBack }) {
 }
 
 
-function NavbarInterna({ page, onNavigate, msgNonLetti = 0 }) {
-  const items = [
-    {Icon:Home,     label:'Home',    p:'home'},
-    {Icon:BookOpen, label:'Diario',  p:'diario'},
-    {Icon:Pill,     label:'Terapie', p:'terapie'},
-    {Icon:Droplets, label:'Toilet',  p:'toilet'},
-    {Icon:Link,     label:'Medico',  p:'condividi', badge: msgNonLetti},
-    {Icon:Layers,   label:'Utility', p:'utility'},
-  ]
+// ─── NAVBAR UNIFICATA ────────────────────────────────────────
+// Unica navbar per tutta l'app — sostituisce NavbarInterna e
+// la navbar di Home.jsx. Monta sempre tranne su crisi/sos.
+function NavbarApp({ page, onNavigate, showExtra, onToggleExtra, msgNonLetti = 0 }) {
+
+  function isNavActive(p) {
+    if (p === '__extra__') return showExtra || EXTRA_PAGES.has(page)
+    return page === p
+  }
+
   return (
-    <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'480px',background:'#feffff',borderTop:'1px solid #f0f1f4',display:'flex',padding:'7px 0 14px',boxShadow:'0 -4px 16px rgba(2,21,63,0.08)',zIndex:100}}>
-      {items.map(({Icon,label,p,badge})=>{
-        const act = page===p
-        return (
-          <div key={label} onClick={()=>onNavigate(p)}
-            style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',touchAction:'manipulation',position:'relative'}}>
-            <div style={{width:'34px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'8px',background:act?'#EEF3FD':'transparent'}}>
-              <Icon size={17} color={act?'#193f9e':'#bec1cc'}/>
-              {badge > 0 && (
-                <span style={{position:'absolute',top:'0px',right:'calc(50% - 20px)',width:'15px',height:'15px',borderRadius:'50%',background:'#F7295A',display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid #feffff',zIndex:2}}>
-                  <span style={{fontSize:'8px',fontWeight:'900',color:'#fff',lineHeight:1}}>{badge > 9 ? '9+' : badge}</span>
-                </span>
+    <>
+      {/* Overlay */}
+      <div
+        className={`nav-overlay${showExtra ? ' open' : ''}`}
+        onClick={onToggleExtra}
+      />
+
+      {/* Barra extra — spring */}
+      <div
+        className={`nav-extra-bar${showExtra ? ' open' : ''}`}
+        style={{ bottom: NAV_H, height: `${EXTRA_H}px` }}
+      >
+        {NAV_EXTRA.map(({ Icon, label, page: p }) => {
+          const active = page === p
+          return (
+            <button key={p} type="button"
+              onClick={() => { onToggleExtra(); onNavigate(p) }}
+              className="nav-btn"
+            >
+              {active && (
+                <div style={{
+                  position:'absolute', top:0, left:'50%',
+                  transform:'translateX(-50%)',
+                  width:'28px', height:'3px',
+                  background:'#193f9e',
+                  borderRadius:'0 0 4px 4px',
+                }}/>
               )}
-            </div>
-            <span style={{fontSize:`${Math.round(9*1.15)}px`,fontWeight:act?'800':'500',color:act?'#193f9e':'#bec1cc'}}>{label}</span>
-          </div>
-        )
-      })}
-    </div>
+              <div style={{
+                width:'36px', height:'28px',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                borderRadius:'10px',
+                background: active ? '#EEF3FD' : 'transparent',
+                transition:'background 0.2s',
+              }}>
+                <Icon size={20} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
+              </div>
+              <span style={{
+                fontSize:`${Math.round(9*1.15)}px`,
+                fontWeight: active ? '800' : '500',
+                color: active ? '#193f9e' : '#bec1cc',
+                transition:'color 0.2s', lineHeight:1,
+              }}>{label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Navbar principale */}
+      <nav style={{
+        position: 'fixed',
+        bottom: 0, left:'50%', transform:'translateX(-50%)',
+        width:'100%', maxWidth:'480px',
+        height:`${NAV_H}px`,
+        background:'#feffff',
+        borderTop:'1px solid #eef0f5',
+        display:'flex', alignItems:'center',
+        boxShadow:'0 -4px 16px rgba(2,21,63,0.09)',
+        zIndex:1200,
+        paddingBottom:'env(safe-area-inset-bottom)',
+      }}>
+        {NAV_BOTTOM.map(({ Icon, label, page: p, isBadge }) => {
+          const isExtra = p === '__extra__'
+          const active  = isNavActive(p)
+          return (
+            <button key={p} type="button"
+              onClick={() => isExtra ? onToggleExtra() : onNavigate(p)}
+              className="nav-btn"
+              style={{ height: '100%' }}
+            >
+              {active && (
+                <div style={{
+                  position:'absolute', top:0, left:'50%',
+                  transform:'translateX(-50%)',
+                  width:'28px', height:'3px',
+                  background:'#193f9e',
+                  borderRadius:'0 0 4px 4px',
+                }}/>
+              )}
+              <div style={{
+                width:'36px', height:'28px',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                borderRadius:'10px',
+                background: active ? '#EEF3FD' : 'transparent',
+                transition:'background 0.2s',
+                position:'relative',
+              }}>
+                {isExtra
+                  ? <ChevronUp
+                      size={20}
+                      color={showExtra ? '#193f9e' : '#bec1cc'}
+                      style={{
+                        transform: showExtra ? 'rotate(0deg)' : 'rotate(180deg)',
+                        transition: 'transform 0.30s cubic-bezier(0.34,1.56,0.64,1)',
+                      }}
+                    />
+                  : <Icon size={20} color={active ? '#193f9e' : '#bec1cc'} strokeWidth={active ? 2.5 : 2}/>
+                }
+                {isBadge && msgNonLetti > 0 && (
+                  <span style={{
+                    position:'absolute', top:'-4px', right:'-4px',
+                    minWidth:'15px', height:'15px', borderRadius:'50%',
+                    background:'#F7295A', display:'flex', alignItems:'center',
+                    justifyContent:'center', border:'2px solid #feffff', padding:'0 2px',
+                  }}>
+                    <span style={{fontSize:'8px',fontWeight:'900',color:'#fff',lineHeight:1}}>
+                      {msgNonLetti > 9 ? '9+' : msgNonLetti}
+                    </span>
+                  </span>
+                )}
+              </div>
+              <span style={{
+                fontSize:`${Math.round(9*1.15)}px`,
+                fontWeight: active ? '800' : '500',
+                color: active ? '#193f9e' : '#bec1cc',
+                transition:'color 0.2s', lineHeight:1,
+              }}>
+                {isExtra ? (showExtra ? 'Chiudi' : 'Altro') : label}
+              </span>
+            </button>
+          )
+        })}
+      </nav>
+    </>
   )
 }
 
@@ -469,8 +668,9 @@ export default function App() {
   }
 
   function handleNavigate(dest) {
-    setShowExtra(false)
-    if (dest==='crisi') setTimerSecCrisi(1)
+    // chiude la barra extra solo se la destinazione NON è una pagina extra
+    if (!EXTRA_PAGES.has(dest)) setShowExtra(false)
+    if (dest === 'crisi') setTimerSecCrisi(1)
     setPage(dest)
   }
 
@@ -479,7 +679,9 @@ export default function App() {
     : isDemo ? (pendingNome||'Ospite')
     : (pendingNome||nomeUtente||'Damiano')
 
-  const noNav = ['crisi','sos']
+  const showNav = authenticated && !isMedico && !NO_NAV.includes(page)
+  // padding bottom per le pagine: navbar + eventuale barra extra
+  const pb = showExtra ? NAV_H + EXTRA_H + 4 : NAV_H + 4
 
   return (
     <>
@@ -502,63 +704,66 @@ export default function App() {
           {page==='crisi' && <CrisiPage onBack={()=>setPage('home')} timerSecInizio={timerSecCrisi} isDemo={isDemo}/>}
           {page==='sos'   && <SOSPage onBack={()=>setPage('home')}/>}
 
-          {!noNav.includes(page) && (
-            <>
-              <div key={page} className="dami-page-enter">
-                {page==='home' && (
-                  <Home2
-                    nomeUtente={nomeEffettivo}
-                    isDemo={isDemo}
-                    onNavigate={handleNavigate}
-                    showExtra={showExtra}
-                    onToggleExtra={()=>setShowExtra(p=>!p)}
-                    msgNonLetti={msgNonLetti}
-                  />
-                )}
-                {page==='diario'        && <DiarioCrisi    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-                {page==='terapie'       && <TerapiePage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-                {page==='toilet'        && <ToiletPage      onBack={()=>setPage('home')} isDemo={isDemo}/>}
-                {page==='condividi'     && <CondividiPage   onBack={()=>setPage('home')} isDemo={isDemo}/>}
-                {page==='messaggi'      && <MessaggiPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
-                {page==='report'        && <ReportPage      onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-                {page==='magazzino'     && <MagazzinoPage   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-                {page==='disturbi'      && <DisturbPage     onBack={()=>setPage('home')} isDemo={isDemo}/>}
-                {page==='utility'       && <UtilityPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
-                {page==='rubrica'       && <RubricaPage     onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-                {page==='pagamenti'     && <PagamentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-                {page==='cosa_portare'  && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
-                {page==='doc_medici'    && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
-                {page==='doc_personali' && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
-                {page==='admin'         && <PaginaInArrivo  onBack={()=>handleNavigate('home')}/>}
+          {!NO_NAV.includes(page) && (
+            <div key={page} className="dami-page-enter" style={{paddingBottom:`${pb}px`}}>
+              {page==='home' && (
+                <Home2
+                  nomeUtente={nomeEffettivo}
+                  isDemo={isDemo}
+                  onNavigate={handleNavigate}
+                  msgNonLetti={msgNonLetti}
+                />
+              )}
+              {page==='diario'        && <DiarioCrisi    onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='terapie'       && <TerapiePage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='toilet'        && <ToiletPage      onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='condividi'     && <CondividiPage   onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='messaggi'      && <MessaggiPage    onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='report'        && <ReportPage      onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='magazzino'     && <MagazzinoPage   onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='disturbi'      && <DisturbPage     onBack={()=>setPage('home')} isDemo={isDemo}/>}
+              {page==='utility'       && <UtilityPage     onBack={()=>setPage('home')} isDemo={isDemo} onNavigate={handleNavigate}/>}
+              {page==='rubrica'       && <RubricaPage     onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='pagamenti'     && <PagamentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='cosa_portare'  && <CosaPortarePage onBack={()=>handleNavigate('utility')} isDemo={isDemo}/>}
+              {page==='doc_medici'    && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="medici"/>}
+              {page==='doc_personali' && <DocumentiPage   onBack={()=>handleNavigate('utility')} isDemo={isDemo} categoria="personali"/>}
+              {page==='admin'         && <PaginaInArrivo  onBack={()=>handleNavigate('home')}/>}
+            </div>
+          )}
+
+          {/* NAVBAR UNIFICATA — sempre montata, mai smontata al cambio pagina */}
+          {showNav && (
+            <NavbarApp
+              page={page}
+              onNavigate={handleNavigate}
+              showExtra={showExtra}
+              onToggleExtra={() => setShowExtra(p => !p)}
+              msgNonLetti={msgNonLetti}
+            />
+          )}
+
+          {showInstallBanner && (
+            <div style={{position:'fixed',bottom: showNav ? NAV_H + 8 : 8,left:'50%',transform:'translateX(-50%)',width:'calc(100% - 24px)',maxWidth:'456px',background:'#08184c',borderRadius:'20px',padding:'14px 16px',boxShadow:'0 8px 32px rgba(2,21,63,0.45)',zIndex:3000,display:'flex',alignItems:'center',gap:'12px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+              <img src="/DamiLogo.png" alt="logo" style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'contain',background:'#f3f4f7',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}} onError={e=>{e.target.style.display='none'}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:'14px',fontWeight:'900',color:'#fff',marginBottom:'2px'}}>Installa DamiAPP</div>
+                {showInstallBanner==='ios'
+                  ? <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)',lineHeight:'1.4'}}>Tocca <strong style={{color:'#fff'}}>⎋ Condividi</strong> poi <strong style={{color:'#fff'}}>"Aggiungi a Home"</strong></div>
+                  : <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)'}}>Accesso rapido dalla schermata Home</div>
+                }
               </div>
-
-              {page !== 'home' && (
-                <NavbarInterna page={page} onNavigate={handleNavigate} msgNonLetti={msgNonLetti}/>
-              )}
-
-              {showInstallBanner && (
-                <div style={{position:'fixed',bottom:'80px',left:'50%',transform:'translateX(-50%)',width:'calc(100% - 24px)',maxWidth:'456px',background:'#08184c',borderRadius:'20px',padding:'14px 16px',boxShadow:'0 8px 32px rgba(2,21,63,0.45)',zIndex:3000,display:'flex',alignItems:'center',gap:'12px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
-                  <img src="/DamiLogo.png" alt="logo" style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'contain',background:'#f3f4f7',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}} onError={e=>{e.target.style.display='none'}}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:'14px',fontWeight:'900',color:'#fff',marginBottom:'2px'}}>Installa DamiAPP</div>
-                    {showInstallBanner==='ios'
-                      ? <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)',lineHeight:'1.4'}}>Tocca <strong style={{color:'#fff'}}>⎋ Condividi</strong> poi <strong style={{color:'#fff'}}>"Aggiungi a Home"</strong></div>
-                      : <div style={{fontSize:'11px',color:'rgba(255,255,255,0.7)'}}>Accesso rapido dalla schermata Home</div>
-                    }
-                  </div>
-                  <div style={{display:'flex',gap:'6px',flexShrink:0}}>
-                    {showInstallBanner==='android' && (
-                      <button type="button" onClick={handleInstall} style={{padding:'8px 14px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:'12px',color:'#08184c',background:'#fff',fontFamily:'inherit'}}>
-                        Installa
-                      </button>
-                    )}
-                    <button type="button" onClick={dismissInstall} style={{width:'30px',height:'30px',borderRadius:'50%',border:'none',cursor:'pointer',background:'rgba(255,255,255,0.15)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>
-                      ×
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
+              <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+                {showInstallBanner==='android' && (
+                  <button type="button" onClick={handleInstall} style={{padding:'8px 14px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:'12px',color:'#08184c',background:'#fff',fontFamily:'inherit'}}>
+                    Installa
+                  </button>
+                )}
+                <button type="button" onClick={dismissInstall} style={{width:'30px',height:'30px',borderRadius:'50%',border:'none',cursor:'pointer',background:'rgba(255,255,255,0.15)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>
+                  ×
+                </button>
+              </div>
+            </div>
           )}
         </>
       )}
