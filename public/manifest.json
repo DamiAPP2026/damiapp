@@ -4,7 +4,7 @@
   "description": "Assistente quotidiano per la gestione delle crisi epilettiche",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f3f4f7",
+  "background_color": "#08184c",
   "theme_color": "#08184c",
   "orientation": "portrait",
   "icons": [
@@ -12,13 +12,25 @@
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/apple-touch-icon.png",
