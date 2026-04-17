@@ -122,15 +122,6 @@ const GLOBAL_CSS = `
     from { opacity: 0; transform: translateY(28px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes damiLogoPop {
-    0%   { opacity: 0; transform: scale(0.72); }
-    70%  { transform: scale(1.07); }
-    100% { opacity: 1; transform: scale(1); }
-  }
-  @keyframes damiLogoPulse {
-    0%, 100% { box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0px rgba(255,255,255,0.12); }
-    50%       { box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3), 0 0 0 7px rgba(255,255,255,0.07); }
-  }
   @keyframes damiSlideInRight {
     from { opacity: 0; transform: translateX(48px); }
     to   { opacity: 1; transform: translateX(0); }
@@ -138,10 +129,6 @@ const GLOBAL_CSS = `
 
   .dami-login-card {
     animation: damiLoginSlideUp 0.45s cubic-bezier(0.22,1,0.36,1) both;
-  }
-  .dami-login-logo {
-    animation: damiLogoPop 0.5s cubic-bezier(0.22,1,0.36,1) 0.15s both,
-               damiLogoPulse 3s ease-in-out 1s infinite;
   }
   .dami-page-enter {
     animation: damiSlideInRight 0.32s cubic-bezier(0.22,1,0.36,1) both;
@@ -251,7 +238,7 @@ function OnboardingModal({ onDone, isDemo }) {
     <div style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
       <div style={{background:'#feffff',borderRadius:'24px',padding:'32px 24px',width:'100%',maxWidth:'340px',boxShadow:'0 20px 60px rgba(2,21,63,0.25)'}}>
         <div style={{textAlign:'center',marginBottom:'24px'}}>
-          <img src="/DamiLogo.png" alt="logo" style={{width:'72px',height:'72px',borderRadius:'50%',objectFit:'contain',background:'#f3f4f7',marginBottom:'14px',boxShadow:'0 4px 16px rgba(8,24,76,0.25)'}} onError={e=>{e.target.style.display='none'}}/>
+          <img src="/DamiAPP_Trasp.png" alt="logo" style={{width:'72px',height:'72px',borderRadius:'50%',objectFit:'contain',background:'#f3f4f7',marginBottom:'14px',boxShadow:'0 4px 16px rgba(8,24,76,0.25)'}} onError={e=>{e.target.style.display='none'}}/>
           <div style={{fontSize:f(20),fontWeight:'900',color:'#08184c',marginBottom:'6px'}}>
             {isDemo ? '👋 Benvenuto nella Demo!' : 'Benvenuto in DamiAPP'}
           </div>
@@ -338,9 +325,8 @@ function Login({ onLogin }) {
         <div style={{background:'linear-gradient(135deg,#08184c,#193f9e)',padding:'36px 24px 30px',textAlign:'center',position:'relative'}}>
           <div style={{position:'absolute',top:'10px',right:'14px',fontSize:f(10),color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>v{VERSION}</div>
           <img
-            src="/DamiLogo.png"
+            src="/DamiAPP_Trasp.png"
             alt="logo"
-            className="dami-login-logo"
             style={{width:'100px',height:'100px',borderRadius:'50%',objectFit:'contain',background:'#f3f4f7',marginBottom:'16px',border:'3px solid rgba(255,255,255,0.25)'}}
             onError={e=>{e.target.style.display='none'}}
           />
@@ -745,7 +731,7 @@ export default function App() {
 
           {showInstallBanner && (
             <div style={{position:'fixed',bottom: showNav ? NAV_H + 8 : 8,left:'50%',transform:'translateX(-50%)',width:'calc(100% - 24px)',maxWidth:'456px',background:'#08184c',borderRadius:'20px',padding:'14px 16px',boxShadow:'0 8px 32px rgba(2,21,63,0.45)',zIndex:3000,display:'flex',alignItems:'center',gap:'12px',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
-              <img src="/DamiLogo.png" alt="logo" style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'contain',background:'#f3f4f7',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}} onError={e=>{e.target.style.display='none'}}/>
+              <img src="/DamiAPP_Trasp.png" alt="logo" style={{width:'44px',height:'44px',borderRadius:'12px',objectFit:'contain',background:'#f3f4f7',flexShrink:0,border:'2px solid rgba(255,255,255,0.2)'}} onError={e=>{e.target.style.display='none'}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:'14px',fontWeight:'900',color:'#fff',marginBottom:'2px'}}>Installa DamiAPP</div>
                 {showInstallBanner==='ios'
