@@ -433,10 +433,11 @@ export default function RubricaPage({ onBack, isDemo }) {
           </div>
 
           {/* BOTTONE SALVA FISSO IN BASSO — sempre visibile, mai coperto dalla tastiera */}
+          {/* paddingBottom = 12px base + 58px navbar App.jsx + safe area iPhone */}
           <div style={{
             flexShrink: 0,
             padding: '12px 14px',
-            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
+            paddingBottom: 'calc(12px + 58px + env(safe-area-inset-bottom))',
             background: '#f3f4f7',
             borderTop: '1px solid #ececf0',
             boxShadow: '0 -4px 20px rgba(2,21,63,0.07)',
