@@ -4,6 +4,7 @@
     "description": "Assistente quotidiano per la gestione delle crisi epilettiche",
     "start_url": "/",
     "display": "standalone",
+    "display_override": ["standalone"],
     "background_color": "#ffffff",
     "theme_color": "#ffffff",
     "orientation": "portrait",
