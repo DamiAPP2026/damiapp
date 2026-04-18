@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronLeft, Check, Save, Plus, PenSquare, X, Filter } from 'lucide-react'
 import { db } from './firebase'
-import { ref, push, onValue, remove, update } from 'firebase/database'
+import { ref, push, onValue, remove, update, set } from 'firebase/database'
 import { processFirebaseSnap, encrypt } from './crypto'
 import ToiletCharts from './ToiletCharts'
 
@@ -216,7 +216,9 @@ export default function ToiletPage({ onBack, isDemo }) {
       note: editForm.note,
     }
     if (!isDemo && editItem._firebaseKey) {
-      update(ref(db, `toilet_training/${editItem._firebaseKey}`), encrypt(updated))
+      // FIX: set() invece di update() perché encrypt() restituisce una stringa
+      // update() si aspetta un oggetto con chiavi — con una stringa cifra corrompe il nodo
+      set(ref(db, 'toilet_training/' + editItem._firebaseKey), encrypt(updated))
     } else {
       setLog(prev => prev.map(x => x.id === editItem.id ? updated : x))
     }

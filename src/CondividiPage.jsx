@@ -4,7 +4,7 @@ import {
   Eye, EyeOff, RefreshCw, AlertCircle, ChevronDown, ChevronUp
 } from 'lucide-react'
 import { db } from './firebase'
-import { ref, push, onValue, set, get } from 'firebase/database'
+import { ref, push, onValue, set, get, remove } from 'firebase/database'
 import { encrypt, processFirebaseSnap, decrypt } from './crypto'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
@@ -151,6 +151,28 @@ export default function CondividiPage({ onBack, isDemo }) {
       set(ref(db,`sharetokens/${t._firebaseKey}`), encrypt(toSave))
     } else {
       setTokens(prev=>prev.map(tk=>tk.id===t.id?{...tk,active:false}:tk))
+    }
+  }
+
+  function handleElimina(t) {
+    const nome = t.medicoName || t.intestatario || 'questo utente'
+    if (!window.confirm('Eliminare definitivamente il token di ' + nome + '?\nQuesta operazione è irreversibile.')) return
+    if (!isDemo && t._firebaseKey) {
+      remove(ref(db, 'sharetokens/' + t._firebaseKey))
+    } else {
+      setTokens(prev => prev.filter(tk => tk.id !== t.id))
+    }
+  }
+
+  function handleEliminaTutti() {
+    if (!window.confirm('Eliminare definitivamente TUTTI i token scaduti e revocati?\nQuesta operazione è irreversibile.')) return
+    const scadutiDaEliminare = tokens.filter(t => !t.active || (t.expiresAt && t.expiresAt <= Date.now()))
+    if (!isDemo) {
+      scadutiDaEliminare.forEach(t => {
+        if (t._firebaseKey) remove(ref(db, 'sharetokens/' + t._firebaseKey))
+      })
+    } else {
+      setTokens(prev => prev.filter(t => t.active && (!t.expiresAt || t.expiresAt > Date.now())))
     }
   }
 
@@ -367,7 +389,12 @@ export default function CondividiPage({ onBack, isDemo }) {
             })}
 
             {scaduti.length>0 && (<>
-              <div style={{fontSize:f(13),fontWeight:'800',color:'#bec1cc',margin:'16px 0 8px'}}>Revocati / Scaduti ({scaduti.length})</div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'16px 0 8px'}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#bec1cc'}}>Revocati / Scaduti ({scaduti.length})</div>
+                <button type="button" onClick={handleEliminaTutti} style={{padding:'5px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(10),fontFamily:'inherit',background:'#FEF0F4',color:'#F7295A',display:'flex',alignItems:'center',gap:'4px'}}>
+                  <Trash2 size={10}/> Elimina tutti
+                </button>
+              </div>
               {scaduti.map(t=>{
                 const ruolo = getRuolo(t.role||'medico')
                 const nomeDisplay = t.role==='toilet_writer' ? t.intestatario : (t.medicoName||'—')
@@ -383,9 +410,14 @@ export default function CondividiPage({ onBack, isDemo }) {
                       </div>
                       <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'5px'}}>
                         <span style={{fontSize:f(10),fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:'#FEF0F4',color:'#F7295A'}}>Revocato</span>
-                        <button type="button" onClick={()=>{setShowRinnova(showRinnova===t.id?null:t.id);setNuovaDurata(90)}} style={{padding:'4px 10px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(10),fontFamily:'inherit',background:'#EEF3FD',color:'#193f9e',display:'flex',alignItems:'center',gap:'4px'}}>
-                          <RefreshCw size={10}/> Rinnova
-                        </button>
+                        <div style={{display:'flex',gap:'5px'}}>
+                          <button type="button" onClick={()=>{setShowRinnova(showRinnova===t.id?null:t.id);setNuovaDurata(90)}} style={{padding:'4px 10px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(10),fontFamily:'inherit',background:'#EEF3FD',color:'#193f9e',display:'flex',alignItems:'center',gap:'4px'}}>
+                            <RefreshCw size={10}/> Rinnova
+                          </button>
+                          <button type="button" onClick={()=>handleElimina(t)} style={{padding:'4px 10px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(10),fontFamily:'inherit',background:'#FEF0F4',color:'#F7295A',display:'flex',alignItems:'center',gap:'4px'}}>
+                            <Trash2 size={10}/> Elimina
+                          </button>
+                        </div>
                       </div>
                     </div>
                     {showRinnova===t.id && <PanelRinnova t={t}/>}

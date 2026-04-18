@@ -29,7 +29,7 @@ import MessaggiPage from './MessaggiPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
-const VERSION   = '05.01.03'
+const VERSION   = '05.01.04'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 
@@ -609,17 +609,20 @@ export default function App() {
     const unsub = onValue(ref(db, 'sharetokens'), snapTokens => {
       const rawTokens = snapTokens.val()
       if (!rawTokens) { setMsgNonLetti(0); return }
-      const tokenKeys = Object.entries(rawTokens)
-        .map(([k, enc]) => { const d = decrypt(enc); return d ? k : null })
+      // FIX bug chat: usa d.token (es. "DMIABC12345") non la chiave Firebase
+      // perché ChatMedico scrive su messages/{token_string}
+      const tokenStrings = Object.entries(rawTokens)
+        .map(([k, enc]) => { const d = decrypt(enc); return (d && d.token && d.active) ? d.token : null })
         .filter(Boolean)
-      if (tokenKeys.length === 0) { setMsgNonLetti(0); return }
+      if (tokenStrings.length === 0) { setMsgNonLetti(0); return }
       Promise.all(
-        tokenKeys.map(tk =>
+        tokenStrings.map(tk =>
           new Promise(resolve => {
-            onValue(ref(db, `messages/${tk}`), snap => {
+            onValue(ref(db, 'messages/' + tk), snap => {
               const raw = snap.val()
               if (!raw) { resolve(0); return }
-              const msgs = Object.values(raw).map(enc => decrypt(enc)).filter(Boolean)
+              // i messaggi sono oggetti plain, non cifrati
+              const msgs = Object.values(raw).filter(m => m && typeof m === 'object')
               resolve(msgs.filter(m => m.da === 'medico' && !m.letto).length)
             }, { onlyOnce: true })
           })
