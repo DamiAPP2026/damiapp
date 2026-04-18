@@ -321,46 +321,63 @@ export default function RubricaPage({ onBack, isDemo }) {
         </div>
       )}
 
-      {/* ── MODAL FORM ── */}
+      {/* ── FORM PAGINA FULL-SCREEN ── */}
+      {/* Copre tutto lo schermo come una pagina vera: niente tastiera che spinge,
+          niente bottone nascosto sotto la navbar, X sempre visibile in alto */}
       {showForm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,21,63,0.55)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', fontFamily: "-apple-system,'Segoe UI',sans-serif" }}
-          onClick={e => { if (e.target === e.currentTarget) chiudiForm() }}>
-          <div style={{ background: '#feffff', borderRadius: '24px 24px 0 0', padding: '0', width: '100%', maxWidth: '480px', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 -8px 40px rgba(2,21,63,0.20)' }}>
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2000,
+          background: '#f3f4f7',
+          fontFamily: "-apple-system,'Segoe UI',sans-serif",
+          display: 'flex', flexDirection: 'column',
+          maxWidth: '480px', left: '50%', transform: 'translateX(-50%)',
+          width: '100%',
+        }}>
 
-            {/* Handle bar */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0' }}>
-              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: '#dde0ed' }} />
-            </div>
-
-            {/* Header modale */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px 0' }}>
-              <div>
-                <div style={{ fontSize: f(17), fontWeight: '900', color: '#02153f' }}>
-                  {editTarget ? '✏️ Modifica contatto' : '➕ Nuovo contatto'}
-                </div>
-                {editTarget && <div style={{ fontSize: f(11), color: '#7c8088', marginTop: '2px' }}>{editTarget.nome}</div>}
+          {/* HEADER FISSO con X per chiudere */}
+          <div style={{
+            background: 'linear-gradient(135deg,#F7295A,#FF8C42)',
+            padding: '14px 16px',
+            paddingTop: 'max(14px, env(safe-area-inset-top))',
+            display: 'flex', alignItems: 'center', gap: '12px',
+            flexShrink: 0,
+            boxShadow: '0 4px 20px rgba(247,41,90,0.25)',
+          }}>
+            <button type="button" onClick={chiudiForm} style={{
+              width: '38px', height: '38px', borderRadius: '50%',
+              background: 'rgba(255,255,255,0.22)', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0,
+            }}>
+              <X size={20} color="#fff" />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: f(16), fontWeight: '900', color: '#fff' }}>
+                {editTarget ? 'Modifica contatto' : 'Nuovo contatto'}
               </div>
-              <button type="button" onClick={chiudiForm}
-                style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#f3f4f7', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={16} color="#7c8088" />
-              </button>
+              {editTarget && (
+                <div style={{ fontSize: f(11), color: 'rgba(255,255,255,0.75)', marginTop: '1px' }}>{editTarget.nome}</div>
+              )}
             </div>
+          </div>
 
-            <div style={{ padding: '16px 20px 32px' }}>
+          {/* CORPO SCROLLABILE */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 0' }}>
 
-              {/* Nome */}
+            <div style={{ background: '#feffff', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', boxShadow: shSm }}>
               <label style={lbStyle}>Nome *</label>
               <input
                 value={form.nome}
                 onChange={e => setForm(p => ({ ...p, nome: e.target.value }))}
-                placeholder="Es: Dr. Rossi — Neurologo"
-                style={{ ...inStyle, marginBottom: '14px' }}
+                placeholder="Es: Dr. Rossi"
+                style={inStyle}
                 onFocus={e => e.target.style.borderColor = '#F7295A'}
                 onBlur={e => e.target.style.borderColor = '#f0f1f4'}
                 autoFocus
               />
+            </div>
 
-              {/* Telefono */}
+            <div style={{ background: '#feffff', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', boxShadow: shSm }}>
               <label style={lbStyle}>Telefono</label>
               <input
                 value={form.telefono}
@@ -368,65 +385,85 @@ export default function RubricaPage({ onBack, isDemo }) {
                 placeholder="Es: 333-1234567"
                 type="tel"
                 inputMode="tel"
-                style={{ ...inStyle, marginBottom: '14px' }}
+                style={inStyle}
                 onFocus={e => e.target.style.borderColor = '#F7295A'}
                 onBlur={e => e.target.style.borderColor = '#f0f1f4'}
               />
+            </div>
 
-              {/* Ruolo */}
+            <div style={{ background: '#feffff', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', boxShadow: shSm }}>
               <label style={lbStyle}>Ruolo</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', marginBottom: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px' }}>
                 {RUOLI.map(r => (
                   <div key={r.key} onClick={() => setForm(p => ({ ...p, ruolo: r.key }))}
-                    style={{ padding: '10px 12px', borderRadius: '12px', cursor: 'pointer', border: `2px solid ${form.ruolo === r.key ? r.color : '#f0f1f4'}`, background: form.ruolo === r.key ? r.bg : '#feffff', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: form.ruolo === r.key ? r.color : '#dde0ed', flexShrink: 0, transition: 'background 0.15s' }} />
+                    style={{
+                      padding: '10px 12px', borderRadius: '12px', cursor: 'pointer',
+                      border: `2px solid ${form.ruolo === r.key ? r.color : '#f0f1f4'}`,
+                      background: form.ruolo === r.key ? r.bg : '#f3f4f7',
+                      transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '8px',
+                    }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: form.ruolo === r.key ? r.color : '#dde0ed', flexShrink: 0 }} />
                     <div style={{ fontSize: f(12), fontWeight: '700', color: form.ruolo === r.key ? r.color : '#394058' }}>{r.label}</div>
                   </div>
                 ))}
               </div>
+            </div>
 
-              {/* Note */}
+            <div style={{ background: '#feffff', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', boxShadow: shSm }}>
               <label style={lbStyle}>Note</label>
               <textarea
                 value={form.note}
                 onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
-                placeholder="Es: visita ogni 6 mesi, apertura..."
-                rows={2}
-                style={{ ...inStyle, resize: 'none', marginBottom: '20px' }}
+                placeholder="Es: visita ogni 6 mesi, orari..."
+                rows={3}
+                style={{ ...inStyle, resize: 'none' }}
                 onFocus={e => e.target.style.borderColor = '#F7295A'}
                 onBlur={e => e.target.style.borderColor = '#f0f1f4'}
               />
-
-              {/* Bottone salva */}
-              <button type="button" onClick={handleSalva} disabled={saving}
-                style={{
-                  width: '100%', padding: '16px', borderRadius: '50px', border: 'none',
-                  cursor: saving ? 'wait' : 'pointer',
-                  fontWeight: '800', fontSize: f(15), color: '#fff', fontFamily: 'inherit',
-                  background: saved
-                    ? 'linear-gradient(135deg,#00BFA6,#2e84e9)'
-                    : 'linear-gradient(135deg,#F7295A,#FF8C42)',
-                  boxShadow: saved
-                    ? '0 6px 20px rgba(0,191,166,0.35)'
-                    : '0 6px 20px rgba(247,41,90,0.35)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  transition: 'all 0.3s',
-                }}>
-                {saved
-                  ? <><Check size={18} /> Salvato!</>
-                  : saving
-                    ? 'Salvataggio...'
-                    : editTarget ? 'Aggiorna contatto' : 'Aggiungi contatto'
-                }
-              </button>
-
-              {isDemo && (
-                <div style={{ textAlign: 'center', marginTop: '10px', fontSize: f(11), color: '#8B6914', fontWeight: '600' }}>
-                  🎭 Modalità demo — non salvato su Firebase
-                </div>
-              )}
             </div>
+
+            {isDemo && (
+              <div style={{ textAlign: 'center', marginBottom: '10px', fontSize: f(11), color: '#8B6914', fontWeight: '600' }}>
+                🎭 Modalità demo — non salvato su Firebase
+              </div>
+            )}
+
+            {/* Spazio per non coprire il bottone fisso */}
+            <div style={{ height: '90px' }} />
           </div>
+
+          {/* BOTTONE SALVA FISSO IN BASSO — sempre visibile, mai coperto dalla tastiera */}
+          <div style={{
+            flexShrink: 0,
+            padding: '12px 14px',
+            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
+            background: '#f3f4f7',
+            borderTop: '1px solid #ececf0',
+            boxShadow: '0 -4px 20px rgba(2,21,63,0.07)',
+          }}>
+            <button type="button" onClick={handleSalva} disabled={saving}
+              style={{
+                width: '100%', padding: '17px', borderRadius: '50px', border: 'none',
+                cursor: saving ? 'wait' : 'pointer',
+                fontWeight: '800', fontSize: f(15), color: '#fff', fontFamily: 'inherit',
+                background: saved
+                  ? 'linear-gradient(135deg,#00BFA6,#2e84e9)'
+                  : 'linear-gradient(135deg,#F7295A,#FF8C42)',
+                boxShadow: saved
+                  ? '0 6px 20px rgba(0,191,166,0.35)'
+                  : '0 6px 20px rgba(247,41,90,0.40)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                transition: 'all 0.3s',
+              }}>
+              {saved
+                ? <><Check size={18} /> Salvato!</>
+                : saving
+                  ? 'Salvataggio...'
+                  : editTarget ? 'Aggiorna contatto' : 'Aggiungi contatto'
+              }
+            </button>
+          </div>
+
         </div>
       )}
     </>
