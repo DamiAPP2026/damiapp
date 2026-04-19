@@ -1,450 +1,515 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Send, MessageCircle, Clock, CheckCheck, Check, AlertCircle, ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Plus, AlertTriangle, Check, Trash2, Pencil, Minus, Camera, X } from 'lucide-react'
 import { db } from './firebase'
-import { ref, push, onValue, serverTimestamp, update } from 'firebase/database'
-import { decrypt } from './crypto'
+import { ref, push, onValue, remove, set } from 'firebase/database'
+import { processFirebaseSnap, encrypt } from './crypto'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
-const NAVBAR_H = 58
+const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
+const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
 
-// ─── HELPERS DATA/ORA ────────────────────────────────────────
-function formatOra(ts) {
-  if (!ts) return ''
-  return new Date(ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-}
-function formatDataCompleta(ts) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  const oggi = new Date()
-  const ieri = new Date(); ieri.setDate(ieri.getDate() - 1)
-  const hm = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-  const dataStr = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
-  if (d.toDateString() === oggi.toDateString()) return `Oggi · ${hm}`
-  if (d.toDateString() === ieri.toDateString()) return `Ieri · ${hm}`
-  return `${dataStr} · ${hm}`
-}
-function formatGiornoSep(ts) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  const oggi = new Date()
-  const ieri = new Date(); ieri.setDate(ieri.getDate() - 1)
-  if (d.toDateString() === oggi.toDateString())
-    return `Oggi · ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`
-  if (d.toDateString() === ieri.toDateString())
-    return `Ieri · ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`
-  return d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-}
-function formatOraSep(ts) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  const oggi = new Date()
-  const ieri = new Date(); ieri.setDate(ieri.getDate() - 1)
-  if (d.toDateString() === oggi.toDateString()) return `Oggi · ${formatOra(ts)}`
-  if (d.toDateString() === ieri.toDateString()) return `Ieri · ${formatOra(ts)}`
-  return `${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} · ${formatOra(ts)}`
+const DEMO_MAGAZZINO = [
+  {id:1,nome:'Keppra 500mg',ean:'8001234567890',scatole:3,lotto:'ABC123',scadenza:'2026-12-31',note:''},
+  {id:2,nome:'Depakine 250ml',ean:'8009876543210',scatole:1,lotto:'DEF456',scadenza:'2026-06-15',note:'Tenere in frigo'},
+  {id:3,nome:'Rivotril 0.5mg',ean:'8001122334455',scatole:2,lotto:'GHI789',scadenza:'2026-08-20',note:''},
+  {id:4,nome:'Keppra 750mg',ean:'8005544332211',scatole:0,lotto:'JKL012',scadenza:'2026-04-30',note:'DA RIORDINARE'},
+]
+
+function getDaysToExpiry(scadenza) {
+  if (!scadenza) return 9999
+  return Math.ceil((new Date(scadenza) - Date.now()) / 86400000)
 }
 
-// ─── SINGOLA CHAT ─────────────────────────────────────────────
-// tokenId: ID univoco del token medico — Firebase path: messages/{tokenId}/
-function SingleChat({ tokenId, nomeMedico, nomeUtente, isDemo, onBack }) {
-  const [messaggi, setMessaggi] = useState([])
-  const [testo,    setTesto]    = useState('')
-  const [inviando, setInviando] = useState(false)
-  const [errore,   setErrore]   = useState('')
-  const bottomRef = useRef(null)
-  const inputRef  = useRef(null)
+function colorScadenza(gg) {
+  if (gg < 0) return '#F7295A'
+  if (gg <= 7) return '#F7295A'
+  if (gg <= 30) return '#FF8C42'
+  return '#00BFA6'
+}
 
-  const chatPath = `messages/${tokenId}`
-
+// ── Grafici canvas ─────────────────────────────────────────────
+function GraficoScatole({ magazzino }) {
+  const canvasRef = useRef(null)
   useEffect(() => {
-    if (isDemo) {
-      setMessaggi([
-        { id: '1', testo: 'Buongiorno! Come sta Damiano questa settimana?',                                                              da: 'medico',   mittente: nomeMedico, timestamp: Date.now() - 86400000 * 2,           letto: true  },
-        { id: '2', testo: 'Ha avuto 2 crisi lunedì, durata circa 2 minuti ciascuna. Mercoledì nessun episodio.',                        da: 'famiglia', mittente: nomeUtente, timestamp: Date.now() - 86400000 * 2 + 3600000, letto: true  },
-        { id: '3', testo: 'Grazie per l\'aggiornamento. Continuate con la terapia attuale. Se le crisi si ripetono sentitemi subito.',   da: 'medico',   mittente: nomeMedico, timestamp: Date.now() - 86400000,              letto: true  },
-        { id: '4', testo: 'Perfetto, grazie dottore.',                                                                                  da: 'famiglia', mittente: nomeUtente, timestamp: Date.now() - 3600000 * 5,            letto: true  },
-        { id: '5', testo: 'Ho rivisto i report delle ultime settimane. Il pattern delle crisi sembra concentrarsi al mattino.',          da: 'medico',   mittente: nomeMedico, timestamp: Date.now() - 1800000,               letto: false },
-      ])
-      return
-    }
-    const unsub = onValue(ref(db, chatPath), snap => {
-      const val = snap.val()
-      if (!val) { setMessaggi([]); return }
-      const lista = Object.entries(val)
-        .map(([id, m]) => ({ id, ...m }))
-        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-      setMessaggi(lista)
-      // Marca come letti i messaggi del medico
-      lista
-        .filter(m => m.da === 'medico' && !m.letto)
-        .forEach(m => update(ref(db, `${chatPath}/${m.id}`), { letto: true }))
-    })
-    return () => unsub()
-  }, [tokenId, isDemo])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messaggi])
-
-  async function invia() {
-    const txt = testo.trim()
-    if (!txt || inviando) return
-    setInviando(true); setErrore('')
-    try {
-      if (isDemo) {
-        setMessaggi(prev => [...prev, {
-          id: Date.now().toString(), testo: txt,
-          da: 'famiglia', mittente: nomeUtente,
-          timestamp: Date.now(), letto: false
-        }])
-        setTesto(''); setInviando(false); return
+    if (!canvasRef.current || magazzino.length === 0) return
+    const ctx = canvasRef.current.getContext('2d')
+    const W = canvasRef.current.width
+    const H = canvasRef.current.height
+    ctx.clearRect(0,0,W,H)
+    const maxS = Math.max(...magazzino.map(m=>m.scatole||0), 1)
+    const barH = Math.min(28, (H-10)/magazzino.length - 4)
+    magazzino.forEach((m,i) => {
+      const y = i*(barH+6) + 5
+      const n = m.scatole||0
+      const pct = n/maxS
+      const color = n===0?'#F7295A':n===1?'#FF8C42':'#00BFA6'
+      ctx.fillStyle = '#f3f4f7'
+      ctx.beginPath(); ctx.roundRect(90, y, W-100, barH, [4]); ctx.fill()
+      if (n>0) {
+        ctx.fillStyle = color
+        ctx.beginPath(); ctx.roundRect(90, y, (W-100)*pct, barH, [4]); ctx.fill()
       }
-      await push(ref(db, chatPath), {
-        testo: txt, da: 'famiglia', mittente: nomeUtente,
-        timestamp: serverTimestamp(), letto: false
-      })
-      setTesto('')
-    } catch (err) {
-      console.error(err); setErrore('Errore nell\'invio. Riprova.')
-    }
-    setInviando(false)
+      const nome = m.nome.length>14 ? m.nome.slice(0,12)+'…' : m.nome
+      ctx.fillStyle = '#394058'; ctx.font = `bold ${Math.round(10*1.15)}px -apple-system`
+      ctx.textAlign = 'right'; ctx.fillText(nome, 85, y+barH/2+4)
+      ctx.fillStyle = n===0?'#F7295A':n===1?'#FF8C42':'#00BFA6'
+      ctx.font = `bold ${Math.round(10*1.15)}px -apple-system`
+      ctx.textAlign = 'left'
+      ctx.fillText(n===0?'Esaurito':`${n} scatole`, 90+(W-100)*pct+6, y+barH/2+4)
+    })
+  }, [magazzino])
+  const altezza = Math.max(magazzino.length * 34 + 20, 80)
+  return <canvas ref={canvasRef} width={420} height={altezza} style={{width:'100%',height:'auto'}}/>
+}
+
+function TimelineScadenze({ magazzino }) {
+  const sorted = [...magazzino]
+    .filter(m => m.scadenza)
+    .sort((a,b) => getDaysToExpiry(a.scadenza) - getDaysToExpiry(b.scadenza))
+  return (
+    <div>
+      {sorted.map((m,i) => {
+        const gg = getDaysToExpiry(m.scadenza)
+        const color = colorScadenza(gg)
+        const maxGG = 365
+        const pct = Math.min(Math.max(gg,0)/maxGG*100, 100)
+        return (
+          <div key={i} style={{marginBottom:'10px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:'3px'}}>
+              <span style={{fontSize:f(11),fontWeight:'700',color:'#394058'}}>{m.nome}</span>
+              <span style={{fontSize:f(11),fontWeight:'700',color}}>
+                {gg<0?'Scaduto':gg===0?'Oggi':gg<=30?`${gg}gg`:`${Math.floor(gg/30)}m`}
+              </span>
+            </div>
+            <div style={{height:'7px',borderRadius:'4px',background:'#f3f4f7',overflow:'hidden'}}>
+              <div style={{height:'100%',borderRadius:'4px',width:`${pct}%`,background:color,transition:'width 0.4s'}}/>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Form aggiunta/modifica ─────────────────────────────────────
+function FormMedicinale({ initial={}, onSave, onCancel, title='Aggiungi medicinale' }) {
+  const [nome, setNome] = useState(initial.nome||'')
+  const [ean, setEan] = useState(initial.ean||'')
+  const [scatole, setScatole] = useState(String(initial.scatole||1))
+  const [lotto, setLotto] = useState(initial.lotto||'')
+  const [scadenza, setScadenza] = useState(initial.scadenza||'')
+  const [note, setNote] = useState(initial.note||'')
+  const [scanning, setScanning] = useState(false)
+  const fileRef = useRef(null)
+
+  function handleSave() {
+    if (!nome.trim()) { alert('Inserisci il nome del medicinale'); return }
+    if (!scadenza) { alert('Inserisci la data di scadenza'); return }
+    onSave({ nome:nome.trim(), ean:ean.trim(), scatole:parseInt(scatole)||0, lotto:lotto.trim(), scadenza, note:note.trim() })
   }
 
-  // Raggruppa per giorno
-  const gruppi = []
-  messaggi.forEach((m, i) => {
-    const giorno = new Date(m.timestamp || 0).toDateString()
-    if (i === 0 || giorno !== new Date(messaggi[i - 1].timestamp || 0).toDateString())
-      gruppi.push({ tipo: 'separatore', giorno: formatGiornoSep(m.timestamp) })
-    gruppi.push({ tipo: 'msg', ...m })
-  })
+  async function handlePhoto(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setScanning(true)
+    try {
+      // Leggi immagine come base64
+      const reader = new FileReader()
+      reader.onload = async (ev) => {
+        const b64 = ev.target.result
+        // Usa API Anthropic per OCR
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 300,
+            messages: [{
+              role: 'user',
+              content: [
+                { type:'image', source:{ type:'base64', media_type:file.type||'image/jpeg', data:b64.split(',')[1] } },
+                { type:'text', text:'Leggi questa immagine di un medicinale o confezione farmaceutica. Rispondimi SOLO in JSON con i campi: nome (nome commerciale del medicinale), ean (codice EAN/barcode numerico se visibile, altrimenti stringa vuota), lotto (numero lotto se visibile, altrimenti stringa vuota), scadenza (data scadenza in formato YYYY-MM-DD se visibile, altrimenti stringa vuota). Niente altro testo.' }
+              ]
+            }]
+          })
+        })
+        const data = await resp.json()
+        const txt = data.content?.[0]?.text || ''
+        try {
+          const clean = txt.replace(/```json|```/g,'').trim()
+          const parsed = JSON.parse(clean)
+          if (parsed.nome) setNome(parsed.nome)
+          if (parsed.ean) setEan(parsed.ean)
+          if (parsed.lotto) setLotto(parsed.lotto)
+          if (parsed.scadenza) setScadenza(parsed.scadenza)
+        } catch { alert('Non sono riuscito a leggere il medicinale. Inserisci i dati manualmente.') }
+        setScanning(false)
+      }
+      reader.readAsDataURL(file)
+    } catch { setScanning(false); alert('Errore lettura immagine') }
+    e.target.value = ''
+  }
 
-  const nonLetti = messaggi.filter(m => m.da === 'medico' && !m.letto).length
+  const inputStyle = {
+    width:'100%', padding:'11px 12px', borderRadius:'12px',
+    border:'1.5px solid #f0f1f4', fontSize:f(13), color:'#02153f',
+    background:'#f3f4f7', fontFamily:'inherit', outline:'none', boxSizing:'border-box',
+    marginBottom:'10px'
+  }
+  const labelStyle = {
+    fontSize:f(11), fontWeight:'700', color:'#7c8088',
+    textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'5px', display:'block'
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: `calc(100dvh - ${NAVBAR_H}px)`, background: '#f3f4f7', fontFamily: "-apple-system,'Segoe UI',sans-serif" }}>
-
-      {/* HEADER */}
-      <div style={{ background: 'linear-gradient(135deg,#193f9e,#2e84e9)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0, boxShadow: '0 4px 20px rgba(25,63,158,0.25)' }}>
-        <button type="button" onClick={onBack} style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.18)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ChevronLeft size={18} color="#fff" />
+    <div style={{background:'#feffff',borderRadius:'18px',padding:'16px',marginBottom:'10px',boxShadow:sh}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+        <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f'}}>{title}</div>
+        <button onClick={onCancel} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <X size={16} color="#7c8088"/>
         </button>
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <MessageCircle size={20} color="#fff" />
+      </div>
+
+      {/* Pulsante fotocamera */}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{display:'none'}}/>
+      <button onClick={()=>fileRef.current?.click()} disabled={scanning} style={{
+        width:'100%',padding:'12px',borderRadius:'12px',border:'1.5px dashed #2e84e9',
+        background:'#EEF3FD',color:'#193f9e',fontWeight:'700',fontSize:f(12),
+        cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',
+        gap:'8px',marginBottom:'14px',fontFamily:'inherit',
+        opacity:scanning?0.6:1
+      }}>
+        <Camera size={16} color="#193f9e"/>
+        {scanning?'Lettura in corso...':'Fotografa il medicinale (OCR automatico)'}
+      </button>
+
+      <label style={labelStyle}>Nome *</label>
+      <input value={nome} onChange={e=>setNome(e.target.value)} placeholder="Es: Keppra 500mg" style={inputStyle}
+        onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+        <div>
+          <label style={labelStyle}>Scatole</label>
+          <input type="number" min="0" value={scatole} onChange={e=>setScatole(e.target.value)} style={inputStyle}
+            onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+        </div>
+        <div>
+          <label style={labelStyle}>Scadenza *</label>
+          <input
+  type="date"
+  value={scadenza}
+  onChange={e=>setScadenza(e.target.value)}
+  min="2020-01-01"
+  max="2040-12-31"
+  style={{...inputStyle, WebkitAppearance:'none', appearance:'none'}}
+  onFocus={e=>e.target.style.borderColor='#2e84e9'}
+  onBlur={e=>e.target.style.borderColor='#f0f1f4'}
+/>
+        </div>
+      </div>
+
+      <label style={labelStyle}>Codice EAN</label>
+      <input value={ean} onChange={e=>setEan(e.target.value)} placeholder="Es: 8001234567890" style={inputStyle}
+        onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+
+      <label style={labelStyle}>Lotto</label>
+      <input value={lotto} onChange={e=>setLotto(e.target.value)} placeholder="Es: ABC123" style={inputStyle}
+        onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+
+      <label style={labelStyle}>Note</label>
+      <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Es: Tenere in frigo" style={inputStyle}
+        onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+
+      <button onClick={handleSave} style={{
+        width:'100%',padding:'14px',borderRadius:'50px',border:'none',
+        cursor:'pointer',fontWeight:'800',fontSize:f(14),color:'#fff',
+        background:'linear-gradient(135deg,#00BFA6,#193f9e)',
+        boxShadow:'0 6px 20px rgba(0,191,166,0.35)',fontFamily:'inherit'
+      }}>
+        <Check size={16} color="#fff" style={{marginRight:'6px'}}/> Salva
+      </button>
+    </div>
+  )
+}
+
+// ── COMPONENTE PRINCIPALE ──────────────────────────────────────
+export default function MagazzinoPage({ onBack, isDemo }) {
+  const [magazzino, setMagazzino] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [sezione, setSezione] = useState('lista')
+  const [showForm, setShowForm] = useState(false)
+  const [editItem, setEditItem] = useState(null)
+  const [savedMsg, setSavedMsg] = useState('')
+
+  useEffect(() => {
+    if (isDemo) { setMagazzino(DEMO_MAGAZZINO); setLoading(false); return }
+    const mRef = ref(db,'magazzino')
+    const unsubscribe = onValue(mRef, (snapshot) => {
+      const lista = processFirebaseSnap(snapshot)
+        .sort((a,b) => getDaysToExpiry(a.scadenza) - getDaysToExpiry(b.scadenza))
+      setMagazzino(lista)
+      setLoading(false)
+    })
+    return () => unsubscribe()
+  }, [isDemo])
+
+  function handleAdd(data) {
+    const med = { id:Date.now(), ...data }
+    if (!isDemo) push(ref(db,'magazzino'), encrypt(med))
+    else setMagazzino(prev=>[...prev,{...med,id:Date.now()}])
+    setShowForm(false)
+    setSavedMsg('Medicinale aggiunto!'); setTimeout(()=>setSavedMsg(''),2000)
+  }
+
+  function handleEdit(data) {
+    if (!isDemo && editItem._firebaseKey) {
+      set(ref(db,`magazzino/${editItem._firebaseKey}`), encrypt({...editItem,...data}))
+    } else {
+      setMagazzino(prev=>prev.map(m=>m.id===editItem.id?{...m,...data}:m))
+    }
+    setEditItem(null)
+    setSavedMsg('Modificato!'); setTimeout(()=>setSavedMsg(''),2000)
+  }
+
+  function handleDelete(item) {
+    if (!window.confirm(`Eliminare ${item.nome}?`)) return
+    if (!isDemo && item._firebaseKey) remove(ref(db,`magazzino/${item._firebaseKey}`))
+    else setMagazzino(prev=>prev.filter(m=>m.id!==item.id))
+  }
+
+  function handleScarico(item) {
+    if ((item.scatole||0) <= 0) return
+    const nuoveScatole = (item.scatole||0) - 1
+    const updated = {...item, scatole:nuoveScatole}
+    if (!isDemo && item._firebaseKey) {
+      const toSave = {...updated}
+      delete toSave._firebaseKey
+      set(ref(db,`magazzino/${item._firebaseKey}`), encrypt(toSave))
+    } else {
+      setMagazzino(prev=>prev.map(m=>m.id===item.id?{...m,scatole:nuoveScatole}:m))
+    }
+    if (nuoveScatole===0) setTimeout(()=>alert(`⚠️ ${item.nome} è esaurito! Riordinare.`),100)
+    else if (nuoveScatole===1) setTimeout(()=>alert(`⚠️ ${item.nome}: ultima scatola rimasta!`),100)
+  }
+
+  const inScadenza = magazzino.filter(m=>{const g=getDaysToExpiry(m.scadenza);return g>=0&&g<=30})
+  const esauriti = magazzino.filter(m=>(m.scatole||0)===0)
+
+  if (loading) return (
+    <div style={{minHeight:'100vh',background:'#f3f4f7',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+      <div style={{textAlign:'center'}}>
+        <div style={{fontSize:'32px',marginBottom:'12px'}}>💊</div>
+        <div style={{fontSize:f(14),color:'#7c8088'}}>Caricamento magazzino...</div>
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.mag-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:100px;width:100%;max-width:480px;margin:0 auto;}`}</style>
+      <div className="mag-wrap">
+
+        {/* HEADER */}
+        <div style={{background:'linear-gradient(135deg,#00BFA6,#193f9e)',padding:'14px 16px 20px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <button onClick={onBack} style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                <ChevronLeft size={20} color="#fff"/>
+              </button>
+              <div>
+                <div style={{fontSize:f(18),fontWeight:'900',color:'#fff'}}>💊 Magazzino</div>
+                <div style={{fontSize:f(11),color:'rgba(255,255,255,0.75)'}}>
+                  {isDemo?'🎭 Dati demo':`${magazzino.length} medicinali`}
+                </div>
+              </div>
+            </div>
+            <button onClick={()=>{setShowForm(true);setEditItem(null)}} style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.25)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <Plus size={20} color="#fff"/>
+            </button>
           </div>
-          {nonLetti > 0 && (
-            <div style={{ position: 'absolute', top: '-3px', right: '-3px', width: '16px', height: '16px', borderRadius: '50%', background: '#F7295A', border: '2px solid #193f9e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '8px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{nonLetti > 9 ? '9+' : nonLetti}</span>
+
+          {/* Stats header */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px'}}>
+            {[
+              {label:'Medicinali',val:magazzino.length,color:'#fff'},
+              {label:'In scadenza',val:inScadenza.length,color:inScadenza.length>0?'#FFD93D':'#fff'},
+              {label:'Esauriti',val:esauriti.length,color:esauriti.length>0?'#FFD93D':'#fff'},
+            ].map(({label,val,color},i)=>(
+              <div key={i} style={{background:'rgba(255,255,255,0.15)',borderRadius:'12px',padding:'8px',textAlign:'center'}}>
+                <div style={{fontSize:f(20),fontWeight:'900',color}}>{val}</div>
+                <div style={{fontSize:f(10),color:'rgba(255,255,255,0.75)',marginTop:'2px'}}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* TAB */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#f3f4f7',margin:'12px 12px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
+          {[{k:'lista',l:'💊 Lista'},{k:'grafici',l:'📊 Grafici'}].map(({k,l})=>(
+            <button key={k} onClick={()=>setSezione(k)} style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(12),fontFamily:'inherit',background:sezione===k?'#feffff':'transparent',color:sezione===k?'#00BFA6':'#7c8088',boxShadow:sezione===k?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        <div style={{padding:'12px'}}>
+
+          {/* Messaggio salvataggio */}
+          {savedMsg && (
+            <div style={{background:'#E8FBF8',borderRadius:'12px',padding:'10px 14px',marginBottom:'10px',fontSize:f(13),color:'#00BFA6',fontWeight:'700',textAlign:'center'}}>
+              ✅ {savedMsg}
             </div>
           )}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: f(15), fontWeight: '900', color: '#fff' }}>{nomeMedico}</div>
-          <div style={{ fontSize: f(10), color: 'rgba(255,255,255,0.7)' }}>
-            {nonLetti > 0 ? `${nonLetti} non letti` : 'Chat privata'}
-          </div>
-        </div>
-        {isDemo && <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '20px', padding: '3px 10px', fontSize: f(9), color: '#fff', fontWeight: '700' }}>DEMO</span>}
-      </div>
 
-      {/* MESSAGGI */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {gruppi.length === 0 && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg,#193f9e22,#2e84e922)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-              <MessageCircle size={28} color="#2e84e9" />
-            </div>
-            <div style={{ fontSize: f(15), fontWeight: '800', color: '#02153f', marginBottom: '6px' }}>Nessun messaggio</div>
-            <div style={{ fontSize: f(12), color: '#7c8088', lineHeight: '1.6', maxWidth: '240px' }}>
-              Scrivi un messaggio. Il medico risponderà appena possibile.
-            </div>
-          </div>
-        )}
+          {/* Form aggiunta */}
+          {showForm && !editItem && (
+            <FormMedicinale
+              title="➕ Aggiungi medicinale"
+              onSave={handleAdd}
+              onCancel={()=>setShowForm(false)}
+            />
+          )}
 
-        {gruppi.map((item, i) => {
-          if (item.tipo === 'separatore') return (
-            <div key={`sep-${i}`} style={{ textAlign: 'center', margin: '10px 0 5px' }}>
-              <span style={{ background: '#e8eaf0', borderRadius: '20px', padding: '3px 12px', fontSize: f(9), color: '#7c8088', fontWeight: '600', textTransform: 'capitalize' }}>{item.giorno}</span>
+          {/* Form modifica */}
+          {editItem && (
+            <FormMedicinale
+              title={`✏️ Modifica — ${editItem.nome}`}
+              initial={editItem}
+              onSave={handleEdit}
+              onCancel={()=>setEditItem(null)}
+            />
+          )}
+
+          {/* ALERT */}
+          {inScadenza.length>0 && sezione==='lista' && (
+            <div style={{background:'#FFF9E6',borderRadius:'14px',padding:'12px 14px',marginBottom:'10px',border:'1.5px solid #FFD93D66',display:'flex',gap:'10px',alignItems:'flex-start'}}>
+              <AlertTriangle size={18} color="#FF8C42" style={{flexShrink:0,marginTop:'1px'}}/>
+              <div>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#8B6914',marginBottom:'2px'}}>Medicinali in scadenza</div>
+                <div style={{fontSize:f(12),color:'#8B6914'}}>{inScadenza.map(m=>m.nome).join(', ')}</div>
+              </div>
             </div>
-          )
-          const isMio = item.da === 'famiglia'
-          const nonLetto = !isMio && !item.letto
-          return (
-            <div key={item.id} style={{ display: 'flex', justifyContent: isMio ? 'flex-end' : 'flex-start', marginBottom: '2px' }}>
-              <div style={{
-                maxWidth: '78%',
-                background: isMio ? 'linear-gradient(135deg,#193f9e,#2e84e9)' : '#feffff',
-                borderRadius: isMio ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                padding: '10px 13px',
-                boxShadow: isMio ? '0 4px 14px rgba(25,63,158,0.30)' : '0 2px 10px rgba(2,21,63,0.08)',
-                border: nonLetto ? '2px solid #2e84e933' : 'none',
-              }}>
-                {!isMio && (
-                  <div style={{ fontSize: f(9), fontWeight: '800', color: '#2e84e9', marginBottom: '3px' }}>
-                    {item.mittente || 'Medico'}
-                    {nonLetto && <span style={{ marginLeft: '5px', background: '#2e84e9', color: '#fff', borderRadius: '10px', padding: '1px 5px', fontSize: '8px', fontWeight: '800' }}>nuovo</span>}
-                  </div>
-                )}
-                <div style={{ fontSize: f(13), lineHeight: '1.5', color: isMio ? '#fff' : '#02153f', wordBreak: 'break-word' }}>{item.testo}</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '5px' }}>
-                  <span style={{ fontSize: f(8), color: isMio ? 'rgba(255,255,255,0.65)' : '#bec1cc' }}>{formatDataCompleta(item.timestamp)}</span>
-                  {isMio && (item.letto
-                    ? <CheckCheck size={11} color="rgba(255,255,255,0.8)" />
-                    : <Check size={11} color="rgba(255,255,255,0.5)" />
-                  )}
+          )}
+          {esauriti.length>0 && sezione==='lista' && (
+            <div style={{background:'#FEF0F4',borderRadius:'14px',padding:'12px 14px',marginBottom:'10px',border:'1.5px solid #F7295A33',display:'flex',gap:'10px',alignItems:'flex-start'}}>
+              <AlertTriangle size={18} color="#F7295A" style={{flexShrink:0,marginTop:'1px'}}/>
+              <div>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#c41230',marginBottom:'2px'}}>Medicinali esauriti</div>
+                <div style={{fontSize:f(12),color:'#c41230'}}>{esauriti.map(m=>m.nome).join(', ')} — Da riordinare</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── LISTA ── */}
+          {sezione==='lista' && (
+            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+              <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>
+                💊 Scorte ({magazzino.length})
+              </div>
+              {magazzino.length===0 ? (
+                <div style={{textAlign:'center',padding:'24px',color:'#bec1cc'}}>
+                  <div style={{fontSize:'32px',marginBottom:'8px'}}>💊</div>
+                  <div style={{fontSize:f(13),marginBottom:'4px'}}>Nessun medicinale</div>
+                  <div style={{fontSize:f(11)}}>Tocca + per aggiungere</div>
                 </div>
-              </div>
-            </div>
-          )
-        })}
-        <div ref={bottomRef} style={{ height: '8px' }} />
-      </div>
+              ) : (
+                magazzino.map((m,i) => {
+                  const gg = getDaysToExpiry(m.scadenza)
+                  const esaurito = (m.scatole||0)===0
+                  const inScad = gg>=0 && gg<=30
+                  const scaduto = gg<0
+                  let borderColor = '#f0f1f4'
+                  if (scaduto||esaurito) borderColor='#F7295A'
+                  else if (inScad) borderColor='#FFD93D'
 
-      {/* ERRORE */}
-      {errore && (
-        <div style={{ margin: '8px 12px 0', padding: '8px 12px', borderRadius: '10px', background: '#FEF0F4', border: '1px solid #F7295A22', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <AlertCircle size={14} color="#F7295A" />
-          <span style={{ fontSize: f(11), color: '#F7295A', fontWeight: '600' }}>{errore}</span>
-        </div>
-      )}
+                  return (
+                    <div key={m.id||i} style={{padding:'12px',borderRadius:'14px',marginBottom:'8px',background:'#f3f4f7',border:`1.5px solid ${borderColor}`}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'8px'}}>
+                        <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',flex:1,marginRight:'8px'}}>{m.nome}</div>
+                        <div style={{display:'flex',gap:'6px'}}>
+                          {/* Modifica */}
+                          <button onClick={()=>{setEditItem(m);setShowForm(false)}} style={{width:'30px',height:'30px',borderRadius:'50%',background:'#EEF3FD',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <Pencil size={13} color="#193f9e"/>
+                          </button>
+                          {/* Elimina */}
+                          <button onClick={()=>handleDelete(m)} style={{width:'30px',height:'30px',borderRadius:'50%',background:'#FEF0F4',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <Trash2 size={13} color="#F7295A"/>
+                          </button>
+                        </div>
+                      </div>
 
-      {/* DISCLAIMER */}
-      <div style={{ background: '#FFF5EE', borderTop: '1px solid #FF8C4222', padding: '7px 14px', display: 'flex', alignItems: 'flex-start', gap: '7px', flexShrink: 0 }}>
-        <AlertCircle size={13} color="#FF8C42" style={{ flexShrink: 0, marginTop: '1px' }} />
-        <div style={{ fontSize: f(9), color: '#8B6914', lineHeight: '1.6' }}>
-          I messaggi sono <strong>permanenti, non eliminabili e non recuperabili</strong> se persi. La chat non sostituisce una visita medica.
-        </div>
-      </div>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
+                        {/* Badge scatole */}
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap',flex:1}}>
+                          <span style={{fontSize:f(11),fontWeight:'700',padding:'3px 10px',borderRadius:'20px',background:esaurito?'#FEF0F4':'#E8FBF8',color:esaurito?'#F7295A':'#00BFA6'}}>
+                            {esaurito?'⚠️ Esaurito':`📦 ${m.scatole} scatole`}
+                          </span>
+                          <span style={{fontSize:f(11),fontWeight:'700',padding:'3px 10px',borderRadius:'20px',background:scaduto?'#FEF0F4':inScad?'#FFF9E6':'#f3f4f7',color:scaduto?'#F7295A':inScad?'#FF8C42':'#7c8088'}}>
+                            {scaduto?'❌ Scaduto':inScad?`⚠️ ${gg}gg`:`✓ ${gg}gg`}
+                          </span>
+                        </div>
 
-      {/* INPUT */}
-      <div style={{ padding: '10px 12px 14px', background: '#feffff', borderTop: '1px solid #f0f1f4', boxShadow: '0 -4px 16px rgba(2,21,63,0.06)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-          <textarea
-            ref={inputRef}
-            value={testo}
-            onChange={e => setTesto(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); invia() } }}
-            placeholder="Scrivi un messaggio…"
-            rows={1}
-            style={{ flex: 1, padding: '11px 14px', borderRadius: '22px', border: '2px solid #e8eaf0', fontSize: f(13), fontFamily: 'inherit', resize: 'none', outline: 'none', background: '#f3f4f7', color: '#02153f', lineHeight: '1.4', maxHeight: '100px', overflowY: 'auto', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
-            onFocus={e => e.target.style.borderColor = '#2e84e9'}
-            onBlur={e => e.target.style.borderColor = '#e8eaf0'}
-          />
-          <button type="button" onClick={invia} disabled={!testo.trim() || inviando} style={{
-            width: '44px', height: '44px', borderRadius: '50%', border: 'none',
-            background: testo.trim() && !inviando ? 'linear-gradient(135deg,#193f9e,#2e84e9)' : '#e8eaf0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: testo.trim() && !inviando ? 'pointer' : 'default',
-            flexShrink: 0, transition: 'all 0.2s',
-            boxShadow: testo.trim() && !inviando ? '0 4px 14px rgba(25,63,158,0.35)' : 'none',
-          }}>
-            {inviando ? <Clock size={18} color="#bec1cc" /> : <Send size={18} color={testo.trim() ? '#fff' : '#bec1cc'} />}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+                        {/* Bottone scarico -1 */}
+                        <button
+                          onClick={()=>handleScarico(m)}
+                          disabled={esaurito}
+                          style={{
+                            display:'flex',alignItems:'center',gap:'5px',
+                            padding:'6px 12px',borderRadius:'20px',border:'none',
+                            cursor:esaurito?'default':'pointer',
+                            background:esaurito?'#f3f4f7':'linear-gradient(135deg,#193f9e,#2e84e9)',
+                            color:esaurito?'#bec1cc':'#fff',
+                            fontWeight:'700',fontSize:f(11),fontFamily:'inherit',
+                            opacity:esaurito?0.5:1
+                          }}>
+                          <Minus size={12} color={esaurito?'#bec1cc':'#fff'}/>
+                          Prendo 1
+                        </button>
+                      </div>
 
-// ─── LISTA CONVERSAZIONI ──────────────────────────────────────
-// Mostra tutte le chat attive con badge non letti per ognuna.
-// tokens: array di { tokenId, nomeMedico } caricato da Firebase (nodo 'tokens')
-function ListaChat({ tokens, isDemo, nomeUtente, onSelect }) {
-  // Per ogni token ascolta il suo nodo messages/{tokenId}
-  // e conta i messaggi non letti da 'medico'
-  const [nonLettiMap, setNonLettiMap] = useState({}) // { [tokenId]: { count, ultimoMsg, ultimoTs } }
-
-  useEffect(() => {
-    if (isDemo) {
-      setNonLettiMap({
-        'demo-token-1': { count: 2, ultimoMsg: 'Il pattern delle crisi sembra concentrarsi al mattino.', ultimoTs: Date.now() - 1800000 },
-        'demo-token-2': { count: 0, ultimoMsg: 'Grazie per le informazioni.', ultimoTs: Date.now() - 86400000 },
-      })
-      return
-    }
-    const unsubs = tokens.map(({ tokenId }) => {
-      return onValue(ref(db, `messages/${tokenId}`), snap => {
-        const val = snap.val()
-        if (!val) {
-          setNonLettiMap(prev => ({ ...prev, [tokenId]: { count: 0, ultimoMsg: null, ultimoTs: null } }))
-          return
-        }
-        const lista = Object.values(val).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-        const nonLetti = lista.filter(m => m.da === 'medico' && !m.letto).length
-        const ultimo = lista[lista.length - 1]
-        setNonLettiMap(prev => ({
-          ...prev,
-          [tokenId]: { count: nonLetti, ultimoMsg: ultimo?.testo || null, ultimoTs: ultimo?.timestamp || null }
-        }))
-      })
-    })
-    return () => unsubs.forEach(u => u())
-  }, [tokens, isDemo])
-
-  const totaleNonLetti = Object.values(nonLettiMap).reduce((s, v) => s + (v.count || 0), 0)
-
-  const tokensDaMonstrare = isDemo
-    ? [
-        { tokenId: 'demo-token-1', nomeMedico: 'Dr. Bianchi' },
-        { tokenId: 'demo-token-2', nomeMedico: 'Dr. Rossi' },
-      ]
-    : tokens
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: `calc(100dvh - ${NAVBAR_H}px)`, background: '#f3f4f7', fontFamily: "-apple-system,'Segoe UI',sans-serif" }}>
-
-      {/* HEADER */}
-      <div style={{ background: 'linear-gradient(135deg,#193f9e,#2e84e9)', padding: '18px 16px 20px', flexShrink: 0, boxShadow: '0 4px 20px rgba(25,63,158,0.25)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,255,255,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MessageCircle size={22} color="#fff" />
-            </div>
-            {totaleNonLetti > 0 && (
-              <div style={{ position: 'absolute', top: '-4px', right: '-4px', minWidth: '18px', height: '18px', borderRadius: '9px', background: '#F7295A', border: '2px solid #193f9e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
-                <span style={{ fontSize: '9px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{totaleNonLetti > 99 ? '99+' : totaleNonLetti}</span>
-              </div>
-            )}
-          </div>
-          <div>
-            <div style={{ fontSize: f(17), fontWeight: '900', color: '#fff' }}>Messaggi</div>
-            <div style={{ fontSize: f(10), color: 'rgba(255,255,255,0.7)', marginTop: '1px' }}>
-              {totaleNonLetti > 0 ? `${totaleNonLetti} non letti` : `${tokensDaMonstrare.length} conversazioni`}
-            </div>
-          </div>
-          {isDemo && <span style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', borderRadius: '20px', padding: '3px 10px', fontSize: f(9), color: '#fff', fontWeight: '700' }}>DEMO</span>}
-        </div>
-      </div>
-
-      {/* LISTA */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-        {tokensDaMonstrare.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#EEF3FD', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-              <MessageCircle size={28} color="#2e84e9" />
-            </div>
-            <div style={{ fontSize: f(15), fontWeight: '800', color: '#02153f', marginBottom: '6px' }}>Nessuna chat attiva</div>
-            <div style={{ fontSize: f(12), color: '#7c8088', lineHeight: '1.6', maxWidth: '240px' }}>
-              Le conversazioni appaiono quando condividi l'accesso con un medico e abiliti la chat.
-            </div>
-          </div>
-        ) : (
-          tokensDaMonstrare.map(({ tokenId, nomeMedico }) => {
-            const info = nonLettiMap[tokenId] || {}
-            const hasNew = info.count > 0
-            return (
-              <button
-                key={tokenId}
-                type="button"
-                onClick={() => onSelect({ tokenId, nomeMedico })}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '13px 14px', borderRadius: '16px', border: 'none', cursor: 'pointer',
-                  background: hasNew ? '#feffff' : '#feffff',
-                  marginBottom: '8px', textAlign: 'left', fontFamily: 'inherit',
-                  boxShadow: hasNew
-                    ? '0 4px 18px rgba(25,63,158,0.14), 0 0 0 2px #2e84e933'
-                    : '0 2px 10px rgba(2,21,63,0.07)',
-                  transition: 'all 0.18s',
-                }}
-              >
-                {/* Avatar */}
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <div style={{
-                    width: '48px', height: '48px', borderRadius: '50%',
-                    background: hasNew ? 'linear-gradient(135deg,#193f9e,#2e84e9)' : 'linear-gradient(135deg,#dde0ed,#bec1cc)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '20px', fontWeight: '800', color: '#fff',
-                  }}>
-                    {nomeMedico.replace('Dr. ', '').charAt(0).toUpperCase()}
-                  </div>
-                  {hasNew && (
-                    <div style={{ position: 'absolute', bottom: '0', right: '0', width: '16px', height: '16px', borderRadius: '50%', background: '#F7295A', border: '2px solid #feffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '8px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{info.count > 9 ? '9+' : info.count}</span>
+                      {m.lotto && <div style={{fontSize:f(11),color:'#bec1cc'}}>Lotto: {m.lotto}</div>}
+                      {m.ean && <div style={{fontSize:f(10),color:'#bec1cc',marginTop:'2px'}}>EAN: {m.ean}</div>}
+                      {m.note && <div style={{fontSize:f(11),color:'#7c8088',marginTop:'4px',fontStyle:'italic'}}>📝 {m.note}</div>}
                     </div>
-                  )}
-                </div>
+                  )
+                })
+              )}
+            </div>
+          )}
 
-                {/* Testo */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                    <span style={{ fontSize: f(14), fontWeight: hasNew ? '800' : '700', color: '#02153f' }}>{nomeMedico}</span>
-                    {info.ultimoTs && (
-                      <span style={{ fontSize: f(9), color: hasNew ? '#F7295A' : '#bec1cc', fontWeight: hasNew ? '700' : '500', flexShrink: 0, marginLeft: '8px' }}>
-                        {formatOraSep(info.ultimoTs)}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: f(12), color: hasNew ? '#394058' : '#bec1cc', fontWeight: hasNew ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {info.ultimoMsg || 'Nessun messaggio ancora'}
-                  </div>
+          {/* ── GRAFICI ── */}
+          {sezione==='grafici' && (
+            <>
+              {magazzino.length===0 ? (
+                <div style={{background:'#feffff',borderRadius:'18px',padding:'32px',textAlign:'center',boxShadow:sh}}>
+                  <div style={{fontSize:'32px',marginBottom:'12px'}}>📊</div>
+                  <div style={{fontSize:f(14),color:'#7c8088'}}>Aggiungi medicinali per vedere i grafici</div>
                 </div>
-              </button>
-            )
-          })
-        )}
+              ) : (
+                <>
+                  <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+                    <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📦 Scorte per medicinale</div>
+                    <GraficoScatole magazzino={magazzino}/>
+                  </div>
+                  <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+                    <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>⏳ Timeline scadenze</div>
+                    <TimelineScadenze magazzino={magazzino}/>
+                    <div style={{display:'flex',gap:'12px',marginTop:'10px',padding:'8px 0',borderTop:'1px solid #f0f1f4'}}>
+                      {[{c:'#00BFA6',l:'OK (>30gg)'},{c:'#FF8C42',l:'Attenzione (≤30gg)'},{c:'#F7295A',l:'Urgente (≤7gg/Scaduto)'}].map(({c,l})=>(
+                        <div key={l} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                          <div style={{width:'10px',height:'10px',borderRadius:'50%',background:c,flexShrink:0}}/>
+                          <span style={{fontSize:f(9),color:'#7c8088'}}>{l}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+        </div>
       </div>
-    </div>
-  )
-}
-
-// ─── EXPORT PRINCIPALE ────────────────────────────────────────
-// tokens: array di { tokenId, nomeMedico } con chat abilitata
-// Se tokens non viene passato (vecchio comportamento), carica i token da Firebase
-export default function MessaggiPage({ onBack, isDemo, nomeUtente = 'Famiglia', tokens = null }) {
-  const [chatSelezionata, setChatSelezionata] = useState(null) // { tokenId, nomeMedico }
-  const [tokenList,       setTokenList]       = useState([])
-
-  useEffect(() => {
-    // Se tokens è passato dall'esterno (da App.jsx che conosce i token attivi con chat abilitata)
-    if (tokens !== null) {
-      setTokenList(tokens)
-      return
-    }
-    if (isDemo) return
-    // Altrimenti carica da Firebase il nodo 'sharetokens' e filtra quelli con shareChat=true
-    const unsub = onValue(ref(db, 'sharetokens'), snap => {
-      const val = snap.val()
-      if (!val) { setTokenList([]); return }
-      const lista = Object.entries(val)
-        .map(([_fbKey, enc]) => {
-          // I token sono cifrati con encrypt() — decifra se necessario
-          const t = typeof enc === 'object' ? enc : decrypt(enc)
-          return t || null
-        })
-        .filter(Boolean)
-        // t.token è la stringa univoca (es. "DMIABC12345") — è il path Firebase messages/{t.token}
-        .filter(t => t.active && t.token && t.permissions?.shareChat)
-        .map(t => ({
-          tokenId:    t.token,   // <-- la stringa univoca generata da generateToken()
-          nomeMedico: t.medicoName ? `Dr. ${t.medicoName}` : (t.intestatario || 'Medico'),
-        }))
-      setTokenList(lista)
-    })
-    return () => unsub()
-  }, [tokens, isDemo])
-
-  // Vista singola chat
-  if (chatSelezionata) {
-    return (
-      <SingleChat
-        tokenId={chatSelezionata.tokenId}
-        nomeMedico={chatSelezionata.nomeMedico}
-        nomeUtente={nomeUtente}
-        isDemo={isDemo}
-        onBack={() => setChatSelezionata(null)}
-      />
-    )
-  }
-
-  // Lista conversazioni
-  return (
-    <ListaChat
-      tokens={tokenList}
-      isDemo={isDemo}
-      nomeUtente={nomeUtente}
-      onSelect={setChatSelezionata}
-    />
+    </>
   )
 }
