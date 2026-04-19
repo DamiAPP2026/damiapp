@@ -27,6 +27,23 @@ function colorScadenza(gg) {
   return '#00BFA6'
 }
 
+// ── Toast feedback ─────────────────────────────────────────────
+function Toast({ msg, color = '#00BFA6' }) {
+  if (!msg) return null
+  return (
+    <div style={{
+      position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
+      background: color, color: '#fff', borderRadius: '50px',
+      padding: '10px 22px', fontSize: f(13), fontWeight: '800',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.18)', zIndex: 9999,
+      whiteSpace: 'nowrap', animation: 'toastIn 0.25s cubic-bezier(0.22,1,0.36,1)',
+      fontFamily: "-apple-system,'Segoe UI',sans-serif",
+    }}>
+      {msg}
+    </div>
+  )
+}
+
 // ── Grafici canvas ─────────────────────────────────────────────
 function GraficoScatole({ magazzino }) {
   const canvasRef = useRef(null)
@@ -101,6 +118,14 @@ function FormMedicinale({ initial={}, onSave, onCancel, title='Aggiungi medicina
   const [note, setNote] = useState(initial.note||'')
   const [scanning, setScanning] = useState(false)
   const fileRef = useRef(null)
+  const formRef = useRef(null)
+
+  // Scroll automatico al form appena montato
+  useEffect(() => {
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }, [])
 
   function handleSave() {
     if (!nome.trim()) { alert('Inserisci il nome del medicinale'); return }
@@ -113,11 +138,9 @@ function FormMedicinale({ initial={}, onSave, onCancel, title='Aggiungi medicina
     if (!file) return
     setScanning(true)
     try {
-      // Leggi immagine come base64
       const reader = new FileReader()
       reader.onload = async (ev) => {
         const b64 = ev.target.result
-        // Usa API Anthropic per OCR
         const resp = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
@@ -162,7 +185,7 @@ function FormMedicinale({ initial={}, onSave, onCancel, title='Aggiungi medicina
   }
 
   return (
-    <div style={{background:'#feffff',borderRadius:'18px',padding:'16px',marginBottom:'10px',boxShadow:sh}}>
+    <div ref={formRef} style={{background:'#feffff',borderRadius:'18px',padding:'16px',marginBottom:'10px',boxShadow:sh}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
         <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f'}}>{title}</div>
         <button onClick={onCancel} style={{width:'32px',height:'32px',borderRadius:'50%',background:'#f3f4f7',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -170,7 +193,6 @@ function FormMedicinale({ initial={}, onSave, onCancel, title='Aggiungi medicina
         </button>
       </div>
 
-      {/* Pulsante fotocamera */}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{display:'none'}}/>
       <button onClick={()=>fileRef.current?.click()} disabled={scanning} style={{
         width:'100%',padding:'12px',borderRadius:'12px',border:'1.5px dashed #2e84e9',
@@ -195,16 +217,10 @@ function FormMedicinale({ initial={}, onSave, onCancel, title='Aggiungi medicina
         </div>
         <div>
           <label style={labelStyle}>Scadenza *</label>
-          <input
-  type="date"
-  value={scadenza}
-  onChange={e=>setScadenza(e.target.value)}
-  min="2020-01-01"
-  max="2040-12-31"
-  style={{...inputStyle, WebkitAppearance:'none', appearance:'none'}}
-  onFocus={e=>e.target.style.borderColor='#2e84e9'}
-  onBlur={e=>e.target.style.borderColor='#f0f1f4'}
-/>
+          <input type="date" value={scadenza} onChange={e=>setScadenza(e.target.value)}
+            min="2020-01-01" max="2040-12-31"
+            style={{...inputStyle, WebkitAppearance:'none', appearance:'none'}}
+            onFocus={e=>e.target.style.borderColor='#2e84e9'} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
         </div>
       </div>
 
@@ -239,7 +255,12 @@ export default function MagazzinoPage({ onBack, isDemo }) {
   const [sezione, setSezione] = useState('lista')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState(null)
-  const [savedMsg, setSavedMsg] = useState('')
+  const [toast, setToast] = useState({ msg: '', color: '#00BFA6' })
+
+  function showToast(msg, color = '#00BFA6') {
+    setToast({ msg, color })
+    setTimeout(() => setToast({ msg: '', color: '#00BFA6' }), 2200)
+  }
 
   useEffect(() => {
     if (isDemo) { setMagazzino(DEMO_MAGAZZINO); setLoading(false); return }
@@ -258,7 +279,7 @@ export default function MagazzinoPage({ onBack, isDemo }) {
     if (!isDemo) push(ref(db,'magazzino'), encrypt(med))
     else setMagazzino(prev=>[...prev,{...med,id:Date.now()}])
     setShowForm(false)
-    setSavedMsg('Medicinale aggiunto!'); setTimeout(()=>setSavedMsg(''),2000)
+    showToast('✅ Medicinale aggiunto!')
   }
 
   function handleEdit(data) {
@@ -268,13 +289,14 @@ export default function MagazzinoPage({ onBack, isDemo }) {
       setMagazzino(prev=>prev.map(m=>m.id===editItem.id?{...m,...data}:m))
     }
     setEditItem(null)
-    setSavedMsg('Modificato!'); setTimeout(()=>setSavedMsg(''),2000)
+    showToast('✅ Modificato!')
   }
 
   function handleDelete(item) {
     if (!window.confirm(`Eliminare ${item.nome}?`)) return
     if (!isDemo && item._firebaseKey) remove(ref(db,`magazzino/${item._firebaseKey}`))
     else setMagazzino(prev=>prev.filter(m=>m.id!==item.id))
+    showToast('🗑️ Eliminato', '#7c8088')
   }
 
   function handleScarico(item) {
@@ -282,14 +304,14 @@ export default function MagazzinoPage({ onBack, isDemo }) {
     const nuoveScatole = (item.scatole||0) - 1
     const updated = {...item, scatole:nuoveScatole}
     if (!isDemo && item._firebaseKey) {
-      const toSave = {...updated}
-      delete toSave._firebaseKey
+      const toSave = {...updated}; delete toSave._firebaseKey
       set(ref(db,`magazzino/${item._firebaseKey}`), encrypt(toSave))
     } else {
       setMagazzino(prev=>prev.map(m=>m.id===item.id?{...m,scatole:nuoveScatole}:m))
     }
-    if (nuoveScatole===0) setTimeout(()=>alert(`⚠️ ${item.nome} è esaurito! Riordinare.`),100)
-    else if (nuoveScatole===1) setTimeout(()=>alert(`⚠️ ${item.nome}: ultima scatola rimasta!`),100)
+    if (nuoveScatole === 0) showToast(`⚠️ ${item.nome} esaurito! Riordinare.`, '#F7295A')
+    else if (nuoveScatole === 1) showToast(`⚠️ ${item.nome}: ultima scatola!`, '#FF8C42')
+    else showToast(`📦 ${item.nome}: ${nuoveScatole} scatole rimaste`)
   }
 
   const inScadenza = magazzino.filter(m=>{const g=getDaysToExpiry(m.scadenza);return g>=0&&g<=30})
@@ -306,7 +328,15 @@ export default function MagazzinoPage({ onBack, isDemo }) {
 
   return (
     <>
-      <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.mag-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:100px;width:100%;max-width:480px;margin:0 auto;}`}</style>
+      <style>{`
+        *{box-sizing:border-box;}
+        body{margin:0;background:#f3f4f7;}
+        .mag-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:100px;width:100%;max-width:480px;margin:0 auto;}
+        @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(12px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+      `}</style>
+
+      <Toast msg={toast.msg} color={toast.color} />
+
       <div className="mag-wrap">
 
         {/* HEADER */}
@@ -328,7 +358,6 @@ export default function MagazzinoPage({ onBack, isDemo }) {
             </button>
           </div>
 
-          {/* Stats header */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px'}}>
             {[
               {label:'Medicinali',val:magazzino.length,color:'#fff'},
@@ -354,13 +383,6 @@ export default function MagazzinoPage({ onBack, isDemo }) {
 
         <div style={{padding:'12px'}}>
 
-          {/* Messaggio salvataggio */}
-          {savedMsg && (
-            <div style={{background:'#E8FBF8',borderRadius:'12px',padding:'10px 14px',marginBottom:'10px',fontSize:f(13),color:'#00BFA6',fontWeight:'700',textAlign:'center'}}>
-              ✅ {savedMsg}
-            </div>
-          )}
-
           {/* Form aggiunta */}
           {showForm && !editItem && (
             <FormMedicinale
@@ -380,7 +402,7 @@ export default function MagazzinoPage({ onBack, isDemo }) {
             />
           )}
 
-          {/* ALERT */}
+          {/* ALERT scadenze */}
           {inScadenza.length>0 && sezione==='lista' && (
             <div style={{background:'#FFF9E6',borderRadius:'14px',padding:'12px 14px',marginBottom:'10px',border:'1.5px solid #FFD93D66',display:'flex',gap:'10px',alignItems:'flex-start'}}>
               <AlertTriangle size={18} color="#FF8C42" style={{flexShrink:0,marginTop:'1px'}}/>
@@ -427,11 +449,9 @@ export default function MagazzinoPage({ onBack, isDemo }) {
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'8px'}}>
                         <div style={{fontSize:f(14),fontWeight:'800',color:'#02153f',flex:1,marginRight:'8px'}}>{m.nome}</div>
                         <div style={{display:'flex',gap:'6px'}}>
-                          {/* Modifica */}
                           <button onClick={()=>{setEditItem(m);setShowForm(false)}} style={{width:'30px',height:'30px',borderRadius:'50%',background:'#EEF3FD',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             <Pencil size={13} color="#193f9e"/>
                           </button>
-                          {/* Elimina */}
                           <button onClick={()=>handleDelete(m)} style={{width:'30px',height:'30px',borderRadius:'50%',background:'#FEF0F4',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             <Trash2 size={13} color="#F7295A"/>
                           </button>
@@ -439,7 +459,6 @@ export default function MagazzinoPage({ onBack, isDemo }) {
                       </div>
 
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
-                        {/* Badge scatole */}
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap',flex:1}}>
                           <span style={{fontSize:f(11),fontWeight:'700',padding:'3px 10px',borderRadius:'20px',background:esaurito?'#FEF0F4':'#E8FBF8',color:esaurito?'#F7295A':'#00BFA6'}}>
                             {esaurito?'⚠️ Esaurito':`📦 ${m.scatole} scatole`}
@@ -448,8 +467,6 @@ export default function MagazzinoPage({ onBack, isDemo }) {
                             {scaduto?'❌ Scaduto':inScad?`⚠️ ${gg}gg`:`✓ ${gg}gg`}
                           </span>
                         </div>
-
-                        {/* Bottone scarico -1 */}
                         <button
                           onClick={()=>handleScarico(m)}
                           disabled={esaurito}
