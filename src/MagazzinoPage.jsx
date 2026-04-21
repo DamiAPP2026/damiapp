@@ -290,7 +290,7 @@ function BottomSheetForm({ initial, onSave, onCancel, isNew }) {
         </div>
 
         {/* Tasto salva — sempre visibile */}
-        <div style={{padding:'10px 16px 24px',flexShrink:0,borderTop:'1px solid #f0f1f4'}}>
+        <div style={{padding:'10px 16px calc(68px + env(safe-area-inset-bottom, 0px))',flexShrink:0,borderTop:'1px solid #f0f1f4'}}>
           <button onClick={handleSave} style={{
             width:'100%',padding:'15px',borderRadius:'50px',border:'none',
             cursor:'pointer',fontWeight:'800',fontSize:f(14),color:'#fff',
