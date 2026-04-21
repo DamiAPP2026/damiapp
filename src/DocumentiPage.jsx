@@ -28,11 +28,12 @@ const TIPI = [
 ]
 
 const SEZIONI = [
-  { key:'damiano',  label:'Damiano',  sub:'Documenti personali', color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#7B5EA7)', Icon:User   },
-  { key:'papa',     label:'Papà',     sub:'Documenti personali', color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', Icon:User   },
-  { key:'mamma',    label:'Mamma',    sub:'Documenti personali', color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#e67e22)', Icon:User   },
-  { key:'famiglia', label:'Famiglia', sub:'Documenti condivisi',  color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#2e84e9)', Icon:Users  },
-  { key:'scuola',   label:'Scuola',   sub:'PEI, comunicazioni',   color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#FFD93D)', Icon:School },
+  { key:'damiano',  label:'Damiano',  sub:'Documenti personali',   color:'#F7295A', grad:'linear-gradient(135deg,#F7295A,#7B5EA7)', Icon:User   },
+  { key:'papa',     label:'Papà',     sub:'Documenti personali',   color:'#193f9e', grad:'linear-gradient(135deg,#193f9e,#2e84e9)', Icon:User   },
+  { key:'mamma',    label:'Mamma',    sub:'Documenti personali',   color:'#7B5EA7', grad:'linear-gradient(135deg,#7B5EA7,#e67e22)', Icon:User   },
+  { key:'parenti',  label:'Parenti',  sub:'Nonni, zii, familiari', color:'#e67e22', grad:'linear-gradient(135deg,#e67e22,#FFD93D)', Icon:Users  },
+  { key:'famiglia', label:'Famiglia', sub:'Documenti condivisi',   color:'#00BFA6', grad:'linear-gradient(135deg,#00BFA6,#2e84e9)', Icon:Users  },
+  { key:'scuola',   label:'Scuola',   sub:'PEI, comunicazioni',    color:'#FF8C42', grad:'linear-gradient(135deg,#FF8C42,#FFD93D)', Icon:School },
 ]
 
 function getTipo(key)    { return TIPI.find(t => t.key === key) || TIPI[TIPI.length - 1] }
@@ -44,10 +45,8 @@ function normalizzaDoc(d) {
   return { ...d, sezione: map[d.categoria] || 'damiano' }
 }
 
-// ── Rileva tipo contenuto dal data URI o URL esterno ──────────
 function detectContent(url, filename) {
   if (!url) return null
-  // Base64 data URI (metodo vecchia app)
   if (url.startsWith('data:')) {
     const mimeMatch = url.match(/data:([^;]+);/)
     const mime = mimeMatch ? mimeMatch[1] : ''
@@ -63,7 +62,6 @@ function detectContent(url, filename) {
     }
     return { type: 'download', url, filename }
   }
-  // URL esterno — fallback con rilevamento estensione
   if (/\.(jpg|jpeg|png|gif|webp|svg)/i.test(url)) return { type: 'image', url }
   if (/\.pdf/i.test(url))                          return { type: 'pdf', url }
   return { type: 'download', url, filename }
@@ -85,7 +83,7 @@ const DEMO_DOCS = [
 
 const EMPTY_FORM = { tipo:'referto', sezione:'damiano', nome:'', data:fmtOggi, url:'', filename:'', note:'' }
 
-// ── Lightbox — stesso approccio della vecchia app ─────────────
+// ── Lightbox ──────────────────────────────────────────────────
 function Lightbox({ doc, onClose }) {
   const tipo = getTipo(doc.tipo)
   const { Icon: TipoIcon } = tipo
@@ -124,7 +122,6 @@ function Lightbox({ doc, onClose }) {
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.96)', zIndex:9000, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:"-apple-system,'Segoe UI',sans-serif", cursor:'pointer' }}>
 
-      {/* Header */}
       <div onClick={e => e.stopPropagation()} style={{ position:'fixed', top:0, left:0, right:0, background:'rgba(0,0,0,0.75)', padding:'14px 16px', display:'flex', alignItems:'center', gap:'12px', zIndex:9001, backdropFilter:'blur(10px)' }}>
         <div style={{ width:'36px', height:'36px', borderRadius:'10px', background:tipo.color, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <TipoIcon size={18} color="#fff"/>
@@ -145,7 +142,6 @@ function Lightbox({ doc, onClose }) {
         </div>
       </div>
 
-      {/* Contenuto */}
       <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:'480px', marginTop:'68px', marginBottom:'40px', padding:'0 16px', display:'flex', flexDirection:'column', alignItems:'center' }}>
         {loading ? (
           <div style={{ textAlign:'center', padding:'60px 0' }}>
@@ -162,12 +158,7 @@ function Lightbox({ doc, onClose }) {
           <>
             {content.type === 'image' && (
               <div style={{ textAlign:'center', width:'100%' }}>
-                <img
-                  src={content.url}
-                  alt={doc.nome}
-                  style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', borderRadius:'12px', boxShadow:'0 0 40px rgba(255,255,255,0.08)' }}
-                  onError={() => setError("Impossibile visualizzare l'immagine")}
-                />
+                <img src={content.url} alt={doc.nome} style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', borderRadius:'12px', boxShadow:'0 0 40px rgba(255,255,255,0.08)' }} onError={() => setError("Impossibile visualizzare l'immagine")}/>
                 <button type="button" onClick={handleDownload} style={{ marginTop:'14px', padding:'10px 24px', borderRadius:'50px', border:'none', cursor:'pointer', background:'rgba(255,255,255,0.15)', color:'#fff', fontWeight:'700', fontSize:f(12), display:'inline-flex', alignItems:'center', gap:'6px', fontFamily:'inherit' }}>
                   <Download size={14} color="#fff"/> Scarica immagine
                 </button>
@@ -175,12 +166,7 @@ function Lightbox({ doc, onClose }) {
             )}
             {content.type === 'pdf' && (
               <div style={{ width:'100%', textAlign:'center' }}>
-                <iframe
-                  src={content.url}
-                  title={doc.nome}
-                  style={{ width:'100%', height:'65vh', border:'none', borderRadius:'12px', background:'#fff' }}
-                  onError={() => setError('Impossibile visualizzare il PDF')}
-                />
+                <iframe src={content.url} title={doc.nome} style={{ width:'100%', height:'65vh', border:'none', borderRadius:'12px', background:'#fff' }} onError={() => setError('Impossibile visualizzare il PDF')}/>
                 <button type="button" onClick={handleDownload} style={{ marginTop:'14px', padding:'10px 24px', borderRadius:'50px', border:'none', cursor:'pointer', background:'rgba(255,255,255,0.15)', color:'#fff', fontWeight:'700', fontSize:f(12), display:'inline-flex', alignItems:'center', gap:'6px', fontFamily:'inherit' }}>
                   <Download size={14} color="#fff"/> Scarica PDF
                 </button>
@@ -276,6 +262,7 @@ export default function DocumentiPage({ onBack, isDemo }) {
   const [uploading,       setUploading]       = useState(false)
   const [uploadError,     setUploadError]     = useState('')
   const fileInputRef = useRef(null)
+  const nomeInputRef = useRef(null)   // ← focus automatico sul nome
 
   useEffect(() => {
     if (isDemo) { setDocumenti(DEMO_DOCS); setLoading(false); return }
@@ -290,7 +277,6 @@ export default function DocumentiPage({ onBack, isDemo }) {
     return () => u()
   }, [isDemo])
 
-  // ── Upload file — stesso metodo vecchia app (FileReader base64) ──
   function handleFileSelect(e) {
     const file = e.target.files[0]
     if (!file) return
@@ -319,6 +305,8 @@ export default function DocumentiPage({ onBack, isDemo }) {
     setUploadError('')
     setEditTarget(null)
     setShowForm(true)
+    // Focus automatico sul campo Nome dopo il render
+    setTimeout(() => nomeInputRef.current?.focus(), 80)
   }
 
   function apriModifica(d) {
@@ -326,6 +314,8 @@ export default function DocumentiPage({ onBack, isDemo }) {
     setUploadError('')
     setEditTarget(d)
     setShowForm(true)
+    // Focus automatico sul campo Nome dopo il render
+    setTimeout(() => nomeInputRef.current?.focus(), 80)
   }
 
   function handleSalva() {
@@ -506,7 +496,6 @@ export default function DocumentiPage({ onBack, isDemo }) {
                 return (
                   <div key={d.id || i} style={{ background:'#feffff', borderRadius:'18px', marginBottom:'10px', boxShadow:shSm, overflow:'hidden' }}>
 
-                    {/* Thumbnail immagine inline */}
                     {isImg && (
                       <div onClick={() => setPreview(d)} style={{ width:'100%', height:'120px', overflow:'hidden', cursor:'pointer', position:'relative', background:'#f3f4f7' }}>
                         <img src={d.url} alt={d.nome} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
@@ -518,12 +507,10 @@ export default function DocumentiPage({ onBack, isDemo }) {
 
                     <div style={{ padding:'12px' }}>
                       <div style={{ display:'flex', alignItems:'flex-start', gap:'10px' }}>
-                        {/* Icona tipo */}
                         <div onClick={() => setPreview(d)} style={{ width:'44px', height:'44px', borderRadius:'12px', background:tipo.color, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, cursor:'pointer', boxShadow:`0 3px 10px ${tipo.color}44` }}>
                           <TIcon size={20} color="#fff"/>
                         </div>
 
-                        {/* Info documento */}
                         <div style={{ flex:1, minWidth:0 }}>
                           <div onClick={() => setPreview(d)} style={{ fontSize:f(14), fontWeight:'800', color:'#02153f', marginBottom:'5px', cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.nome}</div>
                           <div style={{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' }}>
@@ -544,7 +531,6 @@ export default function DocumentiPage({ onBack, isDemo }) {
                           {d.filename && <div style={{ fontSize:f(9), color:'#dde0ed', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.filename}</div>}
                         </div>
 
-                        {/* Azioni */}
                         <div style={{ display:'flex', flexDirection:'column', gap:'5px', flexShrink:0 }}>
                           <button type="button" onClick={() => setPreview(d)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                             <Eye size={13} color="#7c8088"/>
@@ -558,10 +544,9 @@ export default function DocumentiPage({ onBack, isDemo }) {
                         </div>
                       </div>
 
-                      {/* Bottone azione file */}
                       {hasFile && !isImg && (
                         <button type="button"
-                          onClick={() => isPdf || isDownload ? setPreview(d) : setPreview(d)}
+                          onClick={() => setPreview(d)}
                           style={{ width:'100%', marginTop:'10px', padding:'9px', borderRadius:'10px', border:'none', cursor:'pointer', background: isPdf ? '#FEF0F4' : '#EEF3FD', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontWeight:'700', fontSize:f(11), color: isPdf ? '#F7295A' : '#2e84e9', fontFamily:'inherit' }}>
                           {isPdf
                             ? <><Eye size={13} color="#F7295A"/> Visualizza PDF</>
@@ -594,11 +579,17 @@ export default function DocumentiPage({ onBack, isDemo }) {
                 </button>
               </div>
 
-              {/* Nome */}
+              {/* Nome — con ref per focus automatico */}
               <label style={lbStyle}>Nome documento *</label>
-              <input value={form.nome} onChange={e => setForm(p => ({ ...p, nome:e.target.value }))} placeholder="Es: EEG 12/04/2026"
+              <input
+                ref={nomeInputRef}
+                value={form.nome}
+                onChange={e => setForm(p => ({ ...p, nome:e.target.value }))}
+                placeholder="Es: EEG 12/04/2026"
                 style={{ ...inStyle, marginBottom:'12px' }}
-                onFocus={e => e.target.style.borderColor='#2e84e9'} onBlur={e => e.target.style.borderColor='#f0f1f4'}/>
+                onFocus={e => e.target.style.borderColor='#2e84e9'}
+                onBlur={e => e.target.style.borderColor='#f0f1f4'}
+              />
 
               {/* Cartella */}
               <label style={lbStyle}>Cartella</label>
@@ -640,7 +631,7 @@ export default function DocumentiPage({ onBack, isDemo }) {
                 style={{ ...inStyle, marginBottom:'12px' }}
                 onFocus={e => e.target.style.borderColor='#2e84e9'} onBlur={e => e.target.style.borderColor='#f0f1f4'}/>
 
-              {/* Upload file — metodo base64 come vecchia app */}
+              {/* Upload file */}
               <label style={lbStyle}>File allegato</label>
               <input
                 ref={fileInputRef}
@@ -651,7 +642,6 @@ export default function DocumentiPage({ onBack, isDemo }) {
               />
 
               {form.url ? (
-                /* File caricato — anteprima + rimuovi */
                 <div style={{ marginBottom:'12px' }}>
                   {detectContent(form.url, form.filename)?.type === 'image' ? (
                     <div style={{ position:'relative', borderRadius:'12px', overflow:'hidden', marginBottom:'8px', background:'#f3f4f7' }}>
@@ -676,7 +666,6 @@ export default function DocumentiPage({ onBack, isDemo }) {
                   </div>
                 </div>
               ) : (
-                /* Nessun file — area upload */
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   style={{ border:'2px dashed #dde0ed', borderRadius:'14px', padding:'20px', textAlign:'center', cursor:'pointer', marginBottom:'12px', background:'#fafbff', transition:'border-color 0.2s' }}
