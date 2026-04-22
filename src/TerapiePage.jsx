@@ -83,7 +83,7 @@ function FormSheet({ form, setForm, onSalva, onClose, editTarget, saved, isDemo 
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(2,21,63,0.55)', zIndex:2000, display:'flex', alignItems:'flex-end', justifyContent:'center', fontFamily:"-apple-system,'Segoe UI',sans-serif" }}>
-      <div style={{ background:'#feffff', borderRadius:'24px 24px 0 0', padding:'20px', width:'100%', maxWidth:'480px', maxHeight:'90vh', overflowY:'auto' }}>
+      <div style={{ background:'#feffff', borderRadius:'24px 24px 0 0', padding:'20px', paddingBottom:'calc(80px + env(safe-area-inset-bottom, 0px))', width:'100%', maxWidth:'480px', maxHeight:'90vh', overflowY:'auto' }}>
 
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
           <span style={{ fontSize:f(16), fontWeight:'900', color:'#02153f' }}>
