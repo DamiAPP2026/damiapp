@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, Check, Save, Plus, PenSquare, X, Filter } from 'lucide-react'
 import { db } from './firebase'
-import { ref, push, onValue, remove, update, set } from 'firebase/database'
+import { ref, push, onValue, remove, set } from 'firebase/database'
 import { processFirebaseSnap, encrypt } from './crypto'
 import ToiletCharts from './ToiletCharts'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const cardSh = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
+
+// ── padding bottom sheet — MAI sotto navbar ───────────────────
+const SHEET_PB = 'calc(80px + env(safe-area-inset-bottom, 0px))'
 
 const MODALITA = [
   { key: 'adulto',      label: '👆 Comando adulto', sub: "L'adulto ha deciso il momento" },
@@ -68,7 +71,8 @@ const labelStyle = {
   textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'6px', display:'block',
 }
 
-function FormFields({ formData, setFormData, onSubmit, submitLabel, isSaved }) {
+// ── FormFields — accetta ref per il focus sul primo campo ─────
+function FormFields({ formData, setFormData, onSubmit, submitLabel, isSaved, firstFieldRef, isSheet }) {
   return (
     <>
       <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
@@ -76,11 +80,27 @@ function FormFields({ formData, setFormData, onSubmit, submitLabel, isSaved }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
           <div>
             <label style={labelStyle}>Data</label>
-            <input type="text" value={formData.data} onChange={e=>setFormData({...formData,data:e.target.value})} placeholder="gg/mm/aaaa" style={inputStyle}/>
+            <input
+              ref={firstFieldRef}
+              type="text"
+              value={formData.data}
+              onChange={e=>setFormData({...formData,data:e.target.value})}
+              placeholder="gg/mm/aaaa"
+              style={inputStyle}
+              onFocus={e=>e.target.style.borderColor='#7B5EA7'}
+              onBlur={e=>e.target.style.borderColor='#f0f1f4'}
+            />
           </div>
           <div>
             <label style={labelStyle}>Ora</label>
-            <input type="time" value={formData.ora} onChange={e=>setFormData({...formData,ora:e.target.value})} style={inputStyle}/>
+            <input
+              type="time"
+              value={formData.ora}
+              onChange={e=>setFormData({...formData,ora:e.target.value})}
+              style={inputStyle}
+              onFocus={e=>e.target.style.borderColor='#7B5EA7'}
+              onBlur={e=>e.target.style.borderColor='#f0f1f4'}
+            />
           </div>
         </div>
       </div>
@@ -89,7 +109,7 @@ function FormFields({ formData, setFormData, onSubmit, submitLabel, isSaved }) {
         <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'4px'}}>⚠️ Incidente addosso</div>
         <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Indipendente dal bagno</div>
         {[
-          { val:formData.incidentePippi, key:'incidentePippi', icon:'💧', title:'Pipì addosso', oraKey:'oraPippi', oraVal:formData.oraPippi, labelOra:'Ora incidente pipì' },
+          { val:formData.incidentePippi, key:'incidentePippi', icon:'💧', title:'Pipì addosso',  oraKey:'oraPippi', oraVal:formData.oraPippi, labelOra:'Ora incidente pipì' },
           { val:formData.incidenteCacca, key:'incidenteCacca', icon:'💩', title:'Cacca addosso', oraKey:'oraCacca', oraVal:formData.oraCacca, labelOra:'Ora incidente cacca' },
         ].map(({val,key,icon,title,oraKey,oraVal,labelOra},i) => (
           <div key={i}>
@@ -139,25 +159,44 @@ function FormFields({ formData, setFormData, onSubmit, submitLabel, isSaved }) {
         <textarea value={formData.note} onChange={e=>setFormData({...formData,note:e.target.value})} rows={2} placeholder="Annotazioni opzionali..." style={{...inputStyle,resize:'vertical'}}/>
       </div>
 
-      <button type="button" onClick={onSubmit} style={{width:'100%',padding:'16px',borderRadius:'50px',border:'none',cursor:'pointer',fontWeight:'800',fontSize:f(15),color:'#fff',background:isSaved?'linear-gradient(135deg,#00BFA6,#2e84e9)':'linear-gradient(135deg,#7B5EA7,#2e84e9)',boxShadow:'0 6px 20px rgba(123,94,167,0.35)',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',transition:'all 0.3s',marginBottom:'8px'}}>
+      {/* Pulsante salva — paddingBottom gestito dal container se siamo in sheet */}
+      <button
+        type="button"
+        onClick={onSubmit}
+        style={{
+          width:'100%', padding:'16px', borderRadius:'50px', border:'none',
+          cursor:'pointer', fontWeight:'800', fontSize:f(15), color:'#fff',
+          background: isSaved
+            ? 'linear-gradient(135deg,#00BFA6,#2e84e9)'
+            : 'linear-gradient(135deg,#7B5EA7,#2e84e9)',
+          boxShadow:'0 6px 20px rgba(123,94,167,0.35)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          gap:'8px', transition:'all 0.3s',
+          marginBottom: isSheet ? '0' : '8px',
+        }}
+      >
         {isSaved ? <><Check size={18} color="#fff"/> Salvato!</> : <><Save size={18} color="#fff"/> {submitLabel}</>}
       </button>
     </>
   )
 }
 
+// ════════════════════════════════════════════════════════════
 export default function ToiletPage({ onBack, isDemo }) {
-  const [tab, setTab] = useState('form')
-  const [log, setLog] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [saved, setSaved] = useState(false)
-  const [filtro, setFiltro] = useState('settimana')
-  const [showFilters, setShowFilters] = useState(false)
+  const [tab,           setTab]           = useState('form')
+  const [log,           setLog]           = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [saved,         setSaved]         = useState(false)
+  const [filtro,        setFiltro]        = useState('settimana')
+  const [showFilters,   setShowFilters]   = useState(false)
   const [filterBisogno, setFilterBisogno] = useState('tutti')
   const [showEditModal, setShowEditModal] = useState(false)
-  const [editItem, setEditItem] = useState(null)
-  const [form, setForm] = useState(emptyForm())
-  const [editForm, setEditForm] = useState(emptyForm())
+  const [editItem,      setEditItem]      = useState(null)
+  const [form,          setForm]          = useState(emptyForm())
+  const [editForm,      setEditForm]      = useState(emptyForm())
+
+  // ── ref per focus automatico sul campo Data nel modal modifica
+  const editFirstRef = useRef(null)
 
   useEffect(() => {
     if (isDemo) { setLog(DEMO_LOG); setLoading(false); return }
@@ -203,6 +242,8 @@ export default function ToiletPage({ onBack, isDemo }) {
       note: item.note || '',
     })
     setShowEditModal(true)
+    // ── focus automatico sul primo campo del modal dopo il render
+    setTimeout(() => editFirstRef.current?.focus(), 80)
   }
 
   function handleUpdate() {
@@ -216,8 +257,6 @@ export default function ToiletPage({ onBack, isDemo }) {
       note: editForm.note,
     }
     if (!isDemo && editItem._firebaseKey) {
-      // FIX: set() invece di update() perché encrypt() restituisce una stringa
-      // update() si aspetta un oggetto con chiavi — con una stringa cifra corrompe il nodo
       set(ref(db, 'toilet_training/' + editItem._firebaseKey), encrypt(updated))
     } else {
       setLog(prev => prev.map(x => x.id === editItem.id ? updated : x))
@@ -241,16 +280,17 @@ export default function ToiletPage({ onBack, isDemo }) {
     return lista
   }
 
-  const logOggi = log.filter(s => matchOggi(s.data))
-  const bagnoOggi = logOggi.filter(s => s.bisogno && s.bisogno !== 'nessuno').length
+  const logOggi      = log.filter(s => matchOggi(s.data))
+  const bagnoOggi    = logOggi.filter(s => s.bisogno && s.bisogno !== 'nessuno').length
   const incidentiOggi = logOggi.filter(s => s.incidentePippi || s.incidenteCacca).length
-  const logVisibile = logFiltrato()
+  const logVisibile  = logFiltrato()
 
   return (
     <>
       <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.tw{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:140px;width:100%;max-width:480px;margin:0 auto;}`}</style>
       <div className="tw">
 
+        {/* HEADER */}
         <div style={{background:'linear-gradient(135deg,#7B5EA7,#2e84e9)',padding:'14px 16px 20px'}}>
           <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'14px'}}>
             <button type="button" onClick={onBack} style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
@@ -263,9 +303,9 @@ export default function ToiletPage({ onBack, isDemo }) {
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'8px'}}>
             {[
-              {label:'Bagno oggi',    val:bagnoOggi,      color:'#fff'},
-              {label:'Incidenti oggi',val:incidentiOggi,  color:incidentiOggi>0?'#FFD93D':'#fff'},
-              {label:'Tot. sessioni', val:log.length,     color:'#fff'},
+              {label:'Bagno oggi',     val:bagnoOggi,       color:'#fff'},
+              {label:'Incidenti oggi', val:incidentiOggi,   color:incidentiOggi>0?'#FFD93D':'#fff'},
+              {label:'Tot. sessioni',  val:log.length,      color:'#fff'},
             ].map(({label,val,color},i) => (
               <div key={i} style={{background:'rgba(255,255,255,0.15)',borderRadius:'12px',padding:'8px',textAlign:'center'}}>
                 <div style={{fontSize:f(20),fontWeight:'900',color}}>{val}</div>
@@ -275,6 +315,7 @@ export default function ToiletPage({ onBack, isDemo }) {
           </div>
         </div>
 
+        {/* TAB */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',background:'#f3f4f7',margin:'12px 12px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
           {[{k:'form',l:'➕ Nuova'},{k:'storico',l:'📋 Storico'},{k:'grafici',l:'📊 Grafici'}].map(({k,l}) => (
             <button type="button" key={k} onClick={()=>setTab(k)} style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:tab===k?'#feffff':'transparent',color:tab===k?'#7B5EA7':'#7c8088',boxShadow:tab===k?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
@@ -285,13 +326,23 @@ export default function ToiletPage({ onBack, isDemo }) {
 
         <div style={{padding:'12px'}}>
 
+          {/* ── NUOVA SESSIONE ── */}
           {tab==='form' && (
             <>
-              <FormFields formData={form} setFormData={setForm} onSubmit={handleSave} submitLabel="Salva sessione" isSaved={saved}/>
+              <FormFields
+                formData={form}
+                setFormData={setForm}
+                onSubmit={handleSave}
+                submitLabel="Salva sessione"
+                isSaved={saved}
+                firstFieldRef={null}
+                isSheet={false}
+              />
               {isDemo && <div style={{textAlign:'center',fontSize:f(11),color:'#8B6914',fontWeight:'600'}}>🎭 Modalità demo — dati non salvati su Firebase</div>}
             </>
           )}
 
+          {/* ── STORICO ── */}
           {tab==='storico' && (
             <>
               <div style={{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}}>
@@ -356,6 +407,7 @@ export default function ToiletPage({ onBack, isDemo }) {
             </>
           )}
 
+          {/* ── GRAFICI ── */}
           {tab==='grafici' && (
             <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
               {log.length===0 ? (
@@ -372,10 +424,28 @@ export default function ToiletPage({ onBack, isDemo }) {
         </div>
       </div>
 
-      {/* MODALE MODIFICA */}
+      {/* ── MODAL MODIFICA ── */}
       {showEditModal && editItem && (
-        <div onClick={()=>{setShowEditModal(false);setEditItem(null)}} style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:200}}>
-          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:'480px',background:'#f3f4f7',borderTopLeftRadius:'24px',borderTopRightRadius:'24px',padding:'14px',maxHeight:'88vh',overflowY:'auto'}}>
+        <div
+          onClick={()=>{setShowEditModal(false);setEditItem(null)}}
+          style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:200}}
+        >
+          <div
+            onClick={e=>e.stopPropagation()}
+            style={{
+              width:'100%',
+              maxWidth:'480px',
+              background:'#f3f4f7',
+              borderTopLeftRadius:'24px',
+              borderTopRightRadius:'24px',
+              // ── padding bottom: lascia spazio alla navbar + safe area ──
+              paddingBottom: SHEET_PB,
+              padding:'14px',
+              paddingBottom: SHEET_PB,
+              maxHeight:'88vh',
+              overflowY:'auto',
+            }}
+          >
             <div style={{width:'40px',height:'4px',borderRadius:'99px',background:'#dde0ed',margin:'0 auto 14px'}}/>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
               <div style={{fontSize:f(15),fontWeight:'900',color:'#02153f'}}>✏️ Modifica sessione</div>
@@ -388,7 +458,16 @@ export default function ToiletPage({ onBack, isDemo }) {
                 </button>
               </div>
             </div>
-            <FormFields formData={editForm} setFormData={setEditForm} onSubmit={handleUpdate} submitLabel="Aggiorna sessione" isSaved={false}/>
+
+            <FormFields
+              formData={editForm}
+              setFormData={setEditForm}
+              onSubmit={handleUpdate}
+              submitLabel="Aggiorna sessione"
+              isSaved={false}
+              firstFieldRef={editFirstRef}
+              isSheet={true}
+            />
           </div>
         </div>
       )}
