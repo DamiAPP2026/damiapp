@@ -29,7 +29,7 @@ import MessaggiPage from './MessaggiPage'
 
 const PIN_REALE = '261120'
 const PIN_DEMO  = '010101'
-const VERSION   = '05.01.08'
+const VERSION   = '05.01.09'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 
