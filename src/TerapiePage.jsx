@@ -1,416 +1,476 @@
 import { useState, useEffect, useRef } from 'react'
-import { ChevronLeft, Check, Clock, Plus, Edit2, Trash2, X } from 'lucide-react'
+import { ChevronLeft, Check, Save, Plus, PenSquare, X, Filter } from 'lucide-react'
 import { db } from './firebase'
-import { ref, onValue, push, set, remove } from 'firebase/database'
+import { ref, push, onValue, remove, set } from 'firebase/database'
 import { processFirebaseSnap, encrypt } from './crypto'
-
-const DEMO_TERAPIE = [
-  { id:1, nome:'Keppra 500mg',    quantita:'1 compressa', orario:'08:00', note:'Con colazione',    colore:'#F7295A' },
-  { id:2, nome:'Depakine 250ml',  quantita:'5ml',         orario:'13:00', note:'Con pranzo',       colore:'#2e84e9' },
-  { id:3, nome:'Keppra 500mg',    quantita:'1 compressa', orario:'20:00', note:'Con cena',         colore:'#00BFA6' },
-  { id:4, nome:'Rivotril 0.5mg',  quantita:'½ compressa', orario:'22:00', note:'Prima di dormire', colore:'#7B5EA7' },
-]
-
-const COLORI = [
-  '#F7295A','#00BFA6','#7B5EA7','#FF8C42',
-  '#2e84e9','#FFD93D','#E040FB','#26C6DA',
-]
-
-const EMPTY_FORM = { nome:'', quantita:'', orario:'08:00', note:'', colore:'#F7295A' }
+import ToiletCharts from './ToiletCharts'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
+const cardSh = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
 
-// ── Timeline stepper ──────────────────────────────────────────
-function Timeline({ terapie, assunte, ora }) {
-  return (
-    <div style={{ overflowX:'auto', paddingBottom:'4px' }}>
-      <div style={{ display:'flex', alignItems:'flex-start', minWidth:'max-content', position:'relative', padding:'0 4px' }}>
-        {/* linea connettore */}
-        <div style={{ position:'absolute', top:'17px', left:'22px', right:'22px', height:'2px', background:'rgba(255,255,255,0.25)', zIndex:0 }}/>
+// ── padding bottom sheet — MAI sotto navbar ───────────────────
+const SHEET_PB = 'calc(80px + env(safe-area-inset-bottom, 0px))'
 
-        {terapie.map((t, idx) => {
-          const key = t.id || t._firebaseKey || idx
-          const assunta = !!assunte[key]
-          const [h, m] = (t.orario || '00:00').split(':').map(Number)
-          const minT = h * 60 + m
-          const isProssima = !assunta && minT > ora &&
-            terapie.every((x, xi) => {
-              const xKey = x.id || x._firebaseKey || xi
-              const [xh, xm] = (x.orario || '00:00').split(':').map(Number)
-              return assunte[xKey] || x.id === t.id || xh * 60 + xm >= minT
-            })
+const MODALITA = [
+  { key: 'adulto',      label: '👆 Comando adulto', sub: "L'adulto ha deciso il momento" },
+  { key: 'caa-guidata', label: '🤝 CAA guidata',    sub: 'Comunicazione Aumentativa guidata' },
+  { key: 'caa-auto',    label: '⭐ CAA autonoma',   sub: 'Ha comunicato da solo' },
+]
 
-          return (
-            <div key={key} style={{ display:'flex', flexDirection:'column', alignItems:'center', width:'72px', position:'relative', zIndex:1 }}>
-              {/* cerchio */}
-              {assunta ? (
-                <div style={{ width:'34px', height:'34px', borderRadius:'50%', background:'#00BFA6', border:'3px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'5px' }}>
-                  <Check size={13} color="#fff" strokeWidth={3}/>
-                </div>
-              ) : isProssima ? (
-                <div style={{ width:'34px', height:'34px', borderRadius:'50%', background:'rgba(255,255,255,0.95)', border:'3px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'5px', boxShadow:'0 0 0 4px rgba(255,255,255,0.3)' }}>
-                  <div style={{ width:'10px', height:'10px', borderRadius:'50%', background: t.colore || '#2e84e9' }}/>
-                </div>
-              ) : (
-                <div style={{ width:'34px', height:'34px', borderRadius:'50%', background:'rgba(255,255,255,0.12)', border:'3px solid rgba(255,255,255,0.4)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'5px' }}>
-                  <div style={{ width:'10px', height:'10px', borderRadius:'50%', background:'rgba(255,255,255,0.45)' }}/>
-                </div>
-              )}
-              <div style={{ fontSize:'10px', fontWeight:'700', color: assunta ? 'rgba(255,255,255,0.75)' : isProssima ? '#fff' : 'rgba(255,255,255,0.65)', textAlign:'center' }}>
-                {t.orario}
-              </div>
-              <div style={{ fontSize:'9px', color: assunta ? 'rgba(255,255,255,0.5)' : isProssima ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.45)', textAlign:'center', maxWidth:'66px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                {t.nome.split(' ')[0]}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+const BISOGNI = [
+  { key: 'pippi',    label: '💧 Pipì' },
+  { key: 'cacca',    label: '💩 Cacca' },
+  { key: 'entrambi', label: '🔄 Entrambi' },
+]
+
+const DEMO_LOG = [
+  { id:1, timestamp:Date.now()-3600000,   data:'12/04/2026', ora:'08:30', bisogno:'pippi',    modalita:'caa-auto',    incidentePippi:false, incidenteCacca:false },
+  { id:2, timestamp:Date.now()-7200000,   data:'12/04/2026', ora:'13:15', bisogno:'entrambi', modalita:'adulto',      incidentePippi:false, incidenteCacca:false },
+  { id:3, timestamp:Date.now()-86400000,  data:'11/04/2026', ora:'09:00', bisogno:'cacca',    modalita:'caa-guidata', incidentePippi:false, incidenteCacca:false },
+  { id:4, timestamp:Date.now()-90000000,  data:'11/04/2026', ora:'15:30', bisogno:'pippi',    modalita:'caa-auto',    incidentePippi:true,  oraPippi:'15:10', incidenteCacca:false },
+  { id:5, timestamp:Date.now()-180000000, data:'10/04/2026', ora:'11:00', bisogno:'nessuno',  modalita:'',            incidentePippi:true,  oraPippi:'10:50', incidenteCacca:true, oraCacca:'10:55' },
+]
+
+function matchOggi(dataField) {
+  if (!dataField) return false
+  const d = new Date()
+  const oggi = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+  const raw = String(dataField).replace(/[\/\-\s]/g,'')
+  const oggiRaw = oggi.replace(/[\/\-\s]/g,'')
+  return raw === oggiRaw || String(dataField) === oggi
 }
 
-// ── Form bottom sheet ─────────────────────────────────────────
-function FormSheet({ form, setForm, onSalva, onClose, editTarget, saved, isDemo }) {
-  const nomeRef = useRef(null)
-  const inStyle = { width:'100%', padding:'10px 12px', borderRadius:'12px', border:'1.5px solid #f0f1f4', fontSize:f(13), color:'#02153f', background:'#f3f4f7', fontFamily:'inherit', outline:'none', boxSizing:'border-box' }
-  const lbStyle = { fontSize:f(11), fontWeight:'700', color:'#7c8088', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'5px', display:'block' }
+function nowDate() {
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+}
 
-  useEffect(() => {
-    setTimeout(() => nomeRef.current?.focus(), 80)
-  }, [])
+function nowTime() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+}
 
+function emptyForm() {
+  return {
+    data: nowDate(), ora: nowTime(),
+    bisogno: '', modalita: '',
+    incidentePippi: false, oraPippi: '',
+    incidenteCacca: false, oraCacca: '',
+    note: '',
+  }
+}
+
+const inputStyle = {
+  width:'100%', padding:'11px 12px', borderRadius:'12px',
+  border:'1.5px solid #f0f1f4', fontSize:'15px', color:'#02153f',
+  background:'#f3f4f7', fontFamily:'inherit', outline:'none', boxSizing:'border-box',
+}
+const labelStyle = {
+  fontSize:'13px', fontWeight:'700', color:'#7c8088',
+  textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'6px', display:'block',
+}
+
+// ── FormFields — accetta ref per il focus sul primo campo ─────
+function FormFields({ formData, setFormData, onSubmit, submitLabel, isSaved, firstFieldRef, isSheet }) {
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(2,21,63,0.55)', zIndex:2000, display:'flex', alignItems:'flex-end', justifyContent:'center', fontFamily:"-apple-system,'Segoe UI',sans-serif" }}>
-      <div style={{ background:'#feffff', borderRadius:'24px 24px 0 0', padding:'20px', paddingBottom:'calc(80px + env(safe-area-inset-bottom, 0px))', width:'100%', maxWidth:'480px', maxHeight:'90vh', overflowY:'auto' }}>
-
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
-          <span style={{ fontSize:f(16), fontWeight:'900', color:'#02153f' }}>
-            {editTarget ? 'Modifica terapia' : 'Nuova terapia'}
-          </span>
-          <button type="button" onClick={onClose} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'#f3f4f7', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <X size={16} color="#7c8088"/>
-          </button>
-        </div>
-
-        {/* Nome */}
-        <label style={lbStyle}>Nome farmaco *</label>
-        <input
-          ref={nomeRef}
-          value={form.nome}
-          onChange={e => setForm(p => ({ ...p, nome: e.target.value }))}
-          placeholder="Es: Keppra 500mg"
-          style={{ ...inStyle, marginBottom:'12px' }}
-          onFocus={e => e.target.style.borderColor='#00BFA6'}
-          onBlur={e => e.target.style.borderColor='#f0f1f4'}
-        />
-
-        {/* Orario + Quantità */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
+    <>
+      <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+        <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📅 Data e ora</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
           <div>
-            <label style={lbStyle}>Orario *</label>
+            <label style={labelStyle}>Data</label>
+            <input
+              ref={firstFieldRef}
+              type="text"
+              value={formData.data}
+              onChange={e=>setFormData({...formData,data:e.target.value})}
+              placeholder="gg/mm/aaaa"
+              style={inputStyle}
+              onFocus={e=>e.target.style.borderColor='#7B5EA7'}
+              onBlur={e=>e.target.style.borderColor='#f0f1f4'}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Ora</label>
             <input
               type="time"
-              value={form.orario}
-              onChange={e => setForm(p => ({ ...p, orario: e.target.value }))}
-              style={{ ...inStyle }}
-              onFocus={e => e.target.style.borderColor='#00BFA6'}
-              onBlur={e => e.target.style.borderColor='#f0f1f4'}
-            />
-          </div>
-          <div>
-            <label style={lbStyle}>Quantità</label>
-            <input
-              value={form.quantita}
-              onChange={e => setForm(p => ({ ...p, quantita: e.target.value }))}
-              placeholder="Es: 1 compressa"
-              style={{ ...inStyle }}
-              onFocus={e => e.target.style.borderColor='#00BFA6'}
-              onBlur={e => e.target.style.borderColor='#f0f1f4'}
+              value={formData.ora}
+              onChange={e=>setFormData({...formData,ora:e.target.value})}
+              style={inputStyle}
+              onFocus={e=>e.target.style.borderColor='#7B5EA7'}
+              onBlur={e=>e.target.style.borderColor='#f0f1f4'}
             />
           </div>
         </div>
+      </div>
 
-        {/* Note */}
-        <label style={lbStyle}>Note</label>
-        <input
-          value={form.note}
-          onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
-          placeholder="Es: con colazione, a digiuno..."
-          style={{ ...inStyle, marginBottom:'14px' }}
-          onFocus={e => e.target.style.borderColor='#00BFA6'}
-          onBlur={e => e.target.style.borderColor='#f0f1f4'}
-        />
+      <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+        <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'4px'}}>⚠️ Incidente addosso</div>
+        <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Indipendente dal bagno</div>
+        {[
+          { val:formData.incidentePippi, key:'incidentePippi', icon:'💧', title:'Pipì addosso',  oraKey:'oraPippi', oraVal:formData.oraPippi, labelOra:'Ora incidente pipì' },
+          { val:formData.incidenteCacca, key:'incidenteCacca', icon:'💩', title:'Cacca addosso', oraKey:'oraCacca', oraVal:formData.oraCacca, labelOra:'Ora incidente cacca' },
+        ].map(({val,key,icon,title,oraKey,oraVal,labelOra},i) => (
+          <div key={i}>
+            <div onClick={()=>setFormData({...formData,[key]:!val})} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px',borderRadius:'14px',cursor:'pointer',background:val?'#FEF0F4':'#f3f4f7',border:`2px solid ${val?'#F7295A33':'transparent'}`,marginBottom:'8px',transition:'all 0.15s'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <span style={{fontSize:'22px'}}>{icon}</span>
+                <div style={{fontSize:f(13),fontWeight:'700',color:val?'#F7295A':'#394058'}}>{title}</div>
+              </div>
+              <div style={{width:'48px',height:'26px',borderRadius:'13px',background:val?'#F7295A':'#dde0ed',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+                <div style={{width:'20px',height:'20px',borderRadius:'50%',background:'#fff',position:'absolute',top:'3px',left:val?'25px':'3px',transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}/>
+              </div>
+            </div>
+            {val && (
+              <div style={{padding:'0 4px 10px'}}>
+                <label style={labelStyle}>{labelOra}</label>
+                <input type="time" value={oraVal} onChange={e=>setFormData({...formData,[oraKey]:e.target.value})} style={inputStyle}/>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
-        {/* Colore */}
-        <label style={lbStyle}>Colore</label>
-        <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'nowrap' }}>
-          {COLORI.map(c => (
-            <div
-              key={c}
-              onClick={() => setForm(p => ({ ...p, colore: c }))}
-              style={{
-                width:'28px', height:'28px', borderRadius:'50%', background:c,
-                cursor:'pointer', flexShrink:0,
-                boxShadow: form.colore === c ? `0 0 0 2px #fff, 0 0 0 4px ${c}` : 'none',
-                transition:'box-shadow 0.15s',
-              }}
-            />
+      <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
+        <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'4px'}}>🚽 Ha usato il bagno?</div>
+        <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Opzionale</div>
+        <label style={labelStyle}>Cosa ha fatto</label>
+        <div style={{display:'flex',gap:'7px',marginBottom:'14px'}}>
+          {BISOGNI.map(({key,label}) => (
+            <div key={key} onClick={()=>setFormData({...formData,bisogno:formData.bisogno===key?'':key,modalita:formData.bisogno===key?'':formData.modalita})} style={{flex:1,padding:'10px 6px',borderRadius:'12px',cursor:'pointer',textAlign:'center',fontSize:f(12),fontWeight:'700',border:`2px solid ${formData.bisogno===key?'#7B5EA7':'#f0f1f4'}`,background:formData.bisogno===key?'#F5F3FF':'#feffff',color:formData.bisogno===key?'#7B5EA7':'#7c8088',transition:'all 0.15s'}}>{label}</div>
           ))}
         </div>
-
-        <button
-          type="button"
-          onClick={onSalva}
-          style={{ width:'100%', padding:'15px', borderRadius:'50px', border:'none', cursor:'pointer', fontWeight:'800', fontSize:f(15), color:'#fff', background: saved ? 'linear-gradient(135deg,#00BFA6,#2e84e9)' : 'linear-gradient(135deg,#00BFA6,#2e84e9)', boxShadow:'0 6px 20px rgba(0,191,166,0.3)', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontFamily:'inherit', transition:'all 0.3s' }}
-        >
-          {saved ? <><Check size={18} color="#fff"/> Salvato!</> : <>{editTarget ? 'Aggiorna terapia' : 'Aggiungi terapia'}</>}
-        </button>
-
-        {isDemo && (
-          <div style={{ textAlign:'center', marginTop:'10px', fontSize:f(11), color:'#8B6914', fontWeight:'600' }}>
-            Demo — non salvato su Firebase
-          </div>
+        {formData.bisogno && (
+          <>
+            <label style={labelStyle}>🧠 Come è andato</label>
+            {MODALITA.map(opt => (
+              <div key={opt.key} onClick={()=>setFormData({...formData,modalita:opt.key})} style={{display:'flex',alignItems:'center',gap:'12px',padding:'11px 12px',borderRadius:'12px',cursor:'pointer',marginBottom:'7px',border:`2px solid ${formData.modalita===opt.key?'#7B5EA7':'#f0f1f4'}`,background:formData.modalita===opt.key?'#F5F3FF':'#feffff',transition:'all 0.15s'}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:f(13),fontWeight:'700',color:formData.modalita===opt.key?'#7B5EA7':'#02153f'}}>{opt.label}</div>
+                  <div style={{fontSize:f(10),color:'#7c8088'}}>{opt.sub}</div>
+                </div>
+                {formData.modalita===opt.key && <Check size={16} color="#7B5EA7"/>}
+              </div>
+            ))}
+          </>
         )}
+        <label style={{...labelStyle,marginTop:'10px'}}>📝 Note</label>
+        <textarea value={formData.note} onChange={e=>setFormData({...formData,note:e.target.value})} rows={2} placeholder="Annotazioni opzionali..." style={{...inputStyle,resize:'vertical'}}/>
       </div>
-    </div>
+
+      {/* Pulsante salva — paddingBottom gestito dal container se siamo in sheet */}
+      <button
+        type="button"
+        onClick={onSubmit}
+        style={{
+          width:'100%', padding:'16px', borderRadius:'50px', border:'none',
+          cursor:'pointer', fontWeight:'800', fontSize:f(15), color:'#fff',
+          background: isSaved
+            ? 'linear-gradient(135deg,#00BFA6,#2e84e9)'
+            : 'linear-gradient(135deg,#7B5EA7,#2e84e9)',
+          boxShadow:'0 6px 20px rgba(123,94,167,0.35)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          gap:'8px', transition:'all 0.3s',
+          marginBottom: isSheet ? '0' : '8px',
+        }}
+      >
+        {isSaved ? <><Check size={18} color="#fff"/> Salvato!</> : <><Save size={18} color="#fff"/> {submitLabel}</>}
+      </button>
+    </>
   )
 }
 
 // ════════════════════════════════════════════════════════════
-export default function TerapiePage({ onBack, isDemo }) {
-  const [terapie,    setTerapie]    = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [assunte,    setAssunte]    = useState({})
-  const [time,       setTime]       = useState(new Date())
-  const [showForm,   setShowForm]   = useState(false)
-  const [form,       setForm]       = useState({ ...EMPTY_FORM })
-  const [editTarget, setEditTarget] = useState(null)
-  const [saved,      setSaved]      = useState(false)
+export default function ToiletPage({ onBack, isDemo }) {
+  const [tab,           setTab]           = useState('form')
+  const [log,           setLog]           = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [saved,         setSaved]         = useState(false)
+  const [filtro,        setFiltro]        = useState('settimana')
+  const [showFilters,   setShowFilters]   = useState(false)
+  const [filterBisogno, setFilterBisogno] = useState('tutti')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editItem,      setEditItem]      = useState(null)
+  const [form,          setForm]          = useState(emptyForm())
+  const [editForm,      setEditForm]      = useState(emptyForm())
 
-  // Orologio
-  useEffect(() => {
-    const id = setInterval(() => setTime(new Date()), 1000)
-    return () => clearInterval(id)
-  }, [])
+  // ── ref per focus automatico sul campo Data nel modal modifica
+  const editFirstRef = useRef(null)
 
-  // Caricamento
   useEffect(() => {
-    if (isDemo) { setTerapie(DEMO_TERAPIE); setLoading(false); return }
-    const u = onValue(ref(db, 'terapies'), snap => {
-      setTerapie(
-        processFirebaseSnap(snap).sort((a, b) => (a.orario || '').localeCompare(b.orario || ''))
-      )
+    if (isDemo) { setLog(DEMO_LOG); setLoading(false); return }
+    const ttRef = ref(db, 'toilet_training')
+    const unsub = onValue(ttRef, (snap) => {
+      const lista = processFirebaseSnap(snap).sort((a,b) => b.timestamp - a.timestamp)
+      setLog(lista)
       setLoading(false)
     })
-    return () => u()
+    return () => unsub()
   }, [isDemo])
 
-  const timeStr = time.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })
-  const ora = time.getHours() * 60 + time.getMinutes()
-
-  const prossima = terapie
-    .map(t => { const [h, m] = (t.orario || '00:00').split(':').map(Number); return { ...t, min: h * 60 + m } })
-    .filter(t => {
-      const key = t.id || t._firebaseKey
-      return t.min > ora && !assunte[key]
-    })
-    .sort((a, b) => a.min - b.min)[0]
-
-  function apriNuovo() {
-    setForm({ ...EMPTY_FORM })
-    setEditTarget(null)
-    setSaved(false)
-    setShowForm(true)
-  }
-
-  function apriModifica(t) {
-    setForm({ nome: t.nome || '', quantita: t.quantita || '', orario: t.orario || '08:00', note: t.note || '', colore: t.colore || '#F7295A' })
-    setEditTarget(t)
-    setSaved(false)
-    setShowForm(true)
-  }
-
-  function handleSalva() {
-    if (!form.nome.trim()) { alert('Inserisci il nome del farmaco'); return }
-    if (!form.orario)      { alert('Inserisci l\'orario'); return }
-    const doc = { id: editTarget?.id || Date.now(), ...form, nome: form.nome.trim() }
-
-    if (!isDemo) {
-      if (editTarget?._firebaseKey) set(ref(db, `terapies/${editTarget._firebaseKey}`), encrypt(doc))
-      else push(ref(db, 'terapies'), encrypt(doc))
-    } else {
-      if (editTarget) {
-        setTerapie(prev => prev.map(t => t.id === editTarget.id ? { ...doc, _firebaseKey: t._firebaseKey } : t).sort((a, b) => (a.orario || '').localeCompare(b.orario || '')))
-      } else {
-        setTerapie(prev => [...prev, { ...doc, _firebaseKey: `demo_${Date.now()}` }].sort((a, b) => (a.orario || '').localeCompare(b.orario || '')))
-      }
+  function handleSave() {
+    const hasBagno = form.bisogno !== ''
+    const hasIncidente = form.incidentePippi || form.incidenteCacca
+    if (!hasBagno && !hasIncidente) {
+      alert("Seleziona cosa ha fatto in bagno oppure se c'è stato un incidente")
+      return
     }
+    if (hasBagno && !form.modalita) { alert('Seleziona come è andato in bagno'); return }
+    const sessione = {
+      id: Date.now(), timestamp: Date.now(),
+      data: form.data, ora: form.ora,
+      bisogno: form.bisogno || 'nessuno', modalita: form.modalita,
+      incidentePippi: form.incidentePippi, oraPippi: form.incidentePippi ? form.oraPippi : '',
+      incidenteCacca: form.incidenteCacca, oraCacca: form.incidenteCacca ? form.oraCacca : '',
+      note: form.note,
+    }
+    if (!isDemo) push(ref(db, 'toilet_training'), encrypt(sessione))
+    else setLog(prev => [sessione, ...prev])
     setSaved(true)
-    setTimeout(() => { setSaved(false); setShowForm(false) }, 1200)
+    setTimeout(() => { setSaved(false); setForm(emptyForm()) }, 1500)
   }
 
-  function handleElimina(t) {
-    if (!window.confirm(`Eliminare "${t.nome}"?`)) return
-    if (!isDemo && t._firebaseKey) remove(ref(db, `terapies/${t._firebaseKey}`))
-    else setTerapie(prev => prev.filter(x => x.id !== t.id))
+  function openEdit(item) {
+    setEditItem(item)
+    setEditForm({
+      data: item.data || nowDate(), ora: item.ora || nowTime(),
+      bisogno: item.bisogno === 'nessuno' ? '' : (item.bisogno || ''),
+      modalita: item.modalita || '',
+      incidentePippi: !!item.incidentePippi, oraPippi: item.oraPippi || '',
+      incidenteCacca: !!item.incidenteCacca, oraCacca: item.oraCacca || '',
+      note: item.note || '',
+    })
+    setShowEditModal(true)
+    // ── focus automatico sul primo campo del modal dopo il render
+    setTimeout(() => editFirstRef.current?.focus(), 80)
   }
 
-  function toggleAssunta(key) {
-    setAssunte(p => ({ ...p, [key]: !p[key] }))
+  function handleUpdate() {
+    if (!editItem) return
+    const updated = {
+      ...editItem,
+      data: editForm.data, ora: editForm.ora,
+      bisogno: editForm.bisogno || 'nessuno', modalita: editForm.modalita,
+      incidentePippi: editForm.incidentePippi, oraPippi: editForm.incidentePippi ? editForm.oraPippi : '',
+      incidenteCacca: editForm.incidenteCacca, oraCacca: editForm.incidenteCacca ? editForm.oraCacca : '',
+      note: editForm.note,
+    }
+    if (!isDemo && editItem._firebaseKey) {
+      set(ref(db, 'toilet_training/' + editItem._firebaseKey), encrypt(updated))
+    } else {
+      setLog(prev => prev.map(x => x.id === editItem.id ? updated : x))
+    }
+    setShowEditModal(false); setEditItem(null)
   }
 
-  const assunte_count = Object.values(assunte).filter(Boolean).length
+  function handleDelete(item) {
+    if (!window.confirm('Eliminare questa sessione?')) return
+    if (!isDemo && item._firebaseKey) remove(ref(db, `toilet_training/${item._firebaseKey}`))
+    else setLog(prev => prev.filter(x => x.id !== item.id))
+    setShowEditModal(false); setEditItem(null)
+  }
 
-  if (loading) return (
-    <div style={{ minHeight:'100vh', background:'#f3f4f7', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"-apple-system,'Segoe UI',sans-serif" }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:'32px', marginBottom:'12px' }}>💊</div>
-        <div style={{ fontSize:'14px', color:'#7c8088' }}>Caricamento terapie...</div>
-      </div>
-    </div>
-  )
+  function logFiltrato() {
+    let lista = log
+    if (filtro === 'oggi')      lista = lista.filter(s => matchOggi(s.data))
+    if (filtro === 'settimana') lista = lista.filter(s => (s.timestamp||0) >= Date.now()-7*86400000)
+    if (filtro === 'mese')      lista = lista.filter(s => (s.timestamp||0) >= Date.now()-30*86400000)
+    if (filterBisogno !== 'tutti') lista = lista.filter(s => s.bisogno === filterBisogno)
+    return lista
+  }
+
+  const logOggi      = log.filter(s => matchOggi(s.data))
+  const bagnoOggi    = logOggi.filter(s => s.bisogno && s.bisogno !== 'nessuno').length
+  const incidentiOggi = logOggi.filter(s => s.incidentePippi || s.incidenteCacca).length
+  const logVisibile  = logFiltrato()
 
   return (
     <>
-      <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.ter-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:100px;width:100%;max-width:480px;margin:0 auto;}`}</style>
-      <div className="ter-wrap">
-
-        {/* FORM SHEET */}
-        {showForm && (
-          <FormSheet
-            form={form}
-            setForm={setForm}
-            onSalva={handleSalva}
-            onClose={() => setShowForm(false)}
-            editTarget={editTarget}
-            saved={saved}
-            isDemo={isDemo}
-          />
-        )}
+      <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.tw{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:140px;width:100%;max-width:480px;margin:0 auto;}`}</style>
+      <div className="tw">
 
         {/* HEADER */}
-        <div style={{ background:'linear-gradient(135deg,#00BFA6,#2e84e9)', padding:'14px 16px 20px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px' }}>
-            <button onClick={onBack} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.2)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+        <div style={{background:'linear-gradient(135deg,#7B5EA7,#2e84e9)',padding:'14px 16px 20px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'14px'}}>
+            <button type="button" onClick={onBack} style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
               <ChevronLeft size={20} color="#fff"/>
             </button>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:f(18), fontWeight:'900', color:'#fff' }}>💊 Terapie</div>
-              <div style={{ fontSize:f(11), color:'rgba(255,255,255,0.75)' }}>
-                {isDemo ? '🎭 Dati demo' : `${terapie.length} terapie programmate`}
-              </div>
-            </div>
-            <button onClick={apriNuovo} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.25)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-              <Plus size={20} color="#fff"/>
-            </button>
-          </div>
-
-          {/* Ora + prossima */}
-          <div style={{ background:'rgba(255,255,255,0.15)', borderRadius:'16px', padding:'14px', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px' }}>
             <div>
-              <div style={{ fontSize:f(11), color:'rgba(255,255,255,0.7)', marginBottom:'2px' }}>Ora attuale</div>
-              <div style={{ fontSize:f(28), fontWeight:'900', color:'#fff', fontVariantNumeric:'tabular-nums', letterSpacing:'-1px' }}>{timeStr}</div>
+              <div style={{fontSize:f(18),fontWeight:'900',color:'#fff'}}>🚽 Toilet Training</div>
+              <div style={{fontSize:f(11),color:'rgba(255,255,255,0.75)'}}>{isDemo?'🎭 Dati demo':'Registra sessione'}</div>
             </div>
-            {prossima && (
-              <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:f(11), color:'rgba(255,255,255,0.7)', marginBottom:'2px' }}>Prossima</div>
-                <div style={{ fontSize:f(16), fontWeight:'800', color:'#fff' }}>{prossima.orario}</div>
-                <div style={{ fontSize:f(11), color:'rgba(255,255,255,0.85)' }}>{prossima.nome}</div>
-              </div>
-            )}
           </div>
-
-          {/* TIMELINE STEPPER */}
-          {terapie.length > 0 && (
-            <Timeline terapie={terapie} assunte={assunte} ora={ora}/>
-          )}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'8px'}}>
+            {[
+              {label:'Bagno oggi',     val:bagnoOggi,       color:'#fff'},
+              {label:'Incidenti oggi', val:incidentiOggi,   color:incidentiOggi>0?'#FFD93D':'#fff'},
+              {label:'Tot. sessioni',  val:log.length,      color:'#fff'},
+            ].map(({label,val,color},i) => (
+              <div key={i} style={{background:'rgba(255,255,255,0.15)',borderRadius:'12px',padding:'8px',textAlign:'center'}}>
+                <div style={{fontSize:f(20),fontWeight:'900',color}}>{val}</div>
+                <div style={{fontSize:f(10),color:'rgba(255,255,255,0.75)',marginTop:'2px'}}>{label}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* LISTA */}
-        <div style={{ padding:'12px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
-            <span style={{ fontSize:f(14), fontWeight:'800', color:'#02153f' }}>📋 Terapie di oggi</span>
-            <span style={{ fontSize:f(11), color:'#bec1cc' }}>{assunte_count}/{terapie.length} assunte</span>
-          </div>
+        {/* TAB */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',background:'#f3f4f7',margin:'12px 12px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
+          {[{k:'form',l:'➕ Nuova'},{k:'storico',l:'📋 Storico'},{k:'grafici',l:'📊 Grafici'}].map(({k,l}) => (
+            <button type="button" key={k} onClick={()=>setTab(k)} style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:tab===k?'#feffff':'transparent',color:tab===k?'#7B5EA7':'#7c8088',boxShadow:tab===k?'0 2px 8px rgba(2,21,63,0.10)':'none',transition:'all 0.2s'}}>
+              {l}
+            </button>
+          ))}
+        </div>
 
-          {terapie.length === 0 ? (
-            <div style={{ background:'#feffff', borderRadius:'18px', padding:'32px', textAlign:'center', boxShadow:sh }}>
-              <div style={{ fontSize:'32px', marginBottom:'12px' }}>💊</div>
-              <div style={{ fontSize:f(14), color:'#7c8088', marginBottom:'8px' }}>Nessuna terapia registrata</div>
-              <button type="button" onClick={apriNuovo} style={{ padding:'10px 24px', borderRadius:'50px', border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00BFA6,#2e84e9)', color:'#fff', fontWeight:'800', fontSize:f(13), fontFamily:'inherit' }}>
-                + Aggiungi terapia
-              </button>
-            </div>
-          ) : (
-            terapie.map((t, idx) => {
-              const key = t.id || t._firebaseKey || idx
-              const assunta = !!assunte[key]
-              const color = t.colore || COLORI[idx % COLORI.length]
-              const [h, m] = (t.orario || '00:00').split(':').map(Number)
-              const passata = h * 60 + m < ora
+        <div style={{padding:'12px'}}>
 
-              return (
-                <div key={key} style={{ background:'#feffff', borderRadius:'16px', padding:'14px', marginBottom:'8px', boxShadow:sh, display:'flex', alignItems:'center', gap:'12px', opacity: assunta ? 0.6 : 1, transition:'opacity 0.2s', border: passata && !assunta ? '1.5px solid #F7295A33' : '1.5px solid transparent' }}>
+          {/* ── NUOVA SESSIONE ── */}
+          {tab==='form' && (
+            <>
+              <FormFields
+                formData={form}
+                setFormData={setForm}
+                onSubmit={handleSave}
+                submitLabel="Salva sessione"
+                isSaved={saved}
+                firstFieldRef={null}
+                isSheet={false}
+              />
+              {isDemo && <div style={{textAlign:'center',fontSize:f(11),color:'#8B6914',fontWeight:'600'}}>🎭 Modalità demo — dati non salvati su Firebase</div>}
+            </>
+          )}
 
-                  {/* Icona colore */}
-                  <div style={{ width:'44px', height:'44px', borderRadius:'14px', background: assunta ? '#f3f4f7' : `${color}20`, border:`2px solid ${assunta ? '#f0f1f4' : color}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:'20px' }}>
-                    💊
-                  </div>
+          {/* ── STORICO ── */}
+          {tab==='storico' && (
+            <>
+              <div style={{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}}>
+                {[{k:'oggi',l:'Oggi'},{k:'settimana',l:'7 giorni'},{k:'mese',l:'30 giorni'},{k:'tutto',l:'Tutto'}].map(({k,l}) => (
+                  <button type="button" key={k} onClick={()=>setFiltro(k)} style={{padding:'6px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:filtro===k?'#7B5EA7':'#feffff',color:filtro===k?'#fff':'#7c8088',boxShadow:filtro===k?'0 3px 10px rgba(123,94,167,0.3)':'0 2px 6px rgba(0,0,0,0.06)',transition:'all 0.2s'}}>
+                    {l}
+                  </button>
+                ))}
+                <button type="button" onClick={()=>setShowFilters(v=>!v)} style={{padding:'6px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:'#feffff',color:'#7c8088',boxShadow:'0 2px 6px rgba(0,0,0,0.06)',display:'flex',alignItems:'center',gap:'4px'}}>
+                  <Filter size={12}/> Filtri
+                </button>
+              </div>
 
-                  {/* Info */}
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:f(14), fontWeight:'800', color: assunta ? '#bec1cc' : '#02153f', textDecoration: assunta ? 'line-through' : 'none', marginBottom:'2px' }}>{t.nome}</div>
-                    <div style={{ fontSize:f(12), color:'#7c8088' }}>{t.quantita}{t.note ? ` · ${t.note}` : ''}</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:'4px', marginTop:'4px' }}>
-                      <Clock size={11} color={passata && !assunta ? '#F7295A' : '#bec1cc'}/>
-                      <span style={{ fontSize:f(11), fontWeight:'700', color: assunta ? '#bec1cc' : passata ? '#F7295A' : '#193f9e' }}>
-                        {t.orario}{passata && !assunta ? ' — In ritardo!' : ''}{assunta ? ' — Assunta ✓' : ''}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Azioni */}
-                  <div style={{ display:'flex', flexDirection:'column', gap:'5px', flexShrink:0 }}>
-                    {/* Spunta */}
-                    <button type="button" onClick={() => toggleAssunta(key)} style={{ width:'30px', height:'30px', borderRadius:'50%', border:'none', cursor:'pointer', background: assunta ? 'linear-gradient(135deg,#00BFA6,#2e84e9)' : '#f3f4f7', display:'flex', alignItems:'center', justifyContent:'center', boxShadow: assunta ? '0 3px 10px rgba(0,191,166,0.3)' : 'none', transition:'all 0.2s' }}>
-                      <Check size={14} color={assunta ? '#fff' : '#bec1cc'}/>
-                    </button>
-                    {/* Modifica */}
-                    <button type="button" onClick={() => apriModifica(t)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#EEF3FD', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      <Edit2 size={13} color="#2e84e9"/>
-                    </button>
-                    {/* Elimina */}
-                    <button type="button" onClick={() => handleElimina(t)} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#FEF0F4', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      <Trash2 size={13} color="#F7295A"/>
-                    </button>
+              {showFilters && (
+                <div style={{background:'#feffff',borderRadius:'14px',padding:'12px',marginBottom:'10px',boxShadow:cardSh}}>
+                  <label style={labelStyle}>Tipo bisogno</label>
+                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                    {[{k:'tutti',l:'Tutti'}, ...BISOGNI.map(b=>({k:b.key,l:b.label}))].map(({k,l}) => (
+                      <button type="button" key={k} onClick={()=>setFilterBisogno(k)} style={{padding:'5px 10px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:filterBisogno===k?'#7B5EA7':'#f3f4f7',color:filterBisogno===k?'#fff':'#7c8088',transition:'all 0.2s'}}>
+                        {l}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )
-            })
+              )}
+
+              <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+                <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>📋 {logVisibile.length} sessioni</div>
+                {loading ? (
+                  <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Caricamento...</div>
+                ) : logVisibile.length===0 ? (
+                  <div style={{textAlign:'center',padding:'20px',color:'#bec1cc',fontSize:f(13)}}>Nessuna sessione in questo periodo</div>
+                ) : (
+                  logVisibile.map((s,i) => {
+                    const hasBagno = s.bisogno && s.bisogno !== 'nessuno'
+                    const hasInc = s.incidentePippi || s.incidenteCacca
+                    const borderColor = hasInc ? '#F7295A' : hasBagno ? '#7B5EA7' : '#bec1cc'
+                    return (
+                      <div key={s.id||i} style={{padding:'11px 12px',borderRadius:'12px',marginBottom:'8px',background:'#f3f4f7',borderLeft:`3px solid ${borderColor}`}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'5px'}}>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',flex:1}}>
+                            {hasBagno && <span style={{fontSize:f(12),fontWeight:'800',color:'#7B5EA7'}}>{s.bisogno==='pippi'?'💧 Pipì':s.bisogno==='cacca'?'💩 Cacca':'🔄 Entrambi'}</span>}
+                            {hasInc && <span style={{fontSize:f(11),fontWeight:'700',color:'#F7295A',background:'#FEF0F4',padding:'1px 8px',borderRadius:'20px'}}>⚠️ Incidente{s.incidentePippi&&s.incidenteCacca?' pipì+cacca':s.incidentePippi?' pipì':' cacca'}</span>}
+                            {!hasBagno && !hasInc && <span style={{fontSize:f(11),color:'#bec1cc'}}>Sessione vuota</span>}
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
+                            <span style={{fontSize:f(10),color:'#bec1cc'}}>{s.data} {s.ora}</span>
+                            <button type="button" onClick={()=>openEdit(s)} style={{width:'28px',height:'28px',borderRadius:'8px',border:'none',background:'#e8eaf0',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <PenSquare size={13} color="#7c8088"/>
+                            </button>
+                          </div>
+                        </div>
+                        {hasBagno && s.modalita && <div style={{fontSize:f(11),color:'#7c8088'}}>{s.modalita==='adulto'?'👆 Comando adulto':s.modalita==='caa-guidata'?'🤝 CAA guidata':'⭐ CAA autonoma'}</div>}
+                        {s.incidentePippi && s.oraPippi && <div style={{fontSize:f(10),color:'#F7295A',marginTop:'3px'}}>💧 Pipì addosso alle {s.oraPippi}</div>}
+                        {s.incidenteCacca && s.oraCacca && <div style={{fontSize:f(10),color:'#F7295A',marginTop:'2px'}}>💩 Cacca addosso alle {s.oraCacca}</div>}
+                        {s.note ? <div style={{fontSize:f(10),color:'#7c8088',marginTop:'3px',fontStyle:'italic'}}>{s.note}</div> : null}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </>
           )}
 
-          {/* Barra progresso */}
-          {terapie.length > 0 && (
-            <div style={{ background:'#feffff', borderRadius:'18px', padding:'14px', marginTop:'10px', boxShadow:sh }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
-                <span style={{ fontSize:f(13), fontWeight:'800', color:'#02153f' }}>📊 Progresso oggi</span>
-                <span style={{ fontSize:f(11), color:'#7c8088' }}>{assunte_count} di {terapie.length}</span>
-              </div>
-              <div style={{ height:'8px', borderRadius:'4px', background:'#f3f4f7', overflow:'hidden', marginBottom:'6px' }}>
-                <div style={{ height:'100%', borderRadius:'4px', width:`${terapie.length > 0 ? (assunte_count / terapie.length) * 100 : 0}%`, background:'linear-gradient(90deg,#00BFA6,#2e84e9)', transition:'width 0.4s' }}/>
-              </div>
-              <div style={{ fontSize:f(11), color:'#7c8088', textAlign:'right' }}>
-                {terapie.length - assunte_count > 0
-                  ? `${terapie.length - assunte_count} ancora da assumere`
-                  : '✅ Tutte le terapie assunte!'
-                }
-              </div>
+          {/* ── GRAFICI ── */}
+          {tab==='grafici' && (
+            <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
+              {log.length===0 ? (
+                <div style={{textAlign:'center',padding:'24px',color:'#bec1cc'}}>
+                  <div style={{fontSize:'32px',marginBottom:'8px'}}>📊</div>
+                  <div style={{fontSize:f(13)}}>Nessuna sessione registrata</div>
+                </div>
+              ) : (
+                <ToiletCharts dati={log} titolo={false}/>
+              )}
             </div>
           )}
+
         </div>
       </div>
+
+      {/* ── MODAL MODIFICA ── */}
+      {showEditModal && editItem && (
+        <div
+          onClick={()=>{setShowEditModal(false);setEditItem(null)}}
+          style={{position:'fixed',inset:0,background:'rgba(2,21,63,0.5)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:200}}
+        >
+          <div
+            onClick={e=>e.stopPropagation()}
+            style={{
+              width:'100%',
+              maxWidth:'480px',
+              background:'#f3f4f7',
+              borderTopLeftRadius:'24px',
+              borderTopRightRadius:'24px',
+              paddingTop:'14px',
+              paddingLeft:'14px',
+              paddingRight:'14px',
+              paddingBottom: SHEET_PB,
+              maxHeight:'88vh',
+              overflowY:'auto',
+            }}
+          >
+            <div style={{width:'40px',height:'4px',borderRadius:'99px',background:'#dde0ed',margin:'0 auto 14px'}}/>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
+              <div style={{fontSize:f(15),fontWeight:'900',color:'#02153f'}}>✏️ Modifica sessione</div>
+              <div style={{display:'flex',gap:'8px'}}>
+                <button type="button" onClick={()=>handleDelete(editItem)} style={{padding:'8px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),background:'#FEF0F4',color:'#F7295A',fontFamily:'inherit'}}>
+                  🗑 Elimina
+                </button>
+                <button type="button" onClick={()=>{setShowEditModal(false);setEditItem(null)}} style={{width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'#f3f4f7',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <X size={16} color="#7c8088"/>
+                </button>
+              </div>
+            </div>
+
+            <FormFields
+              formData={editForm}
+              setFormData={setEditForm}
+              onSubmit={handleUpdate}
+              submitLabel="Aggiorna sessione"
+              isSaved={false}
+              firstFieldRef={editFirstRef}
+              isSheet={true}
+            />
+          </div>
+        </div>
+      )}
     </>
   )
 }
