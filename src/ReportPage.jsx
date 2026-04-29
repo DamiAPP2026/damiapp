@@ -215,7 +215,7 @@ export default function ReportPage({ onBack, isDemo }) {
     const done = () => { n++; if (n >= 3) setLoading(false) }
     const u1 = onValue(ref(db, 'crises'),        s => { setCrisi(processFirebaseSnap(s) || []);       done() })
     const u2 = onValue(ref(db, 'terapies'),      s => { setTerapie(processFirebaseSnap(s) || []);     done() })
-    const u3 = onValue(ref(db, 'toilettraining'),s => { setToiletData(processFirebaseSnap(s) || []); done() })
+    const u3 = onValue(ref(db, 'toilet_training'),s => { setToiletData(processFirebaseSnap(s) || []); done() })
     return () => { u1(); u2(); u3() }
   }, [isDemo])
 

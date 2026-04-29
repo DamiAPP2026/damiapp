@@ -16,7 +16,7 @@ const TIPI_DISTURBO = [
   { key:'spasmo',     label:'Spasmo',     color:'#F7295A' },
   { key:'braccio_dx', label:'Braccio Dx', color:'#193f9e' },
   { key:'braccio_sx', label:'Braccio Sx', color:'#8e44ad' },
-  { key:'scialorea',  label:'Scialorea',  color:'#e67e22' },
+  { key:'scialorrea',  label:'Scialorrea',  color:'#e67e22' },
   { key:'altro',      label:'Altro',      color:'#394058' },
 ]
 
@@ -26,7 +26,7 @@ const DEMO_LOG = [
   { id:1, timestamp:Date.now()-3600000,    data:'12/04/2026', ora:'08:15', tipi:['tremore'],               intensita:4, durataSecondi:125, nota:'' },
   { id:2, timestamp:Date.now()-86400000,   data:'11/04/2026', ora:'14:30', tipi:['distonia','braccio_sx'], intensita:7, durataSecondi:340, nota:'Dopo pasto' },
   { id:3, timestamp:Date.now()-2*86400000, data:'10/04/2026', ora:'09:00', tipi:['spasmo'],                intensita:6, durataSecondi:45,  nota:'' },
-  { id:4, timestamp:Date.now()-3*86400000, data:'09/04/2026', ora:'20:10', tipi:['tremore','scialorea'],   intensita:3, durataSecondi:200, nota:'' },
+  { id:4, timestamp:Date.now()-3*86400000, data:'09/04/2026', ora:'20:10', tipi:['tremore','scialorrea'],   intensita:3, durataSecondi:200, nota:'' },
   { id:5, timestamp:Date.now()-5*86400000, data:'07/04/2026', ora:'11:45', tipi:['tic'],                   intensita:2, durataSecondi:30,  nota:'' },
 ]
 
