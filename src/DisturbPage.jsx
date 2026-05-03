@@ -1,23 +1,30 @@
+// DisturbPage.jsx — patch v2
+// Modifiche:
+// 1. Aggiunta `desc` breve in grigio sotto ogni tipo di disturbo (// ← MODIFICATO)
+// 2. Timer via Web Worker + Wake Lock (da patch precedente)
+
 import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, Check, Play, Square, RotateCcw, Edit2, Trash2, X, Save } from 'lucide-react'
 import { db } from './firebase'
 import { ref, push, remove, set, onValue } from 'firebase/database'
 import { processFirebaseSnap, encrypt } from './crypto'
+import { useTimerWorker } from './useTimerWorker'
 
 const f = (base) => `${Math.round(base * 1.15)}px`
 const sh   = '0 6px 24px rgba(2,21,63,0.10), 0 2px 8px rgba(0,0,0,0.05)'
 const shSm = '0 4px 16px rgba(2,21,63,0.08), 0 1px 5px rgba(0,0,0,0.04)'
 
+// ← MODIFICATO: aggiunta proprietà `desc`
 const TIPI_DISTURBO = [
-  { key:'tremore',    label:'Tremore',    color:'#FF8C42' },
-  { key:'distonia',   label:'Distonia',   color:'#7B5EA7' },
-  { key:'corea',      label:'Corea',      color:'#2e84e9' },
-  { key:'tic',        label:'Tic',        color:'#00BFA6' },
-  { key:'spasmo',     label:'Spasmo',     color:'#F7295A' },
-  { key:'braccio_dx', label:'Braccio Dx', color:'#193f9e' },
-  { key:'braccio_sx', label:'Braccio Sx', color:'#8e44ad' },
-  { key:'scialorrea',  label:'Scialorrea',  color:'#e67e22' },
-  { key:'altro',      label:'Altro',      color:'#394058' },
+  { key:'tremore',    label:'Tremore',    color:'#FF8C42', desc:'oscillazioni ritmiche involontarie' },
+  { key:'distonia',   label:'Distonia',   color:'#7B5EA7', desc:'contrazioni muscolari sostenute' },
+  { key:'corea',      label:'Corea',      color:'#2e84e9', desc:'movimenti bruschi irregolari' },
+  { key:'tic',        label:'Tic',        color:'#00BFA6', desc:'movimenti/suoni ripetitivi' },
+  { key:'spasmo',     label:'Spasmo',     color:'#F7295A', desc:'contrazione improvvisa intensa' },
+  { key:'braccio_dx', label:'Braccio Dx', color:'#193f9e', desc:'disturbo arto superiore destro' },
+  { key:'braccio_sx', label:'Braccio Sx', color:'#8e44ad', desc:'disturbo arto superiore sinistro' },
+  { key:'scialorrea', label:'Scialorrea', color:'#e67e22', desc:'salivazione eccessiva incontrollata' },
+  { key:'altro',      label:'Altro',      color:'#394058', desc:'disturbo non classificato sopra' },
 ]
 
 const INTENSITA_LABELS = ['','Lieve','Lieve','Lieve','Moderata','Moderata','Moderata','Intensa','Intensa','Severa','Severa']
@@ -26,7 +33,7 @@ const DEMO_LOG = [
   { id:1, timestamp:Date.now()-3600000,    data:'12/04/2026', ora:'08:15', tipi:['tremore'],               intensita:4, durataSecondi:125, nota:'' },
   { id:2, timestamp:Date.now()-86400000,   data:'11/04/2026', ora:'14:30', tipi:['distonia','braccio_sx'], intensita:7, durataSecondi:340, nota:'Dopo pasto' },
   { id:3, timestamp:Date.now()-2*86400000, data:'10/04/2026', ora:'09:00', tipi:['spasmo'],                intensita:6, durataSecondi:45,  nota:'' },
-  { id:4, timestamp:Date.now()-3*86400000, data:'09/04/2026', ora:'20:10', tipi:['tremore','scialorrea'],   intensita:3, durataSecondi:200, nota:'' },
+  { id:4, timestamp:Date.now()-3*86400000, data:'09/04/2026', ora:'20:10', tipi:['tremore','scialorrea'],  intensita:3, durataSecondi:200, nota:'' },
   { id:5, timestamp:Date.now()-5*86400000, data:'07/04/2026', ora:'11:45', tipi:['tic'],                   intensita:2, durataSecondi:30,  nota:'' },
 ]
 
@@ -56,7 +63,6 @@ function toITA(data='') {
   const [yyyy,mm,dd]=data.split('-'); return `${dd}/${mm}/${yyyy}`
 }
 
-// ── Calendario ───────────────────────────────────────────────
 function CalendarioMese({ log, mese, setMese }) {
   const mesiNomi=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
   const primoGiorno=new Date(mese.getFullYear(),mese.getMonth(),1).getDay()
@@ -104,7 +110,6 @@ function CalendarioMese({ log, mese, setMese }) {
   )
 }
 
-// ── Grafico orario ────────────────────────────────────────────
 function GraficoOrario({ log }) {
   const canvasRef=useRef(null)
   const counts=Array(24).fill(0)
@@ -135,7 +140,6 @@ function GraficoOrario({ log }) {
   )
 }
 
-// ── Campi durata fissi ────────────────────────────────────────
 function DurataManuale({ value, onChange }) {
   const h=Math.floor(value/3600), m=Math.floor((value%3600)/60), s=value%60
   function update(nh,nm,ns){onChange(Math.max(0,nh)*3600+Math.max(0,nm)*60+Math.max(0,ns))}
@@ -144,29 +148,20 @@ function DurataManuale({ value, onChange }) {
   return(
     <div style={{display:'grid',gridTemplateColumns:'1fr 16px 1fr 16px 1fr',alignItems:'center',gap:'4px'}}>
       <div>
-        <input type="number" min="0" max="23" value={h||''} placeholder="0"
-          onChange={e=>update(parseInt(e.target.value)||0,m,s)}
-          style={fs}
-          onFocus={e=>{e.target.style.borderColor='#FF8C42';e.target.select()}}
-          onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+        <input type="number" min="0" max="23" value={h||''} placeholder="0" onChange={e=>update(parseInt(e.target.value)||0,m,s)} style={fs}
+          onFocus={e=>{e.target.style.borderColor='#FF8C42';e.target.select()}} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
         <div style={ls}>ore</div>
       </div>
       <div style={{textAlign:'center',fontSize:f(22),fontWeight:'900',color:'#bec1cc',paddingBottom:'22px'}}>:</div>
       <div>
-        <input type="number" min="0" max="59" value={m||''} placeholder="0"
-          onChange={e=>update(h,Math.min(59,parseInt(e.target.value)||0),s)}
-          style={fs}
-          onFocus={e=>{e.target.style.borderColor='#FF8C42';e.target.select()}}
-          onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+        <input type="number" min="0" max="59" value={m||''} placeholder="0" onChange={e=>update(h,Math.min(59,parseInt(e.target.value)||0),s)} style={fs}
+          onFocus={e=>{e.target.style.borderColor='#FF8C42';e.target.select()}} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
         <div style={ls}>min</div>
       </div>
       <div style={{textAlign:'center',fontSize:f(22),fontWeight:'900',color:'#bec1cc',paddingBottom:'22px'}}>:</div>
       <div>
-        <input type="number" min="0" max="59" value={s||''} placeholder="0"
-          onChange={e=>update(h,m,Math.min(59,parseInt(e.target.value)||0))}
-          style={fs}
-          onFocus={e=>{e.target.style.borderColor='#FF8C42';e.target.select()}}
-          onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
+        <input type="number" min="0" max="59" value={s||''} placeholder="0" onChange={e=>update(h,m,Math.min(59,parseInt(e.target.value)||0))} style={fs}
+          onFocus={e=>{e.target.style.borderColor='#FF8C42';e.target.select()}} onBlur={e=>e.target.style.borderColor='#f0f1f4'}/>
         <div style={ls}>sec</div>
       </div>
     </div>
@@ -178,7 +173,6 @@ function emptyForm() {
   return { tipi:[], data:now.toISOString().split('T')[0], ora:now.toTimeString().slice(0,5), intensita:5, nota:'', durataSecondi:0, usaTimer:true }
 }
 
-// ════════════════════════════════════════════════════════════
 export default function DisturbPage({ onBack, isDemo }) {
   const [sezione,setSezione]       = useState('form')
   const [mese,setMese]             = useState(new Date())
@@ -187,9 +181,8 @@ export default function DisturbPage({ onBack, isDemo }) {
   const [form,setForm]             = useState(emptyForm())
   const [editTarget,setEditTarget] = useState(null)
   const [saved,setSaved]           = useState(false)
-  const [timerSec,setTimerSec]     = useState(0)
-  const [running,setRunning]       = useState(false)
-  const timerRef                   = useRef(null)
+
+  const { timerSec, running, startTimer, stopTimer, resetTimer } = useTimerWorker(0)
 
   useEffect(()=>{
     if(isDemo){setLog(DEMO_LOG);setLoading(false);return}
@@ -198,11 +191,9 @@ export default function DisturbPage({ onBack, isDemo }) {
     return()=>u()
   },[isDemo])
 
-  function startTimer(){if(running)return;setRunning(true);timerRef.current=setInterval(()=>setTimerSec(s=>s+1),1000)}
-  function stopTimer(){setRunning(false);clearInterval(timerRef.current)}
-  function resetTimer(){stopTimer();setTimerSec(0);setForm(p=>({...p,durataSecondi:0}))}
-
-  useEffect(()=>{if(form.usaTimer)setForm(p=>({...p,durataSecondi:timerSec}))},[timerSec])
+  useEffect(()=>{
+    if(form.usaTimer) setForm(p=>({...p,durataSecondi:timerSec}))
+  },[timerSec])
 
   function toggleTipo(key){setForm(p=>({...p,tipi:p.tipi.includes(key)?p.tipi.filter(k=>k!==key):[...p.tipi,key]}))}
 
@@ -216,18 +207,22 @@ export default function DisturbPage({ onBack, isDemo }) {
       durataSecondi: ep.durataSecondi||0,
       usaTimer:      false,
     })
-    setTimerSec(0); stopTimer()
+    resetTimer()
     setEditTarget(ep)
     setSezione('form')
     window.scrollTo({top:0,behavior:'smooth'})
   }
 
-  function annullaModifica(){setEditTarget(null);setForm(emptyForm());setTimerSec(0);stopTimer()}
+  function annullaModifica(){
+    setEditTarget(null)
+    setForm(emptyForm())
+    resetTimer()
+  }
 
-  function handleSave(){
+  async function handleSave(){
     if(form.tipi.length===0){alert('Seleziona almeno un tipo di disturbo');return}
     if(form.durataSecondi===0){alert('Inserisci la durata (usa il timer o i campi)');return}
-    stopTimer()
+    await stopTimer()
     const episodio={
       id:            editTarget?.id||Date.now(),
       timestamp:     editTarget?.timestamp||Date.now(),
@@ -247,7 +242,9 @@ export default function DisturbPage({ onBack, isDemo }) {
       else setLog(prev=>[episodio,...prev])
     }
     setSaved(true)
-    setTimeout(()=>{setSaved(false);setEditTarget(null);setForm(emptyForm());setTimerSec(0);stopTimer()},1400)
+    setTimeout(()=>{
+      setSaved(false); setEditTarget(null); setForm(emptyForm()); resetTimer()
+    },1400)
   }
 
   function handleElimina(ep){
@@ -263,8 +260,7 @@ export default function DisturbPage({ onBack, isDemo }) {
   const inStyle={width:'100%',padding:'11px 12px',borderRadius:'12px',border:'1.5px solid #f0f1f4',fontSize:f(13),color:'#02153f',background:'#f3f4f7',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}
   const lbStyle={fontSize:f(11),fontWeight:'700',color:'#7c8088',textTransform:'uppercase',letterSpacing:'0.4px',marginBottom:'6px',display:'block'}
 
-  // ── Scheda episodio riutilizzabile ────────────────────────
-  function EpisodioCard({e,i,total}){
+  function EpisodioCard({e}){
     const colore=getColorePrincipale(e.tipi||[e.tipo])
     return(
       <div style={{padding:'10px',borderRadius:'12px',marginBottom:'7px',background:'#f3f4f7',borderLeft:`3px solid ${colore}`}}>
@@ -296,7 +292,6 @@ export default function DisturbPage({ onBack, isDemo }) {
       <style>{`*{box-sizing:border-box;}body{margin:0;background:#f3f4f7;}.dm-wrap{background:#f3f4f7;min-height:100vh;font-family:-apple-system,'Segoe UI',sans-serif;padding-bottom:100px;width:100%;max-width:480px;margin:0 auto;}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{opacity:1;}`}</style>
       <div className="dm-wrap">
 
-        {/* HEADER */}
         <div style={{background:'linear-gradient(135deg,#FF8C42,#F7295A)',padding:'14px 16px 20px'}}>
           <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'14px'}}>
             <button onClick={onBack} style={{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
@@ -317,7 +312,6 @@ export default function DisturbPage({ onBack, isDemo }) {
           </div>
         </div>
 
-        {/* TABS */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',background:'#f3f4f7',margin:'12px 12px 0',borderRadius:'12px',padding:'3px',gap:'3px'}}>
           {[{k:'form',l:'➕ Nuovo'},{k:'calendario',l:'📅 Calendario'},{k:'statistiche',l:'📊 Stats'}].map(({k,l})=>(
             <button key={k} onClick={()=>setSezione(k)} style={{padding:'9px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:f(11),fontFamily:'inherit',background:sezione===k?'#feffff':'transparent',color:sezione===k?'#FF8C42':'#7c8088',boxShadow:sezione===k?shSm:'none',transition:'all 0.2s'}}>
@@ -328,23 +322,19 @@ export default function DisturbPage({ onBack, isDemo }) {
 
         <div style={{padding:'12px'}}>
 
-          {/* ══ FORM ══ */}
           {sezione==='form'&&(
             <>
-              {/* Banner modifica attiva */}
               {editTarget&&(
                 <div style={{background:'#FFF5EE',borderRadius:'14px',padding:'10px 14px',marginBottom:'10px',border:'2px solid #FF8C42',display:'flex',alignItems:'center',gap:'10px'}}>
                   <Edit2 size={15} color="#FF8C42" style={{flexShrink:0}}/>
-                  <div style={{flex:1,fontSize:f(12),fontWeight:'700',color:'#FF8C42'}}>
-                    Modifica: {editTarget.data} ore {editTarget.ora}
-                  </div>
+                  <div style={{flex:1,fontSize:f(12),fontWeight:'700',color:'#FF8C42'}}>Modifica: {editTarget.data} ore {editTarget.ora}</div>
                   <button onClick={annullaModifica} style={{width:'26px',height:'26px',borderRadius:'50%',background:'#FF8C42',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                     <X size={13} color="#fff"/>
                   </button>
                 </div>
               )}
 
-              {/* Tipo — MULTI selezione */}
+              {/* TIPO DI DISTURBO */}
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'2px'}}>Tipo di disturbo</div>
                 <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px'}}>Puoi selezionarne più di uno</div>
@@ -360,6 +350,8 @@ export default function DisturbPage({ onBack, isDemo }) {
                           </div>
                         )}
                         <div style={{fontSize:f(11),fontWeight:'800',color:sel?t.color:'#394058',lineHeight:'1.2'}}>{t.label}</div>
+                        {/* ← MODIFICATO: descrizione breve */}
+                        <div style={{fontSize:'9px',color:'#7c8088',marginTop:'3px',lineHeight:'1.3'}}>{t.desc}</div>
                       </div>
                     )
                   })}
@@ -371,7 +363,7 @@ export default function DisturbPage({ onBack, isDemo }) {
                 )}
               </div>
 
-              {/* Quando */}
+              {/* QUANDO */}
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>Quando</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px'}}>
@@ -387,7 +379,7 @@ export default function DisturbPage({ onBack, isDemo }) {
                 </div>
               </div>
 
-              {/* Durata */}
+              {/* DURATA */}
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>Durata</div>
                 <div style={{display:'flex',gap:'6px',marginBottom:'14px'}}>
@@ -398,14 +390,11 @@ export default function DisturbPage({ onBack, isDemo }) {
                     </button>
                   ))}
                 </div>
-
                 {form.usaTimer?(
                   <>
-                    <div style={{fontSize:f(44),fontWeight:'900',textAlign:'center',color:'#02153f',letterSpacing:'-2px',fontVariantNumeric:'tabular-nums',marginBottom:'12px'}}>
-                      {fmtShort(timerSec)}
-                    </div>
+                    <div style={{fontSize:f(44),fontWeight:'900',textAlign:'center',color:'#02153f',letterSpacing:'-2px',fontVariantNumeric:'tabular-nums',marginBottom:'12px'}}>{fmtShort(timerSec)}</div>
                     <div style={{display:'flex',justifyContent:'center',gap:'12px',marginBottom:'8px'}}>
-                      <button onClick={startTimer} disabled={running} style={{width:'48px',height:'48px',borderRadius:'50%',border:'none',cursor:'pointer',background:running?'#f3f4f7':'linear-gradient(135deg,#FF8C42,#F7295A)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:running?'none':'0 4px 14px rgba(255,140,66,0.4)'}}>
+                      <button onClick={()=>startTimer()} disabled={running} style={{width:'48px',height:'48px',borderRadius:'50%',border:'none',cursor:'pointer',background:running?'#f3f4f7':'linear-gradient(135deg,#FF8C42,#F7295A)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:running?'none':'0 4px 14px rgba(255,140,66,0.4)'}}>
                         <Play size={20} color={running?'#bec1cc':'#fff'} fill={running?'#bec1cc':'#fff'}/>
                       </button>
                       <button onClick={stopTimer} style={{width:'48px',height:'48px',borderRadius:'50%',border:'none',cursor:'pointer',background:'linear-gradient(135deg,#7c8088,#394058)',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -420,9 +409,7 @@ export default function DisturbPage({ onBack, isDemo }) {
                   </>
                 ):(
                   <>
-                    <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px',textAlign:'center'}}>
-                      Tocca il campo e inserisci il valore
-                    </div>
+                    <div style={{fontSize:f(11),color:'#7c8088',marginBottom:'12px',textAlign:'center'}}>Tocca il campo e inserisci il valore</div>
                     <DurataManuale value={form.durataSecondi} onChange={sec=>setForm(p=>({...p,durataSecondi:sec}))}/>
                     {form.durataSecondi>0&&(
                       <div style={{marginTop:'12px',padding:'9px 12px',background:'#E8FBF8',borderRadius:'10px',fontSize:f(12),fontWeight:'700',color:'#00BFA6',textAlign:'center'}}>
@@ -433,7 +420,7 @@ export default function DisturbPage({ onBack, isDemo }) {
                 )}
               </div>
 
-              {/* Note */}
+              {/* NOTE */}
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <label style={lbStyle}>Note (opzionale)</label>
                 <textarea value={form.nota} onChange={e=>setForm(p=>({...p,nota:e.target.value}))} placeholder="Es: dopo pasto, in posizione seduta..." rows={2} style={{...inStyle,resize:'none',lineHeight:'1.5'}}/>
@@ -446,7 +433,6 @@ export default function DisturbPage({ onBack, isDemo }) {
             </>
           )}
 
-          {/* ══ CALENDARIO ══ */}
           {sezione==='calendario'&&(
             <>
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
@@ -457,20 +443,19 @@ export default function DisturbPage({ onBack, isDemo }) {
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>Episodi del mese ({epMese.length})</div>
                 {epMese.length===0
                   ?<div style={{textAlign:'center',padding:'16px',color:'#bec1cc',fontSize:f(12)}}>Nessun episodio questo mese</div>
-                  :epMese.map((e,i)=><EpisodioCard key={e.id||i} e={e} i={i} total={epMese.length}/>)
+                  :epMese.map((e,i)=><EpisodioCard key={e.id||i} e={e}/>)
                 }
               </div>
             </>
           )}
 
-          {/* ══ STATISTICHE ══ */}
           {sezione==='statistiche'&&(
             <>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'7px',marginBottom:'10px'}}>
                 {[
-                  {label:'Totale',      val:log.length,                                         color:'#FF8C42'},
-                  {label:'Int. media',  val:mediaInt,                                           color:'#F7295A'},
-                  {label:'Tipi usati',  val:new Set(log.flatMap(e=>e.tipi||[e.tipo])).size,     color:'#7B5EA7'},
+                  {label:'Totale',     val:log.length,                                        color:'#FF8C42'},
+                  {label:'Int. media', val:mediaInt,                                          color:'#F7295A'},
+                  {label:'Tipi usati', val:new Set(log.flatMap(e=>e.tipi||[e.tipo])).size,    color:'#7B5EA7'},
                 ].map(({label,val,color},i)=>(
                   <div key={i} style={{background:'#feffff',borderRadius:'14px',padding:'10px 8px',boxShadow:shSm,textAlign:'center'}}>
                     <div style={{fontSize:f(22),fontWeight:'900',color}}>{val}</div>
@@ -478,12 +463,10 @@ export default function DisturbPage({ onBack, isDemo }) {
                   </div>
                 ))}
               </div>
-
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>Distribuzione oraria</div>
                 {log.length===0?<div style={{textAlign:'center',padding:'16px',color:'#bec1cc'}}>Nessun dato</div>:<GraficoOrario log={log}/>}
               </div>
-
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',marginBottom:'10px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>Per tipo</div>
                 {TIPI_DISTURBO.map(t=>{
@@ -503,13 +486,11 @@ export default function DisturbPage({ onBack, isDemo }) {
                   )
                 })}
               </div>
-
-              {/* Lista completa */}
               <div style={{background:'#feffff',borderRadius:'18px',padding:'14px',boxShadow:sh}}>
                 <div style={{fontSize:f(13),fontWeight:'800',color:'#02153f',marginBottom:'12px'}}>Tutti gli episodi</div>
                 {log.length===0
                   ?<div style={{textAlign:'center',padding:'16px',color:'#bec1cc'}}>Nessun episodio</div>
-                  :log.slice(0,30).map((e,i)=><EpisodioCard key={e.id||i} e={e} i={i} total={log.length}/>)
+                  :log.slice(0,30).map((e,i)=><EpisodioCard key={e.id||i} e={e}/>)
                 }
               </div>
             </>
